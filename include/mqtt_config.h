@@ -5,17 +5,17 @@
 
 
 #ifdef CONFIG_MQTT_LOG_ERROR_ON
-    #define mqtt_error( format, ... ) printf( "[ERROR] "format, ## __VA_ARGS__ )
+    #define mqtt_error( format, ... ) printf( "[MQTT ERROR] "format, ## __VA_ARGS__ )
 #else
     #define mqtt_error( format, ... )
 #endif
 #ifdef CONFIG_MQTT_LOG_WARN_ON
-    #define mqtt_warn( format, ... ) printf( "[WARN] "format, ## __VA_ARGS__ )
+    #define mqtt_warn( format, ... ) printf( "[MQTT WARN] "format, ## __VA_ARGS__ )
 #else
     #define mqtt_warn( format, ... )
 #endif
 #ifdef CONFIG_MQTT_LOG_INFO_ON
-    #define mqtt_info( format, ... ) printf( "[INFO] "format, ## __VA_ARGS__ )
+    #define mqtt_info( format, ... ) printf( "[MQTT INFO] "format, ## __VA_ARGS__ )
 #else
     #define mqtt_info( format, ... )
 #endif

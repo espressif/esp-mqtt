@@ -9,9 +9,14 @@ config MQTT_PROTOCOL_311
 
 config MQTT_SECURITY_ON
     bool "Enable MQTT over SSL"
-    default y
+    default n
     help
         Enable MQTT Over SSL
+
+config MQTT_PRIORITY
+    int "MQTT Task Priority"
+    range 1 15
+    default 5
 
 config CONFIG_MQTT_LOG_ERROR_ON
     bool "Enable MQTT Debug message"
@@ -29,13 +34,18 @@ config CONFIG_MQTT_LOG_INFO_ON
     help
         Disable it will redurce memory and run faster
 config MQTT_RECONNECT_TIMEOUT
-    int "Reconnect timeout"
+    int "Reconnect timeout (in second)"
     range 10 16535
     default 60
 
 config MQTT_QUEUE_BUFFER_SIZE_WORD
     int "Outbox queue buffer size in word (4 bytes)"
     range 256 4096
+    default 1024
+
+config MQTT_BUFFER_SIZE_BYTE
+    int "Network buffer size for MQTT in byte"
+    range 128 4096
     default 1024
 
 config MQTT_MAX_HOST_LEN
