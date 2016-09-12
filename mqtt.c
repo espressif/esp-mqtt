@@ -2,7 +2,7 @@
 * @Author: Tuan PM
 * @Date:   2016-09-10 09:33:06
 * @Last Modified by:   Tuan PM
-* @Last Modified time: 2016-09-11 21:41:55
+* @Last Modified time: 2016-09-12 12:35:23
 */
 #include "mqtt.h"
 #include "freertos/FreeRTOS.h"
@@ -13,6 +13,7 @@
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
+#include <stdio.h>
 
 static TaskHandle_t xMqttTask = NULL;
 
@@ -31,25 +32,32 @@ static int resolev_dns(const char *host, struct sockaddr_in *ip) {
 
 static int client_connect(const char *stream_host, int stream_port)
 {
+    int sock;
+    struct sockaddr_in remote_ip;
     while (1) {
-        struct sockaddr_in remote_ip;
         bzero(&remote_ip, sizeof(struct sockaddr_in));
+        remote_ip.sin_family = AF_INET;
         //if stream_host is not ip address, resolve it
-        if (inet_pton(AF_INET, stream_host, &(remote_ip.sin_addr)) != 1) {
+        if (inet_aton(stream_host, &(remote_ip.sin_addr)) == 0) {
+            mqtt_info("Resolve dns for domain: %s", stream_host);
             if (!resolev_dns(stream_host, &remote_ip)) {
                 vTaskDelay(1000 / portTICK_RATE_MS);
                 continue;
             }
         }
-        int sock = socket(PF_INET, SOCK_STREAM, 0);
+        sock = socket(PF_INET, SOCK_STREAM, 0);
         if (sock == -1) {
             continue;
         }
         remote_ip.sin_port = htons(stream_port);
-        mqtt_info("Connecting to server %s...:%d,%d\n", ipaddr_ntoa((const ip_addr_t*)&remote_ip.sin_addr.s_addr), stream_port, remote_ip.sin_port);
+        mqtt_info("Connecting to server %s:%d,%d",
+                  inet_ntoa((remote_ip.sin_addr)),
+                  stream_port,
+                  remote_ip.sin_port);
+
         if (connect(sock, (struct sockaddr *)(&remote_ip), sizeof(struct sockaddr)) != 00) {
             close(sock);
-            mqtt_error("[MQTT] Conn err.\n");
+            mqtt_error("Conn err.");
             vTaskDelay(1000 / portTICK_RATE_MS);
             continue;
         }
@@ -64,6 +72,13 @@ static int client_connect(const char *stream_host, int stream_port)
 static bool mqtt_connect(mqtt_client *client)
 {
     int write_len, read_len, connect_rsp_code;
+    struct timeval tv;
+
+    tv.tv_sec = 10;  /* 30 Secs Timeout */
+    tv.tv_usec = 0;  // Not init'ing this can cause strange errors
+
+    setsockopt(client->socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval));
+
     mqtt_msg_init(&client->mqtt_state.mqtt_connection,
                   client->mqtt_state.out_buffer,
                   client->mqtt_state.out_buffer_length);
@@ -72,26 +87,26 @@ static bool mqtt_connect(mqtt_client *client)
     client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
     client->mqtt_state.pending_msg_id = mqtt_get_id(client->mqtt_state.outbound_message->data,
                                         client->mqtt_state.outbound_message->length);
-    mqtt_info("Sending MQTT CONNECT message, type: %d, id: %04X\r\n",
+    mqtt_info("Sending MQTT CONNECT message, type: %d, id: %04X",
               client->mqtt_state.pending_msg_type,
               client->mqtt_state.pending_msg_id);
     write_len = write(client->socket,
                       client->mqtt_state.outbound_message->data,
                       client->mqtt_state.outbound_message->length);
-    mqtt_info("Reading MQTT CONNECT response message\n");
+    mqtt_info("Reading MQTT CONNECT response message");
     read_len = read(client->socket, client->mqtt_state.in_buffer, CONFIG_MQTT_BUFFER_SIZE_BYTE);
-    if (read_len == 0) {
-        mqtt_error("Error network response\n");
+    if (read_len < 0) {
+        mqtt_error("Error network response");
         return false;
     }
     if (mqtt_get_type(client->mqtt_state.in_buffer) != MQTT_MSG_TYPE_CONNACK) {
-        mqtt_error("Invalid MSG_TYPE response: %d\n", mqtt_get_type(client->mqtt_state.in_buffer));
+        mqtt_error("Invalid MSG_TYPE response: %d, read_len: %d", mqtt_get_type(client->mqtt_state.in_buffer), read_len);
         return false;
     }
     connect_rsp_code = mqtt_get_connect_return_code(client->mqtt_state.in_buffer);
     switch (connect_rsp_code) {
         case CONNECTION_ACCEPTED:
-            mqtt_info("Connected\n");
+            mqtt_info("Connected");
             if (client->settings->connected_cb) {
                 client->settings->connected_cb(client);
             }
@@ -100,46 +115,61 @@ static bool mqtt_connect(mqtt_client *client)
         case CONNECTION_REFUSE_SERVER_UNAVAILABLE:
         case CONNECTION_REFUSE_BAD_USERNAME:
         case CONNECTION_REFUSE_NOT_AUTHORIZED:
-            mqtt_warn("Connection refuse, reason code: %d\r\n", connect_rsp_code);
+            mqtt_warn("Connection refuse, reason code: %d", connect_rsp_code);
             return false;
         default:
-            mqtt_warn("Connection refuse, Unknow reason\n");
+            mqtt_warn("Connection refuse, Unknow reason");
             return false;
     }
     return false;
 }
 
+
+void mqtt_destroy(mqtt_client *client)
+{
+    free(client->mqtt_state.in_buffer);
+    free(client->mqtt_state.out_buffer);
+    free(client);
+}
+
 void mqtt_task(void *pvParameters)
 {
     mqtt_client *client = (mqtt_client *)pvParameters;
-
     client->socket = client_connect(client->settings->host, client->settings->port);
-    mqtt_info("Connected to server %s:%d\n", client->host, client->port);
+    mqtt_info("Connected to server %s:%d", client->settings->host, client->settings->port);
 
     if (!mqtt_connect(client)) {
         close(client->socket);
-        return;
+        //return;
     }
+    mqtt_info("wait");
+    while(1);
+    mqtt_destroy(client);
+    vTaskDelete(NULL);
 
 }
 
-void mqtt_start(mqtt_settings *mqtt_info)
+void mqtt_start(mqtt_settings *settings)
 {
     if (xMqttTask != NULL)
         return;
     mqtt_client *client = malloc(sizeof(mqtt_client));
+    memset(client, 0, sizeof(mqtt_client));
     if (client == NULL) {
-        mqtt_error("Memory not enought\n");
+        mqtt_error("Memory not enought");
         return;
     }
-    client->settings = mqtt_info;
+    client->settings = settings;
+    client->connect_info.client_id = settings->client_id;
+    client->connect_info.username = settings->username;
+    client->connect_info.password = settings->password;
+    client->connect_info.will_topic = settings->lwt_topic;
+    client->connect_info.will_message = settings->lwt_msg;
+    client->connect_info.will_qos = settings->lwt_qos;
+    client->connect_info.will_retain = settings->lwt_retain;
 
-    memset(&client->connect_info, 0, sizeof(mqtt_connect_info_t));
-    client->connect_info.client_id = mqtt_info->client_id;
-    client->connect_info.username = mqtt_info->username;
-    client->connect_info.password = mqtt_info->password;
-    client->connect_info.keepalive = mqtt_info->keepalive;
-    client->connect_info.clean_session = mqtt_info->clean_session;
+    client->connect_info.keepalive = settings->keepalive;
+    client->connect_info.clean_session = settings->clean_session;
 
     client->mqtt_state.in_buffer = (uint8_t *)malloc(CONFIG_MQTT_BUFFER_SIZE_BYTE);
     client->mqtt_state.in_buffer_length = CONFIG_MQTT_BUFFER_SIZE_BYTE;
@@ -151,8 +181,7 @@ void mqtt_start(mqtt_settings *mqtt_info)
                   client->mqtt_state.out_buffer,
                   client->mqtt_state.out_buffer_length);
 
-
-    xTaskCreate(&mqtt_task, "mqtt_task", 2048, &client, CONFIG_MQTT_PRIORITY, &xMqttTask);
+    xTaskCreate(&mqtt_task, "mqtt_task", 2048, client, CONFIG_MQTT_PRIORITY, &xMqttTask);
 }
 
 void mqtt_stop()

@@ -18,17 +18,17 @@ config MQTT_PRIORITY
     range 1 15
     default 5
 
-config CONFIG_MQTT_LOG_ERROR_ON
+config MQTT_LOG_ERROR_ON
     bool "Enable MQTT Debug message"
     default y
     help
         Disable it will redurce memory and run faster
-config CONFIG_MQTT_LOG_WARN_ON
+config MQTT_LOG_WARN_ON
     bool "Enable MQTT Warning message"
     default y
     help
         Disable it will redurce memory and run faster
-config CONFIG_MQTT_LOG_INFO_ON
+config MQTT_LOG_INFO_ON
     bool "Enable MQTT Info message"
     default y
     help
