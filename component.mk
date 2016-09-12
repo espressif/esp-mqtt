@@ -15,4 +15,4 @@ EXTRA_CFLAGS := -Wno-error=implicit-function-declaration -Wno-error=format= -DHA
 
 
 
-include $(IDF_PATH)/make/component.mk
+include $(IDF_PATH)/make/component_common.mk
