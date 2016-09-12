@@ -5,7 +5,9 @@
 #include "mqtt_config.h"
 #include "mqtt_msg.h"
 #include "ringbuf.h"
-typedef void (* mqtt_callback)(void *);
+
+
+typedef void (* mqtt_callback)(void *, void *);
 
 typedef struct {
     mqtt_callback connected_cb;
@@ -28,6 +30,17 @@ typedef struct {
     uint32_t clean_session;
     uint32_t keepalive;
 } mqtt_settings;
+
+typedef struct mqtt_event_data_t
+{
+  uint8_t type;
+  const char* topic;
+  const char* data;
+  uint16_t topic_length;
+  uint16_t data_length;
+  uint16_t data_offset;
+  uint16_t data_total_length;
+} mqtt_event_data_t;
 
 typedef struct mqtt_state_t
 {
@@ -57,9 +70,9 @@ typedef struct  {
   uint32_t keepalive_tick;
 } mqtt_client;
 
-void mqtt_start(mqtt_settings *mqtt_info);
+mqtt_client *mqtt_start(mqtt_settings *mqtt_info);
 void mqtt_task(void *pvParameters);
 void mqtt_subscribe(mqtt_client *client, char *topic, uint8_t qos);
-void mqtt_publish();
+void mqtt_publish(mqtt_client* client, char *topic, char *data, int len, int qos, int retain);
 void mqtt_detroy();
 #endif
