@@ -4,7 +4,7 @@
 #include <string.h>
 #include "mqtt_config.h"
 #include "mqtt_msg.h"
-
+#include "ringbuf.h"
 typedef void (* mqtt_callback)(void *);
 
 typedef struct {
@@ -52,11 +52,14 @@ typedef struct  {
   mqtt_settings *settings;
   mqtt_state_t  mqtt_state;
   mqtt_connect_info_t connect_info;
+  QueueHandle_t xSendingQueue;
+  RINGBUF send_rb;
+  uint32_t keepalive_tick;
 } mqtt_client;
 
 void mqtt_start(mqtt_settings *mqtt_info);
 void mqtt_task(void *pvParameters);
+void mqtt_subscribe(mqtt_client *client, char *topic, uint8_t qos);
 void mqtt_publish();
-void mqtt_subscribe();
 void mqtt_detroy();
 #endif
