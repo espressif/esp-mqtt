@@ -11,7 +11,7 @@ COMPONENT_ADD_INCLUDEDIRS := include
 
 COMPONENT_SRCDIRS :=  .
 #EXTRA_CFLAGS := -DICACHE_RODATA_ATTR
-EXTRA_CFLAGS := -Wno-error=implicit-function-declaration -Wno-error=format= -DHAVE_CONFIG_H
+CFLAGS += -Wno-error=implicit-function-declaration -Wno-error=format= -DHAVE_CONFIG_H
 
 
 
