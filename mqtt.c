@@ -2,7 +2,7 @@
 * @Author: Tuan PM
 * @Date:   2016-09-10 09:33:06
 * @Last Modified by:   Tuan PM
-* @Last Modified time: 2016-09-12 22:27:40
+* @Last Modified time: 2016-09-23 22:02:04
 */
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
@@ -20,7 +20,7 @@ static TaskHandle_t xMqttTask = NULL;
 static TaskHandle_t xMqttSendingTask = NULL;
 
 
-static int resolev_dns(const char *host, struct sockaddr_in *ip) {
+static int resolve_dns(const char *host, struct sockaddr_in *ip) {
     struct hostent *he;
     struct in_addr **addr_list;
     he = gethostbyname(host);
@@ -49,7 +49,7 @@ static int client_connect(const char *stream_host, int stream_port)
         //if stream_host is not ip address, resolve it
         if (inet_aton(stream_host, &(remote_ip.sin_addr)) == 0) {
             mqtt_info("Resolve dns for domain: %s", stream_host);
-            if (!resolev_dns(stream_host, &remote_ip)) {
+            if (!resolve_dns(stream_host, &remote_ip)) {
                 vTaskDelay(1000 / portTICK_RATE_MS);
                 continue;
             }
