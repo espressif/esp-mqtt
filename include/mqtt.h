@@ -7,6 +7,19 @@
 #include "ringbuf.h"
 
 
+#if defined(CONFIG_MQTT_SECURITY_ON)  // ENABLE MQTT OVER SSL
+#include "openssl/ssl.h"
+
+  #define ClientRead(buf,num) SSL_read(client->ssl, buf, num)    
+  #define ClientWrite(buf,num) SSL_write(client->ssl, buf, num)
+
+#else
+
+  #define ClientRead(buf,num) read(client->socket, buf, num) 
+  #define ClientWrite(buf,num) write(client->socket, buf, num)   
+#endif
+
+
 typedef void (* mqtt_callback)(void *, void *);
 
 typedef struct {
@@ -62,6 +75,12 @@ typedef struct mqtt_state_t
 
 typedef struct  {
   int socket;
+
+#if defined(CONFIG_MQTT_SECURITY_ON)  // ENABLE MQTT OVER SSL
+  SSL_CTX *ctx;
+  SSL *ssl;
+#endif
+
   mqtt_settings *settings;
   mqtt_state_t  mqtt_state;
   mqtt_connect_info_t connect_info;
@@ -71,6 +90,7 @@ typedef struct  {
 } mqtt_client;
 
 mqtt_client *mqtt_start(mqtt_settings *mqtt_info);
+void mqtt_stop();
 void mqtt_task(void *pvParameters);
 void mqtt_subscribe(mqtt_client *client, char *topic, uint8_t qos);
 void mqtt_publish(mqtt_client* client, char *topic, char *data, int len, int qos, int retain);
