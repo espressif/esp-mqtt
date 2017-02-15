@@ -2,7 +2,7 @@
 * @Author: Tuan PM
 * @Date:   2016-09-10 09:33:06
 * @Last Modified by:   Tuan PM
-* @Last Modified time: 2016-09-23 22:02:04
+* @Last Modified time: 2017-02-15 13:02:53
 */
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
@@ -33,7 +33,10 @@ static int resolve_dns(const char *host, struct sockaddr_in *ip) {
 }
 static void mqtt_queue(mqtt_client *client)
 {
-// TODO: detect buffer full (ringbuf and queue)
+    while (rb_available(&client->send_rb) < client->mqtt_state.outbound_message->length) {
+        xQueueReceive(client->xSendingQueue, &msg_len, 1000 / portTICK_RATE_MS);
+        rb_read(&client->send_rb, client->mqtt_state.out_buffer, msg_len);
+    }
     rb_write(&client->send_rb,
              client->mqtt_state.outbound_message->data,
              client->mqtt_state.outbound_message->length);
