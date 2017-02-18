@@ -22,7 +22,7 @@
 
 typedef void (* mqtt_callback)(void *, void *);
 
-typedef struct {
+typedef struct mqtt_settings {
     mqtt_callback connected_cb;
     mqtt_callback disconnected_cb;
     mqtt_callback reconnect_cb;
@@ -73,7 +73,7 @@ typedef struct mqtt_state_t
   int pending_publish_qos;
 } mqtt_state_t;
 
-typedef struct  {
+typedef struct mqtt_client {
   int socket;
 
 #if defined(CONFIG_MQTT_SECURITY_ON)  // ENABLE MQTT OVER SSL
