@@ -7,25 +7,39 @@
 #include "ringbuf.h"
 
 
-#if defined(CONFIG_MQTT_SECURITY_ON)  // ENABLE MQTT OVER SSL
-#include "openssl/ssl.h"
-
-  #define ClientRead(buf,num) SSL_read(client->ssl, buf, num)    
-  #define ClientWrite(buf,num) SSL_write(client->ssl, buf, num)
-
-#else
-
-  #define ClientRead(buf,num) read(client->socket, buf, num) 
-  #define ClientWrite(buf,num) write(client->socket, buf, num)   
-#endif
-
-
 typedef struct mqtt_client mqtt_client;
 typedef struct mqtt_event_data_t mqtt_event_data_t;
 
+/**
+ * \return True on connect success, false on error
+ */
+typedef bool (* mqtt_connect_callback)(mqtt_client *client);
+/**
+ */
+typedef void (* mqtt_disconnect_callback)(mqtt_client *client);
+/**
+ * \param[out] buffer Pointer to buffer to fill
+ * \param[in] len Number of bytes to read
+ * \param[in] timeout_ms Time to wait for completion, or 0 for no timeout
+ * \return Number of bytes read, less than 0 on error
+ */
+typedef int (* mqtt_read_callback)(mqtt_client *client, void *buffer, int len, int timeout_ms);
+/**
+ * \param[in] buffer Pointer to buffer to write
+ * \param[in] len Number of bytes to write
+ * \param[in] timeout_ms Time to wait for completion, or 0 for no timeout
+ * \return Number of bytes written, less than 0 on error
+ */
+typedef int (* mqtt_write_callback)(mqtt_client *client, const void *buffer, int len, int timeout_ms);
 typedef void (* mqtt_event_callback)(mqtt_client *client, mqtt_event_data_t *event_data);
 
 typedef struct mqtt_settings {
+    mqtt_connect_callback connect_cb;
+    mqtt_disconnect_callback disconnect_cb;
+
+    mqtt_read_callback read_cb;
+    mqtt_write_callback write_cb;
+
     mqtt_event_callback connected_cb;
     mqtt_event_callback disconnected_cb; // unused
     mqtt_event_callback reconnect_cb; // unused
