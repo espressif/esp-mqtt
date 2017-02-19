@@ -20,16 +20,19 @@
 #endif
 
 
-typedef void (* mqtt_callback)(void *, void *);
+typedef struct mqtt_client mqtt_client;
+typedef struct mqtt_event_data_t mqtt_event_data_t;
+
+typedef void (* mqtt_event_callback)(mqtt_client *client, mqtt_event_data_t *event_data);
 
 typedef struct mqtt_settings {
-    mqtt_callback connected_cb;
-    mqtt_callback disconnected_cb;
-    mqtt_callback reconnect_cb;
+    mqtt_event_callback connected_cb;
+    mqtt_event_callback disconnected_cb; // unused
+    mqtt_event_callback reconnect_cb; // unused
 
-    mqtt_callback subscribe_cb;
-    mqtt_callback publish_cb;
-    mqtt_callback data_cb;
+    mqtt_event_callback subscribe_cb;
+    mqtt_event_callback publish_cb;
+    mqtt_event_callback data_cb;
 
     char host[CONFIG_MQTT_MAX_HOST_LEN];
     uint32_t port;
