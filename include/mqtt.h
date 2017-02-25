@@ -10,13 +10,13 @@
 #if defined(CONFIG_MQTT_SECURITY_ON)  // ENABLE MQTT OVER SSL
 #include "openssl/ssl.h"
 
-  #define ClientRead(buf,num) SSL_read(client->ssl, buf, num)    
+  #define ClientRead(buf,num) SSL_read(client->ssl, buf, num)
   #define ClientWrite(buf,num) SSL_write(client->ssl, buf, num)
 
 #else
 
-  #define ClientRead(buf,num) read(client->socket, buf, num) 
-  #define ClientWrite(buf,num) write(client->socket, buf, num)   
+  #define ClientRead(buf,num) read(client->socket, buf, num)
+  #define ClientWrite(buf,num) write(client->socket, buf, num)
 #endif
 
 
@@ -94,5 +94,5 @@ void mqtt_stop();
 void mqtt_task(void *pvParameters);
 void mqtt_subscribe(mqtt_client *client, char *topic, uint8_t qos);
 void mqtt_publish(mqtt_client* client, char *topic, char *data, int len, int qos, int retain);
-void mqtt_detroy();
+void mqtt_destroy();
 #endif
