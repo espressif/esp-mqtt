@@ -389,7 +389,7 @@ void mqtt_start_receive_schedule(mqtt_client *client)
 
                 break;
             case MQTT_MSG_TYPE_PUBCOMP:
-                if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH && client->mqtt_state.pending_msg_id == msg_id) {
+                if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBREL && client->mqtt_state.pending_msg_id == msg_id) {
                     mqtt_info("Receive MQTT_MSG_TYPE_PUBCOMP, finish QoS2 publish");
                 }
                 break;
