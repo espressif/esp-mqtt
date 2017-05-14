@@ -7,29 +7,46 @@
 #include "ringbuf.h"
 
 
-#if defined(CONFIG_MQTT_SECURITY_ON)  // ENABLE MQTT OVER SSL
-#include "openssl/ssl.h"
+typedef struct mqtt_client mqtt_client;
+typedef struct mqtt_event_data_t mqtt_event_data_t;
 
-  #define ClientRead(buf,num) SSL_read(client->ssl, buf, num)
-  #define ClientWrite(buf,num) SSL_write(client->ssl, buf, num)
+/**
+ * \return True on connect success, false on error
+ */
+typedef bool (* mqtt_connect_callback)(mqtt_client *client);
+/**
+ */
+typedef void (* mqtt_disconnect_callback)(mqtt_client *client);
+/**
+ * \param[out] buffer Pointer to buffer to fill
+ * \param[in] len Number of bytes to read
+ * \param[in] timeout_ms Time to wait for completion, or 0 for no timeout
+ * \return Number of bytes read, less than 0 on error
+ */
+typedef int (* mqtt_read_callback)(mqtt_client *client, void *buffer, int len, int timeout_ms);
+/**
+ * \param[in] buffer Pointer to buffer to write
+ * \param[in] len Number of bytes to write
+ * \param[in] timeout_ms Time to wait for completion, or 0 for no timeout
+ * \return Number of bytes written, less than 0 on error
+ */
+typedef int (* mqtt_write_callback)(mqtt_client *client, const void *buffer, int len, int timeout_ms);
+typedef void (* mqtt_event_callback)(mqtt_client *client, mqtt_event_data_t *event_data);
 
-#else
+typedef struct mqtt_settings {
+    mqtt_connect_callback connect_cb;
+    mqtt_disconnect_callback disconnect_cb;
 
-  #define ClientRead(buf,num) read(client->socket, buf, num)
-  #define ClientWrite(buf,num) write(client->socket, buf, num)
-#endif
+    mqtt_read_callback read_cb;
+    mqtt_write_callback write_cb;
 
+    mqtt_event_callback connected_cb;
+    mqtt_event_callback disconnected_cb; // unused
+    mqtt_event_callback reconnect_cb; // unused
 
-typedef void (* mqtt_callback)(void *, void *);
-
-typedef struct {
-    mqtt_callback connected_cb;
-    mqtt_callback disconnected_cb;
-    mqtt_callback reconnect_cb;
-
-    mqtt_callback subscribe_cb;
-    mqtt_callback publish_cb;
-    mqtt_callback data_cb;
+    mqtt_event_callback subscribe_cb;
+    mqtt_event_callback publish_cb;
+    mqtt_event_callback data_cb;
 
     char host[CONFIG_MQTT_MAX_HOST_LEN];
     uint32_t port;
@@ -73,7 +90,7 @@ typedef struct mqtt_state_t
   int pending_publish_qos;
 } mqtt_state_t;
 
-typedef struct  {
+typedef struct mqtt_client {
   int socket;
 
 #if defined(CONFIG_MQTT_SECURITY_ON)  // ENABLE MQTT OVER SSL
