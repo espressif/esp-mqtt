@@ -509,7 +509,7 @@ mqtt_client *mqtt_start(mqtt_settings *settings)
     return client;
 }
 
-void mqtt_subscribe(mqtt_client *client, char *topic, uint8_t qos)
+void mqtt_subscribe(mqtt_client *client, const char *topic, uint8_t qos)
 {
     client->mqtt_state.outbound_message = mqtt_msg_subscribe(&client->mqtt_state.mqtt_connection,
                                           topic, qos,
@@ -518,7 +518,7 @@ void mqtt_subscribe(mqtt_client *client, char *topic, uint8_t qos)
     mqtt_queue(client);
 }
 
-void mqtt_publish(mqtt_client* client, char *topic, char *data, int len, int qos, int retain)
+void mqtt_publish(mqtt_client* client, const char *topic, const char *data, int len, int qos, int retain)
 {
 
     client->mqtt_state.outbound_message = mqtt_msg_publish(&client->mqtt_state.mqtt_connection,
