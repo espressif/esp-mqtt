@@ -49,7 +49,6 @@ static void mqtt_queue(mqtt_client *client)
 
 static bool client_connect(mqtt_client *client)
 {
-    int ret;
     struct sockaddr_in remote_ip;
 
     while (1) {
@@ -114,8 +113,7 @@ static bool client_connect(mqtt_client *client)
         }
 
         mqtt_info("Start SSL connect..");
-        ret = SSL_connect(client->ssl);
-        if (!ret) {
+        if (!SSL_connect(client->ssl)) {
             mqtt_error("SSL Connect FAILED");
             goto failed4;
         }
