@@ -261,6 +261,10 @@ static bool mqtt_connect(mqtt_client *client)
     write_len = client->settings->write_cb(client,
                       client->mqtt_state.outbound_message->data,
                       client->mqtt_state.outbound_message->length, 0);
+    if(write_len < 0) {
+        mqtt_error("Writing failed: %d", errno);
+        return false;
+    }
 
     mqtt_info("Reading MQTT CONNECT response message");
 
@@ -295,7 +299,8 @@ static bool mqtt_connect(mqtt_client *client)
 void mqtt_sending_task(void *pvParameters)
 {
     mqtt_client *client = (mqtt_client *)pvParameters;
-    uint32_t msg_len, send_len;
+    uint32_t msg_len;
+    int send_len;
     mqtt_info("mqtt_sending_task");
 
     while (1) {
@@ -310,7 +315,11 @@ void mqtt_sending_task(void *pvParameters)
                 rb_read(&client->send_rb, client->mqtt_state.out_buffer, send_len);
                 client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.out_buffer);
                 client->mqtt_state.pending_msg_id = mqtt_get_id(client->mqtt_state.out_buffer, send_len);
-                client->settings->write_cb(client, client->mqtt_state.out_buffer, send_len, 0);
+                send_len = client->settings->write_cb(client, client->mqtt_state.out_buffer, send_len, 0);
+                if(send_len < 0) {
+                    mqtt_info("Write error: %d", errno);
+                    break; // TODO is this right handling?
+                }
 
                 //TODO: Check sending type, to callback publish message
                 msg_len -= send_len;
@@ -368,6 +377,10 @@ void deliver_publish(mqtt_client *client, uint8_t *message, int length)
             break;
 
         len_read = client->settings->read_cb(client, client->mqtt_state.in_buffer, CONFIG_MQTT_BUFFER_SIZE_BYTE, 0);
+        if(len_read < 0) {
+            mqtt_info("Read error: %d", errno);
+            break;
+        }
         client->mqtt_state.message_length_read += len_read;
     } while (1);
 
@@ -386,6 +399,12 @@ void mqtt_start_receive_schedule(mqtt_client *client)
         mqtt_info("Read len %d", read_len);
         if (read_len == 0)
             break;
+        if (read_len < 0) {
+            // ECONNRESET for example
+            mqtt_info("Read error %d", errno);
+            break;
+        }
+
 
         msg_type = mqtt_get_type(client->mqtt_state.in_buffer);
         msg_qos = mqtt_get_qos(client->mqtt_state.in_buffer);
