@@ -529,6 +529,10 @@ mqtt_client *mqtt_start(mqtt_settings *settings)
     }
     memset(client, 0, sizeof(mqtt_client));
 
+    if (settings->lwt_msg_len > CONFIG_MQTT_MAX_LWT_MSG) {
+        mqtt_error("Last will message longer than CONFIG_MQTT_MAX_LWT_MSG!");
+    }
+
     client->settings = settings;
     client->connect_info.client_id = settings->client_id;
     client->connect_info.username = settings->username;
@@ -537,7 +541,7 @@ mqtt_client *mqtt_start(mqtt_settings *settings)
     client->connect_info.will_message = settings->lwt_msg;
     client->connect_info.will_qos = settings->lwt_qos;
     client->connect_info.will_retain = settings->lwt_retain;
-
+    client->connect_info.will_length = settings->lwt_msg_len;
 
     client->keepalive_tick = settings->keepalive / 2;
 

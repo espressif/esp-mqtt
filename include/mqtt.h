@@ -58,6 +58,7 @@ typedef struct mqtt_settings {
     char password[CONFIG_MQTT_MAX_PASSWORD_LEN];
     char lwt_topic[CONFIG_MQTT_MAX_LWT_TOPIC];
     char lwt_msg[CONFIG_MQTT_MAX_LWT_MSG];
+    uint32_t lwt_msg_len;
     uint32_t lwt_qos;
     uint32_t lwt_retain;
     uint32_t clean_session;

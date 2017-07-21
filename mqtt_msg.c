@@ -328,7 +328,7 @@ mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_inf
         if (append_string(connection, info->will_topic, strlen(info->will_topic)) < 0)
             return fail_message(connection);
 
-        if (append_string(connection, info->will_message, strlen(info->will_message)) < 0)
+        if (append_string(connection, info->will_message, info->will_length) < 0)
             return fail_message(connection);
 
         variable_header->flags |= MQTT_CONNECT_FLAG_WILL;

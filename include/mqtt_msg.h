@@ -93,6 +93,7 @@ typedef struct mqtt_connect_info
   char* will_topic;
   char* will_message;
   int keepalive;
+  int will_length;
   int will_qos;
   int will_retain;
   int clean_session;
