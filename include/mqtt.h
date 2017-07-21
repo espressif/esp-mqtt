@@ -6,6 +6,9 @@
 #include "mqtt_msg.h"
 #include "ringbuf.h"
 
+#if defined(CONFIG_MQTT_SECURITY_ON)
+#include "openssl/ssl.h"
+#endif
 
 typedef struct mqtt_client mqtt_client;
 typedef struct mqtt_event_data_t mqtt_event_data_t;
