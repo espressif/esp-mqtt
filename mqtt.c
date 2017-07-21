@@ -595,6 +595,16 @@ void mqtt_subscribe(mqtt_client *client, const char *topic, uint8_t qos)
     mqtt_queue(client);
 }
 
+
+void mqtt_unsubscribe(mqtt_client *client, const char *topic)
+{
+	client->mqtt_state.outbound_message = mqtt_msg_unsubscribe(&client->mqtt_state.mqtt_connection,
+	                                          topic,
+	                                          &client->mqtt_state.pending_msg_id);
+	mqtt_info("Queue unsubscribe, topic\"%s\", id: %d", topic, client->mqtt_state.pending_msg_id);
+	mqtt_queue(client);
+}
+
 void mqtt_publish(mqtt_client* client, const char *topic, const char *data, int len, int qos, int retain)
 {
 
