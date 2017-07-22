@@ -281,13 +281,19 @@ static bool mqtt_connect(mqtt_client *client)
             mqtt_info("Connected");
             return true;
         case CONNECTION_REFUSE_PROTOCOL:
+            mqtt_warn("Connection refused, bad protocol");
+            return false;
         case CONNECTION_REFUSE_SERVER_UNAVAILABLE:
+            mqtt_warn("Connection refused, server unavailable");
+            return false;
         case CONNECTION_REFUSE_BAD_USERNAME:
+            mqtt_warn("Connection refused, bad username");
+            return false;
         case CONNECTION_REFUSE_NOT_AUTHORIZED:
-            mqtt_warn("Connection refuse, reason code: %d", connect_rsp_code);
+            mqtt_warn("Connection refused, not authorized");
             return false;
         default:
-            mqtt_warn("Connection refuse, Unknow reason");
+            mqtt_warn("Connection refused, Unknow reason");
             return false;
     }
     return false;
