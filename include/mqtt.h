@@ -44,8 +44,7 @@ typedef struct mqtt_settings {
     mqtt_write_callback write_cb;
 
     mqtt_event_callback connected_cb;
-    mqtt_event_callback disconnected_cb; // unused
-    mqtt_event_callback reconnect_cb; // unused
+    mqtt_event_callback disconnected_cb;
 
     mqtt_event_callback subscribe_cb;
     mqtt_event_callback publish_cb;

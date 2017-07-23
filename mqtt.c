@@ -498,8 +498,12 @@ void mqtt_task(void *pvParameters)
         mqtt_info("Connected to server %s:%d", client->settings->host, client->settings->port);
         if (!mqtt_connect(client)) {
             client->settings->disconnect_cb(client);
+
+            if (client->settings->disconnected_cb) {
+				client->settings->disconnected_cb(client, NULL);
+			}
+
             continue;
-            //return;
         }
         mqtt_info("Connected to MQTT broker, create sending thread before call connected callback");
         xTaskCreate(&mqtt_sending_task, "mqtt_sending_task", 2048, client, CONFIG_MQTT_PRIORITY + 1, &xMqttSendingTask);
@@ -511,12 +515,15 @@ void mqtt_task(void *pvParameters)
         mqtt_start_receive_schedule(client);
 
         client->settings->disconnect_cb(client);
+        if (client->settings->disconnected_cb) {
+        	client->settings->disconnected_cb(client, NULL);
+		}
+
         vTaskDelete(xMqttSendingTask);
         vTaskDelay(1000 / portTICK_RATE_MS);
 
     }
     mqtt_destroy(client);
-
 
 }
 
