@@ -13,9 +13,6 @@
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
-#if defined(CONFIG_MQTT_SECURITY_ON)
-#include "openssl/ssl.h"
-#endif
 #include "ringbuf.h"
 #include "mqtt.h"
 
@@ -222,7 +219,7 @@ int mqtt_write(mqtt_client *client, const void *buffer, int len, int timeout_ms)
     }
 
 #if defined(CONFIG_MQTT_SECURITY_ON)
-    result = SSL_write(client->ssl, buffer, len)
+    result = SSL_write(client->ssl, buffer, len);
 #else
     result = write(client->socket, buffer, len);
 #endif
@@ -284,13 +281,19 @@ static bool mqtt_connect(mqtt_client *client)
             mqtt_info("Connected");
             return true;
         case CONNECTION_REFUSE_PROTOCOL:
+            mqtt_warn("Connection refused, bad protocol");
+            return false;
         case CONNECTION_REFUSE_SERVER_UNAVAILABLE:
+            mqtt_warn("Connection refused, server unavailable");
+            return false;
         case CONNECTION_REFUSE_BAD_USERNAME:
+            mqtt_warn("Connection refused, bad username");
+            return false;
         case CONNECTION_REFUSE_NOT_AUTHORIZED:
-            mqtt_warn("Connection refuse, reason code: %d", connect_rsp_code);
+            mqtt_warn("Connection refused, not authorized");
             return false;
         default:
-            mqtt_warn("Connection refuse, Unknow reason");
+            mqtt_warn("Connection refused, Unknow reason");
             return false;
     }
     return false;
@@ -532,6 +535,10 @@ mqtt_client *mqtt_start(mqtt_settings *settings)
     }
     memset(client, 0, sizeof(mqtt_client));
 
+    if (settings->lwt_msg_len > CONFIG_MQTT_MAX_LWT_MSG) {
+        mqtt_error("Last will message longer than CONFIG_MQTT_MAX_LWT_MSG!");
+    }
+
     client->settings = settings;
     client->connect_info.client_id = settings->client_id;
     client->connect_info.username = settings->username;
@@ -540,7 +547,7 @@ mqtt_client *mqtt_start(mqtt_settings *settings)
     client->connect_info.will_message = settings->lwt_msg;
     client->connect_info.will_qos = settings->lwt_qos;
     client->connect_info.will_retain = settings->lwt_retain;
-
+    client->connect_info.will_length = settings->lwt_msg_len;
 
     client->keepalive_tick = settings->keepalive / 2;
 
@@ -596,6 +603,16 @@ void mqtt_subscribe(mqtt_client *client, const char *topic, uint8_t qos)
                                           &client->mqtt_state.pending_msg_id);
     mqtt_info("Queue subscribe, topic\"%s\", id: %d", topic, client->mqtt_state.pending_msg_id);
     mqtt_queue(client);
+}
+
+
+void mqtt_unsubscribe(mqtt_client *client, const char *topic)
+{
+	client->mqtt_state.outbound_message = mqtt_msg_unsubscribe(&client->mqtt_state.mqtt_connection,
+	                                          topic,
+	                                          &client->mqtt_state.pending_msg_id);
+	mqtt_info("Queue unsubscribe, topic\"%s\", id: %d", topic, client->mqtt_state.pending_msg_id);
+	mqtt_queue(client);
 }
 
 void mqtt_publish(mqtt_client* client, const char *topic, const char *data, int len, int qos, int retain)

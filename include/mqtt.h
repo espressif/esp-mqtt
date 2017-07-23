@@ -6,6 +6,9 @@
 #include "mqtt_msg.h"
 #include "ringbuf.h"
 
+#if defined(CONFIG_MQTT_SECURITY_ON)
+#include "openssl/ssl.h"
+#endif
 
 typedef struct mqtt_client mqtt_client;
 typedef struct mqtt_event_data_t mqtt_event_data_t;
@@ -55,6 +58,7 @@ typedef struct mqtt_settings {
     char password[CONFIG_MQTT_MAX_PASSWORD_LEN];
     char lwt_topic[CONFIG_MQTT_MAX_LWT_TOPIC];
     char lwt_msg[CONFIG_MQTT_MAX_LWT_MSG];
+    uint32_t lwt_msg_len;
     uint32_t lwt_qos;
     uint32_t lwt_retain;
     uint32_t clean_session;
@@ -110,6 +114,7 @@ mqtt_client *mqtt_start(mqtt_settings *mqtt_info);
 void mqtt_stop();
 void mqtt_task(void *pvParameters);
 void mqtt_subscribe(mqtt_client *client, const char *topic, uint8_t qos);
+void mqtt_unsubscribe(mqtt_client *client, const char *topic);
 void mqtt_publish(mqtt_client* client, const char *topic, const char *data, int len, int qos, int retain);
 void mqtt_destroy();
 #endif
