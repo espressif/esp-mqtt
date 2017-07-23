@@ -503,7 +503,11 @@ void mqtt_task(void *pvParameters)
 				client->settings->disconnected_cb(client, NULL);
 			}
 
-            continue;
+            if (!client->settings->auto_reconnect) {
+				break;
+			} else {
+				continue;
+			}
         }
         mqtt_info("Connected to MQTT broker, create sending thread before call connected callback");
         xTaskCreate(&mqtt_sending_task, "mqtt_sending_task", 2048, client, CONFIG_MQTT_PRIORITY + 1, &xMqttSendingTask);
@@ -520,6 +524,9 @@ void mqtt_task(void *pvParameters)
 		}
 
         vTaskDelete(xMqttSendingTask);
+        if (!client->settings->auto_reconnect) {
+			break;
+		}
         vTaskDelay(1000 / portTICK_RATE_MS);
 
     }

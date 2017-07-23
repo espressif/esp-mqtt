@@ -62,6 +62,7 @@ typedef struct mqtt_settings {
     uint32_t lwt_retain;
     uint32_t clean_session;
     uint32_t keepalive;
+    bool auto_reconnect;
 } mqtt_settings;
 
 typedef struct mqtt_event_data_t
