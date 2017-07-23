@@ -19,6 +19,7 @@
 static TaskHandle_t xMqttTask = NULL;
 static TaskHandle_t xMqttSendingTask = NULL;
 
+static bool terminate_mqtt = false;
 
 static int resolve_dns(const char *host, struct sockaddr_in *ip) {
     struct hostent *he;
@@ -397,6 +398,8 @@ void mqtt_start_receive_schedule(mqtt_client *client)
 
     while (1) {
 
+    	if (terminate_mqtt) break;
+
         read_len = client->settings->read_cb(client, client->mqtt_state.in_buffer, CONFIG_MQTT_BUFFER_SIZE_BYTE, 0);
 
         mqtt_info("Read len %d", read_len);
@@ -407,7 +410,6 @@ void mqtt_start_receive_schedule(mqtt_client *client)
             mqtt_info("Read error %d", errno);
             break;
         }
-
 
         msg_type = mqtt_get_type(client->mqtt_state.in_buffer);
         msg_qos = mqtt_get_qos(client->mqtt_state.in_buffer);
@@ -493,6 +495,8 @@ void mqtt_task(void *pvParameters)
     mqtt_client *client = (mqtt_client *)pvParameters;
 
     while (1) {
+    	if (terminate_mqtt) break;
+
         client->settings->connect_cb(client);
 
         mqtt_info("Connected to server %s:%d", client->settings->host, client->settings->port);
@@ -536,6 +540,8 @@ void mqtt_task(void *pvParameters)
 
 mqtt_client *mqtt_start(mqtt_settings *settings)
 {
+	terminate_mqtt = false;
+
     int stackSize = 2048;
 
     uint8_t *rb_buf;
@@ -645,6 +651,6 @@ void mqtt_publish(mqtt_client* client, const char *topic, const char *data, int 
 
 void mqtt_stop()
 {
-
+	terminate_mqtt = true;
 }
 
