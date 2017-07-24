@@ -288,7 +288,7 @@ static bool mqtt_connect(mqtt_client *client)
             mqtt_warn("Connection refused, server unavailable");
             return false;
         case CONNECTION_REFUSE_BAD_USERNAME:
-            mqtt_warn("Connection refused, bad username");
+            mqtt_warn("Connection refused, bad username or password");
             return false;
         case CONNECTION_REFUSE_NOT_AUTHORIZED:
             mqtt_warn("Connection refused, not authorized");
@@ -479,19 +479,23 @@ void mqtt_start_receive_schedule(mqtt_client *client)
                 break;
         }
     }
-    mqtt_info("network disconnected");
 }
 
 void mqtt_destroy(mqtt_client *client)
 {
+	if (client == NULL) return;
+
     free(client->mqtt_state.in_buffer);
     free(client->mqtt_state.out_buffer);
     free(client);
-    vTaskDelete(xMqttTask);
+
+    mqtt_info("Client destroyed");
 }
 
 void mqtt_task(void *pvParameters)
 {
+    mqtt_info("Starting mqtt task");
+
     mqtt_client *client = (mqtt_client *)pvParameters;
 
     while (1) {
@@ -534,8 +538,10 @@ void mqtt_task(void *pvParameters)
         vTaskDelay(1000 / portTICK_RATE_MS);
 
     }
-    mqtt_destroy(client);
 
+    mqtt_destroy(client);
+    xMqttTask = NULL;
+    vTaskDelete(NULL);
 }
 
 mqtt_client *mqtt_start(mqtt_settings *settings)
