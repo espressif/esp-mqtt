@@ -259,7 +259,7 @@ static bool mqtt_connect(mqtt_client *client)
     write_len = client->settings->write_cb(client,
                       client->mqtt_state.outbound_message->data,
                       client->mqtt_state.outbound_message->length, 0);
-    if (write_len <= 0) {
+    if(write_len < 0) {
         mqtt_error("Writing failed: %d", errno);
         return false;
     }
@@ -304,7 +304,7 @@ void mqtt_sending_task(void *pvParameters)
 {
     mqtt_client *client = (mqtt_client *)pvParameters;
     uint32_t msg_len;
-    int send_len, read_len;
+    int send_len;
     mqtt_info("mqtt_sending_task");
 
     while (1) {
@@ -319,8 +319,8 @@ void mqtt_sending_task(void *pvParameters)
                 rb_read(&client->send_rb, client->mqtt_state.out_buffer, send_len);
                 client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.out_buffer);
                 client->mqtt_state.pending_msg_id = mqtt_get_id(client->mqtt_state.out_buffer, send_len);
-                send_len = client->settings->write_cb(client, client->mqtt_state.out_buffer, send_len, 10 * 1000);
-                if (send_len <= 0) {
+                send_len = client->settings->write_cb(client, client->mqtt_state.out_buffer, send_len, 0);
+                if(send_len < 0) {
                     mqtt_info("Write error: %d", errno);
                     break; // TODO is this right handling?
                 }
@@ -328,27 +328,24 @@ void mqtt_sending_task(void *pvParameters)
                 //TODO: Check sending type, to callback publish message
                 msg_len -= send_len;
             }
+            //invalidate keepalive timer
+            client->keepalive_tick = client->settings->keepalive / 2;
         }
-		if (client->keepalive_tick > 0) client->keepalive_tick --;
-		else {
-			client->keepalive_tick = client->settings->keepalive / 2;
-			client->mqtt_state.outbound_message = mqtt_msg_pingreq(&client->mqtt_state.mqtt_connection);
-			client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
-			client->mqtt_state.pending_msg_id = mqtt_get_id(client->mqtt_state.outbound_message->data,
-												client->mqtt_state.outbound_message->length);
-			mqtt_info("Sending pingreq");
-			client->settings->write_cb(client,
-				  client->mqtt_state.outbound_message->data,
-				  client->mqtt_state.outbound_message->length, 0);
-
-			read_len = client->settings->read_cb(client, client->mqtt_state.in_buffer, CONFIG_MQTT_BUFFER_SIZE_BYTE, 10 * 1000);
-			if (read_len < 0) {
-				mqtt_error("Error network response");
-				break;
-			}
-		}
+        else {
+            if (client->keepalive_tick > 0) client->keepalive_tick --;
+            else {
+                client->keepalive_tick = client->settings->keepalive / 2;
+                client->mqtt_state.outbound_message = mqtt_msg_pingreq(&client->mqtt_state.mqtt_connection);
+                client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
+                client->mqtt_state.pending_msg_id = mqtt_get_id(client->mqtt_state.outbound_message->data,
+                                                    client->mqtt_state.outbound_message->length);
+                mqtt_info("Sending pingreq");
+                client->settings->write_cb(client,
+                      client->mqtt_state.outbound_message->data,
+                      client->mqtt_state.outbound_message->length, 0);
+            }
+        }
     }
-    xMqttSendingTask = NULL;
     vTaskDelete(NULL);
 }
 
@@ -402,7 +399,6 @@ void mqtt_start_receive_schedule(mqtt_client *client)
     while (1) {
 
     	if (terminate_mqtt) break;
-    	if (xMqttSendingTask == NULL) break;
 
         read_len = client->settings->read_cb(client, client->mqtt_state.in_buffer, CONFIG_MQTT_BUFFER_SIZE_BYTE, 0);
 
