@@ -485,6 +485,8 @@ void mqtt_destroy(mqtt_client *client)
 {
 	if (client == NULL) return;
 
+	vQueueDelete(client->xSendingQueue);
+
     free(client->mqtt_state.in_buffer);
     free(client->mqtt_state.out_buffer);
     free(client->send_rb.p_o);
