@@ -662,7 +662,7 @@ void mqtt_publish(mqtt_client* client, const char *topic, const char *data, int 
                                           qos, retain,
                                           &client->mqtt_state.pending_msg_id);
     mqtt_queue(client);
-    mqtt_info("Queuing publish, length: %d, queue size(%d/%d)\r\n",
+    mqtt_info("Queuing publish, length: %d, queue size(%d/%d)",
               client->mqtt_state.outbound_message->length,
               client->send_rb.fill_cnt,
               client->send_rb.size);
