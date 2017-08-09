@@ -1,6 +1,7 @@
 #ifndef _MQTT_H_
 #define _MQTT_H_
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include "mqtt_config.h"
 #include "mqtt_msg.h"
@@ -44,8 +45,7 @@ typedef struct mqtt_settings {
     mqtt_write_callback write_cb;
 
     mqtt_event_callback connected_cb;
-    mqtt_event_callback disconnected_cb; // unused
-    mqtt_event_callback reconnect_cb; // unused
+    mqtt_event_callback disconnected_cb;
 
     mqtt_event_callback subscribe_cb;
     mqtt_event_callback publish_cb;
@@ -63,6 +63,7 @@ typedef struct mqtt_settings {
     uint32_t lwt_retain;
     uint32_t clean_session;
     uint32_t keepalive;
+    bool auto_reconnect;
 } mqtt_settings;
 
 typedef struct mqtt_event_data_t
