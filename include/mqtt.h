@@ -1,8 +1,13 @@
 #ifndef _MQTT_H_
 #define _MQTT_H_
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+
 #include "mqtt_config.h"
 #include "mqtt_msg.h"
 #include "ringbuf.h"
