@@ -294,7 +294,7 @@ static bool mqtt_connect(mqtt_client *client)
             mqtt_warn("Connection refused, not authorized");
             return false;
         default:
-            mqtt_warn("Connection refused, Unknow reason");
+            mqtt_warn("Connection refused, Unknown reason");
             return false;
     }
     return false;
@@ -422,7 +422,7 @@ void mqtt_start_receive_schedule(mqtt_client *client)
         msg_type = mqtt_get_type(client->mqtt_state.in_buffer);
         msg_qos = mqtt_get_qos(client->mqtt_state.in_buffer);
         msg_id = mqtt_get_id(client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_length);
-        // mqtt_info("msg_type %d, msg_id: %d, pending_id: %d", msg_type, msg_id, client->mqtt_state.pending_msg_type);
+        mqtt_info("msg_type %d, msg_id %d, pending_type %d, pending_id %d", msg_type, msg_id, client->mqtt_state.pending_msg_type, client->mqtt_state.pending_msg_id);
         switch (msg_type)
         {
             case MQTT_MSG_TYPE_SUBACK:
