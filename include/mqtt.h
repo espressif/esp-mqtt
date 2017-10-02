@@ -11,6 +11,11 @@
 #include "openssl/ssl.h"
 #endif
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 typedef struct mqtt_client mqtt_client;
 typedef struct mqtt_event_data_t mqtt_event_data_t;
 
@@ -118,4 +123,9 @@ void mqtt_subscribe(mqtt_client *client, const char *topic, uint8_t qos);
 void mqtt_unsubscribe(mqtt_client *client, const char *topic);
 void mqtt_publish(mqtt_client* client, const char *topic, const char *data, int len, int qos, int retain);
 void mqtt_destroy();
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
