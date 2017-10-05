@@ -17,6 +17,7 @@ typedef struct{
 } RINGBUF;
 
 int32_t rb_init(RINGBUF *r, uint8_t* buf, int32_t size, int32_t block_size);
+int32_t rb_reset(RINGBUF *r);
 int32_t rb_put(RINGBUF *r, uint8_t* c);
 int32_t rb_get(RINGBUF *r, uint8_t* c);
 int32_t rb_available(RINGBUF *r);

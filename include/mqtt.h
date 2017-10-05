@@ -119,6 +119,11 @@ typedef struct mqtt_client {
 mqtt_client *mqtt_start(mqtt_settings *mqtt_info);
 void mqtt_stop();
 void mqtt_task(void *pvParameters);
+
+/*
+ *   WARNING: ack (subscribe_cb) from server is required after each subscribe. Subscribing in one big pack is not possible now
+ *   (mqtt server will disconnect you with socket error)
+ */
 void mqtt_subscribe(mqtt_client *client, const char *topic, uint8_t qos);
 void mqtt_unsubscribe(mqtt_client *client, const char *topic);
 void mqtt_publish(mqtt_client* client, const char *topic, const char *data, int len, int qos, int retain);

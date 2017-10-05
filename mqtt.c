@@ -225,7 +225,7 @@ int mqtt_write(mqtt_client *client, const void *buffer, int len, int timeout_ms)
     result = write(client->socket, buffer, len);
 #endif
 
-    if (timeout_ms > 0) {
+    if (result > 0 && timeout_ms > 0) {
         tv.tv_sec = 0;
         tv.tv_usec = 0;
         setsockopt(client->socket, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
@@ -313,16 +313,18 @@ void mqtt_sending_task(void *pvParameters)
             //queue available
             while (msg_len > 0) {
                 send_len = msg_len;
-                if (send_len > CONFIG_MQTT_BUFFER_SIZE_BYTE)
+                if (send_len > CONFIG_MQTT_BUFFER_SIZE_BYTE) {
                     send_len = CONFIG_MQTT_BUFFER_SIZE_BYTE;
+                }
                 mqtt_info("Sending...%d bytes", send_len);
 
+                // blocking operation, takes data from ring buffer
                 rb_read(&client->send_rb, client->mqtt_state.out_buffer, send_len);
                 client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.out_buffer);
                 client->mqtt_state.pending_msg_id = mqtt_get_id(client->mqtt_state.out_buffer, send_len);
                 send_len = client->settings->write_cb(client, client->mqtt_state.out_buffer, send_len, 5 * 1000);
                 if(send_len <= 0) {
-                    mqtt_info("Write error: %d", errno);
+                    mqtt_info("Write error: %d, result=%d", errno, send_len);
                     connected = false;
                     break;
                 }
@@ -355,6 +357,7 @@ void mqtt_sending_task(void *pvParameters)
     }
     closeclient(client);
     xMqttSendingTask = NULL;
+    mqtt_info("mqtt_sending_task destroy");
     vTaskDelete(NULL);
 }
 
@@ -548,6 +551,11 @@ void mqtt_task(void *pvParameters)
         if (!client->settings->auto_reconnect) {
 			break;
 		}
+
+        // clean up for new reconnect
+        xQueueReset(client->xSendingQueue);
+        rb_reset(&client->send_rb);
+
         vTaskDelay(1000 / portTICK_RATE_MS);
 
     }

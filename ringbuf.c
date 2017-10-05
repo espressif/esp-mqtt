@@ -26,6 +26,21 @@ int32_t rb_init(RINGBUF *r, uint8_t* buf, int32_t size, int32_t block_size)
     r->block_size = block_size;
     return 0;
 }
+
+/**
+* \brief reset a RINGBUF object
+* \param r pointer to a RINGBUF object
+* \return 0 if successfull, otherwise failed
+*/
+int32_t rb_reset(RINGBUF *r)
+{
+    if (r == 0) return -1;
+
+    r->p_r = r->p_w = r->p_o;
+    r->fill_cnt = 0;
+    return 0;
+}
+
 /**
 * \brief put a character into ring buffer
 * \param r pointer to a ringbuf object
