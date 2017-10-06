@@ -561,7 +561,7 @@ mqtt_client *mqtt_start(mqtt_settings *settings)
 {
 	terminate_mqtt = false;
 
-    int stackSize = 2048;
+    int stackSize = 4096;
 
     uint8_t *rb_buf;
     if (xMqttTask != NULL)
