@@ -163,8 +163,6 @@ void closeclient(mqtt_client *client)
 
 
 #if defined(CONFIG_MQTT_SECURITY_ON)
-    // mqtt_info( "pre close ssl" );
-    // vTaskDelay(1);
     if (client->ssl != NULL)
     {
       SSL_shutdown(client->ssl);
@@ -173,17 +171,11 @@ void closeclient(mqtt_client *client)
       client->ssl = NULL;
     }
 
-    // mqtt_info( "closed ssl" );
-    // vTaskDelay(1);
-
     if (client->ctx != NULL)
     {
       SSL_CTX_free(client->ctx);
       client->ctx = NULL;
     }
-    // vTaskDelay(1);
-
-    // mqtt_info( "closed ssl_ctx" );
 #endif
 
 }
