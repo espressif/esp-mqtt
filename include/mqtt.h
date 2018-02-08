@@ -12,6 +12,8 @@
 #include "mqtt_msg.h"
 #include "ringbuf.h"
 
+extern bool mqtt_connected;
+
 #if defined(CONFIG_MQTT_SECURITY_ON)
 #include "openssl/ssl.h"
 #endif

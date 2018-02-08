@@ -20,6 +20,9 @@ static TaskHandle_t xMqttTask = NULL;
 static TaskHandle_t xMqttSendingTask = NULL;
 
 static bool terminate_mqtt = false;
+static int no_reply_pingreq = 0;
+
+bool mqtt_connected = false;
 
 static int resolve_dns(const char *host, struct sockaddr_in *ip) {
     struct hostent *he;
@@ -153,25 +156,26 @@ void closeclient(mqtt_client *client)
     mqtt_info("Closing client socket");
 
     if (client->socket != -1)
-	{
-	  close(client->socket);
-	  client->socket = -1;
-	}
+    {
+      close(client->socket);
+      client->socket = -1;
+    }
+
 
 #if defined(CONFIG_MQTT_SECURITY_ON)
-	if (client->ssl != NULL)
-	{
-	  SSL_shutdown(client->ssl);
+    if (client->ssl != NULL)
+    {
+      SSL_shutdown(client->ssl);
 
-	  SSL_free(client->ssl);
-	  client->ssl = NULL;
-	}
+      SSL_free(client->ssl);
+      client->ssl = NULL;
+    }
 
-	if (client->ctx != NULL)
-	{
-	  SSL_CTX_free(client->ctx);
-	  client->ctx = NULL;
-	}
+    if (client->ctx != NULL)
+    {
+      SSL_CTX_free(client->ctx);
+      client->ctx = NULL;
+    }
 #endif
 
 }
@@ -308,7 +312,7 @@ void mqtt_sending_task(void *pvParameters)
     bool connected = true;
     mqtt_info("mqtt_sending_task");
 
-    while (connected) {
+    while (connected & !terminate_mqtt) {
         if (xQueueReceive(client->xSendingQueue, &msg_len, 1000 / portTICK_RATE_MS)) {
             //queue available
             while (msg_len > 0) {
@@ -345,15 +349,18 @@ void mqtt_sending_task(void *pvParameters)
                 send_len = client->settings->write_cb(client,
                       client->mqtt_state.outbound_message->data,
                       client->mqtt_state.outbound_message->length, 0);
-                if(send_len <= 0) {
-					mqtt_info("Write error: %d", errno);
+                no_reply_pingreq++;
+                if(send_len <= 0 || no_reply_pingreq >= CONFIG_PINGREQ_TIMEOUT_COUNT ) {
+                    mqtt_info("Write error: %d", errno);
                     connected = false;
-					break;
-				}
+                    no_reply_pingreq = 0;
+                    break;
+                }
             }
         }
     }
     closeclient(client);
+    mqtt_connected = false;
     xMqttSendingTask = NULL;
     vTaskDelete(NULL);
 }
@@ -407,8 +414,8 @@ void mqtt_start_receive_schedule(mqtt_client *client)
 
     while (1) {
 
-    	if (terminate_mqtt) break;
-    	if (xMqttSendingTask == NULL) break;
+        if (terminate_mqtt) break;
+        if (xMqttSendingTask == NULL) break;
 
         read_len = client->settings->read_cb(client, client->mqtt_state.in_buffer, CONFIG_MQTT_BUFFER_SIZE_BYTE, 0);
 
@@ -483,6 +490,7 @@ void mqtt_start_receive_schedule(mqtt_client *client)
                 break;
             case MQTT_MSG_TYPE_PINGRESP:
                 mqtt_info("MQTT_MSG_TYPE_PINGRESP");
+                no_reply_pingreq = 0;
                 // Ignore
                 break;
         }
@@ -491,9 +499,9 @@ void mqtt_start_receive_schedule(mqtt_client *client)
 
 void mqtt_destroy(mqtt_client *client)
 {
-	if (client == NULL) return;
+    if (client == NULL) return;
 
-	vQueueDelete(client->xSendingQueue);
+    vQueueDelete(client->xSendingQueue);
 
     free(client->mqtt_state.in_buffer);
     free(client->mqtt_state.out_buffer);
@@ -510,23 +518,24 @@ void mqtt_task(void *pvParameters)
     mqtt_client *client = (mqtt_client *)pvParameters;
 
     while (1) {
-    	if (terminate_mqtt) break;
+        if (terminate_mqtt) break;
 
         client->settings->connect_cb(client);
 
         mqtt_info("Connected to server %s:%d", client->settings->host, client->settings->port);
-        if (!mqtt_connect(client)) {
+        mqtt_connected = mqtt_connect(client);
+        if (!mqtt_connected) {
             client->settings->disconnect_cb(client);
 
             if (client->settings->disconnected_cb) {
-				client->settings->disconnected_cb(client, NULL);
-			}
+                client->settings->disconnected_cb(client, NULL);
+            }
 
             if (!client->settings->auto_reconnect) {
-				break;
-			} else {
-				continue;
-			}
+                break;
+            } else {
+                continue;
+            }
         }
         mqtt_info("Connected to MQTT broker, create sending thread before call connected callback");
         xTaskCreate(&mqtt_sending_task, "mqtt_sending_task", 2048, client, CONFIG_MQTT_PRIORITY + 1, &xMqttSendingTask);
@@ -539,27 +548,28 @@ void mqtt_task(void *pvParameters)
 
         client->settings->disconnect_cb(client);
         if (client->settings->disconnected_cb) {
-        	client->settings->disconnected_cb(client, NULL);
-		}
+            client->settings->disconnected_cb(client, NULL);
+        }
 
         if (xMqttSendingTask != NULL) {
-        	vTaskDelete(xMqttSendingTask);
+            vTaskDelete(xMqttSendingTask);
         }
         if (!client->settings->auto_reconnect) {
-			break;
-		}
+            break;
+        }
         vTaskDelay(1000 / portTICK_RATE_MS);
 
     }
 
     mqtt_destroy(client);
     xMqttTask = NULL;
+    mqtt_connected = false;
     vTaskDelete(NULL);
 }
 
 mqtt_client *mqtt_start(mqtt_settings *settings)
 {
-	terminate_mqtt = false;
+    terminate_mqtt = false;
 
     int stackSize = 2048;
 
@@ -647,11 +657,11 @@ void mqtt_subscribe(mqtt_client *client, const char *topic, uint8_t qos)
 
 void mqtt_unsubscribe(mqtt_client *client, const char *topic)
 {
-	client->mqtt_state.outbound_message = mqtt_msg_unsubscribe(&client->mqtt_state.mqtt_connection,
-	                                          topic,
-	                                          &client->mqtt_state.pending_msg_id);
-	mqtt_info("Queue unsubscribe, topic\"%s\", id: %d", topic, client->mqtt_state.pending_msg_id);
-	mqtt_queue(client);
+    client->mqtt_state.outbound_message = mqtt_msg_unsubscribe(&client->mqtt_state.mqtt_connection,
+                                              topic,
+                                              &client->mqtt_state.pending_msg_id);
+    mqtt_info("Queue unsubscribe, topic\"%s\", id: %d", topic, client->mqtt_state.pending_msg_id);
+    mqtt_queue(client);
 }
 
 void mqtt_publish(mqtt_client* client, const char *topic, const char *data, int len, int qos, int retain)
@@ -670,6 +680,6 @@ void mqtt_publish(mqtt_client* client, const char *topic, const char *data, int 
 
 void mqtt_stop()
 {
-	terminate_mqtt = true;
+    terminate_mqtt = true;
 }
 
