@@ -727,6 +727,7 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
 
 int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain)
 {
+    int pending_msg_id;
     if (client->state != MQTT_STATE_CONNECTED) {
         ESP_LOGE(TAG, "Client has not connected");
         return -1;
@@ -734,18 +735,25 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
     if (len <= 0) {
         len = strlen(data);
     }
-    mqtt_enqueue(client);
+    if (qos > 0) {
+        mqtt_enqueue(client);
+    }
+
     client->mqtt_state.outbound_message = mqtt_msg_publish(&client->mqtt_state.mqtt_connection,
                                           topic, data, len,
                                           qos, retain,
-                                          &client->mqtt_state.pending_msg_id);
-    client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
-    client->mqtt_state.pending_msg_count ++;
+                                          &pending_msg_id);
+    if (qos > 0) {
+        client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
+        client->mqtt_state.pending_msg_id = pending_msg_id;
+        client->mqtt_state.pending_msg_count ++;
+    }
+
     if (mqtt_write_data(client) != ESP_OK) {
         ESP_LOGE(TAG, "Error to public data to topic=%s, qos=%d", topic, qos);
         return -1;
     }
-    return client->mqtt_state.pending_msg_id;
+    return pending_msg_id;
 }
 
 
