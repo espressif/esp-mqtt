@@ -14,6 +14,7 @@
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
+#include "tcpip_adapter.h"
 #include "ringbuf.h"
 #include "mqtt.h"
 
@@ -370,18 +371,18 @@ void deliver_publish(mqtt_client* client, uint8_t* message, int length, size_t* 
 
     bool first_chunk = true;
 
-    ESP_LOGI("MQTT-ETR", ">>>deliver_publish: length = %d", length);
-    ESP_LOG_BUFFER_HEXDUMP("MQTT-ETR", message, length, ESP_LOG_DEBUG);
+//    ESP_LOGI("MQTT-ETR", ">>>deliver_publish: length = %d", length);
+//    ESP_LOG_BUFFER_HEXDUMP("MQTT-ETR", message, length, ESP_LOG_DEBUG);
 
     do {
         if (first_chunk) {
-            ESP_LOGI("MQTT-ETR", "Fisrt chunk");
+//            ESP_LOGI("MQTT-ETR", "Fisrt chunk");
             event_data.topic_length = length;
             event_data.topic        = mqtt_get_publish_topic(message, &event_data.topic_length);
             event_data.data_length  = length;
             event_data.data         = mqtt_get_publish_data(message, &event_data.data_length);
         } else {
-            ESP_LOGI("MQTT-ETR", "next chunk(s)");
+//            ESP_LOGI("MQTT-ETR", "next chunk(s)");
             event_data.topic        = NULL;
             event_data.topic_length = 0;
             event_data.data         = (char*)message;
@@ -389,25 +390,25 @@ void deliver_publish(mqtt_client* client, uint8_t* message, int length, size_t* 
             client->mqtt_state.message_length_read += event_data.data_length;
         }
 
-        ESP_LOGD("MQTT-ETR", "Topic lenght = %d", event_data.topic_length);
-        ESP_LOGD("MQTT-ETR", "Data lenght = %d", event_data.data_length);
-        ESP_LOGD(
-            "MQTT-ETR", "client->mqtt_state.message_length = %d", client->mqtt_state.message_length); // Total mqtt message length
-        ESP_LOGD("MQTT-ETR",
-                 "client->mqtt_state.message_length_read = %d",
-                 client->mqtt_state.message_length_read); // Amount of used data from network buffer (mqtt header+topix+data)
+//        ESP_LOGD("MQTT-ETR", "Topic lenght = %d", event_data.topic_length);
+//        ESP_LOGD("MQTT-ETR", "Data lenght = %d", event_data.data_length);
+//        ESP_LOGD(
+//            "MQTT-ETR", "client->mqtt_state.message_length = %d", client->mqtt_state.message_length); // Total mqtt message length
+//        ESP_LOGD("MQTT-ETR",
+//                 "client->mqtt_state.message_length_read = %d",
+//                 client->mqtt_state.message_length_read); // Amount of used data from network buffer (mqtt header+topix+data)
 
         if (event_data.data_total_length == 0) {
             if (client->mqtt_state.message_length_read >= client->mqtt_state.message_length) {
-                ESP_LOGW("MQTT-ETR", "A");
+//                ESP_LOGW("MQTT-ETR", "A");
                 event_data.data_total_length = event_data.data_length;
             } else {
-                ESP_LOGW("MQTT-ETR", "B");
+//                ESP_LOGW("MQTT-ETR", "B");
                 event_data.data_total_length =
                     client->mqtt_state.message_length - client->mqtt_state.message_length_read + event_data.data_length;
             }
 
-            ESP_LOGD("MQTT-ETR", "event_data.data_total_length = %d", event_data.data_total_length);
+//            ESP_LOGD("MQTT-ETR", "event_data.data_total_length = %d", event_data.data_total_length);
         }
 
         mqtt_info("Data received: %d/%d bytes ", event_data.data_length, event_data.data_total_length);
@@ -416,7 +417,7 @@ void deliver_publish(mqtt_client* client, uint8_t* message, int length, size_t* 
         }
 
         if (client->mqtt_state.message_length_read >= client->mqtt_state.message_length) {
-            ESP_LOGI("MQTT-ETR", "break 1");
+//            ESP_LOGI("MQTT-ETR", "break 1");
             break;
         }
 
@@ -424,35 +425,35 @@ void deliver_publish(mqtt_client* client, uint8_t* message, int length, size_t* 
 
         length = client->settings->read_cb(client, client->mqtt_state.in_buffer, CONFIG_MQTT_BUFFER_SIZE_BYTE, 0);
         if (length < 0) {
-            mqtt_info("Read error: %d", errno);
+            mqtt_info("+Read error: %d", errno);
             break;
         }
         first_chunk = false;
-        ESP_LOGD("MQTT-ETR", "Next data len: %d", length);
-        ESP_LOG_BUFFER_HEXDUMP("MQTT-ETR", message, length, ESP_LOG_DEBUG);
+//        ESP_LOGD("MQTT-ETR", "Next data len: %d", length);
+//        ESP_LOG_BUFFER_HEXDUMP("MQTT-ETR", message, length, ESP_LOG_DEBUG);
 
     } while (1);
 
-    ESP_LOGD(
-        "MQTT-ETR", "client->mqtt_state.message_length = %d", client->mqtt_state.message_length); // Total mqtt message length
-    ESP_LOGD("MQTT-ETR",
-             "client->mqtt_state.message_length_read = %d",
-             client->mqtt_state.message_length_read); // Amount of used data from network buffer (mqtt header+topix+data)
+//    ESP_LOGD(
+//        "MQTT-ETR", "client->mqtt_state.message_length = %d", client->mqtt_state.message_length); // Total mqtt message length
+//    ESP_LOGD("MQTT-ETR",
+//             "client->mqtt_state.message_length_read = %d",
+//             client->mqtt_state.message_length_read); // Amount of used data from network buffer (mqtt header+topix+data)
 
-    ESP_LOGD("MQTT-ETR", "length = %d", length);
+//    ESP_LOGD("MQTT-ETR", "length = %d", length);
 
     if ((first_chunk && client->mqtt_state.message_length < length) || (!first_chunk && event_data.data_length < length)) {
 
         *remaining_data_len    = first_chunk ? length - client->mqtt_state.message_length : length - event_data.data_length;
         *remaining_data_offset = first_chunk ? client->mqtt_state.message_length : event_data.data_length;
-        ESP_LOGW("MQTT-ETR", "More data to read in buffer: %d @0x%p", *remaining_data_len, message+ *remaining_data_offset);
-        ESP_LOGE("MQTT-ETR", "==========================================================================");
+//        ESP_LOGW("MQTT-ETR", "More data to read in buffer: %d @0x%p", *remaining_data_len, message+ *remaining_data_offset);
+//        ESP_LOGE("MQTT-ETR", "==========================================================================");
     } else {
-        ESP_LOGD("MQTT-ETR", "remaining data offset: %d", *remaining_data_offset);
-        ESP_LOGD("MQTT-ETR", "remaining data length: %d", *remaining_data_len);
+//        ESP_LOGD("MQTT-ETR", "remaining data offset: %d", *remaining_data_offset);
+//        ESP_LOGD("MQTT-ETR", "remaining data length: %d", *remaining_data_len);
     }
 
-    ESP_LOGI("MQTT-ETR", "<<<<deliver_publish");
+//    ESP_LOGI("MQTT-ETR", "<<<<deliver_publish");
 }
 void mqtt_start_receive_schedule(mqtt_client *client)
 {
@@ -477,7 +478,7 @@ void mqtt_start_receive_schedule(mqtt_client *client)
             mqtt_info("Read len %d", read_len);
             if (read_len <= 0) {
                 // ECONNRESET for example
-                mqtt_info("Read error %d", errno);
+                mqtt_info("=Read error %d", errno);
                 break;
             }
         } else {
