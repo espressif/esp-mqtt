@@ -4,17 +4,6 @@
 #include "rom/queue.h"
 #include "esp_log.h"
 
-// typedef struct outbox_item {
-//     char *buffer;
-//     int len;
-//     int msg_id;
-//     int msg_type;
-//     int tick_created;
-//     int retry_count;
-//     bool pending;
-//     STAILQ_ENTRY(outbox) next;
-// } outbox_item;
-
 static const char *TAG = "OUTBOX";
 
 outbox_handle_t outbox_init()

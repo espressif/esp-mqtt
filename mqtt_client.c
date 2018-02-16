@@ -128,8 +128,11 @@ static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_
 
     client->connect_info.will_qos = config->lwt_qos;
     client->connect_info.will_retain = config->lwt_retain;
-    client->connect_info.clean_session = config->clean_session; //TODO: default is CLEAN
 
+    client->connect_info.clean_session = true//TODO: default is CLEAN
+    if (config->disable_clean_session) {
+        client->connect_info.clean_session = false;
+    }
     client->connect_info.keepalive = config->keepalive;
     if (client->connect_info.keepalive == 0) {
         client->connect_info.keepalive = MQTT_KEEPALIVE_TICK;
@@ -138,6 +141,10 @@ static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_
     cfg->user_context = config->user_context;
     cfg->event_handle = config->event_handle;
     cfg->auto_reconnect = true;
+    if (cfg->disable_auto_reconnect) {
+        cfg->auto_reconnect = false;
+    }
+
     client->config = cfg;
     return ESP_OK;
 }
@@ -404,9 +411,6 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
         mqtt_data_length = length;
         mqtt_data = mqtt_get_publish_data(message, &mqtt_data_length);
 
-        if (client->config->event_handle) {
-            // client->config->event_handle(client, &event_data);
-        }
         mqtt_data_offset += mqtt_data_length;
 
         ESP_LOGI(TAG, "Get data len= %d, topic len=%d", mqtt_data_length, mqtt_topic_length);

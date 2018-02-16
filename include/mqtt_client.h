@@ -51,12 +51,11 @@ typedef struct {
     char password[MQTT_MAX_PASSWORD_LEN];
     char lwt_topic[MQTT_MAX_LWT_TOPIC];
     char lwt_msg[MQTT_MAX_LWT_MSG];
-    int lwt_msg_len;
     int lwt_qos;
     int lwt_retain;
-    int clean_session;
+    int disable_clean_session;
     int keepalive;
-    bool auto_reconnect;
+    bool disable_auto_reconnect;
     void *user_context;
     int task_prio;
     int task_stack;
