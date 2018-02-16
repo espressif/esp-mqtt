@@ -132,7 +132,7 @@ static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_
     client->connect_info.will_qos = config->lwt_qos;
     client->connect_info.will_retain = config->lwt_retain;
 
-    client->connect_info.clean_session = true;
+    client->connect_info.clean_session = 1;
     if (config->disable_clean_session) {
         client->connect_info.clean_session = false;
     }
