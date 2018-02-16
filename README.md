@@ -10,6 +10,7 @@ git submodule add https://github.com/tuanpmt/espmqtt.git components/espmqtt
 ## Documentation
 ### URI
 
+- Curently support `mqtt` and `mqtts` schemes
 - MQTT over HTTP, default port `1883`: `mqtt://iot.eclipse.org`
 - MQTT over HTTP, port `1884`: `mqtt://iot.eclipse.org:1884`
 - MQTT over HTTP, port `1884`, username and password: `mqtt://username:password@iot.eclipse.org:1884`
