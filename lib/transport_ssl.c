@@ -31,6 +31,7 @@ typedef struct {
     mbedtls_net_context      client_fd;
     void                     *cert_pem_data;
     int                      cert_pem_len;
+    bool                     ssl_initialized;
 } transport_ssl_t;
 
 static int ssl_connect(transport_handle_t t, const char *host, int port, int timeout_ms)
@@ -42,6 +43,7 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
     if (!ssl) {
         return -1;
     }
+    ssl->ssl_initialized = true;
     mbedtls_ssl_init(&ssl->ctx);
     mbedtls_ctr_drbg_init(&ssl->ctr_drbg);
     mbedtls_ssl_config_init(&ssl->conf);
@@ -196,8 +198,8 @@ static int ssl_close(transport_handle_t t)
 {
     int ret = -1;
     transport_ssl_t *ssl = transport_get_data(t);
-    if (ssl->client_fd.fd >= 0) {
-
+    if (ssl->ssl_initialized) {
+        ESP_LOGD(TAG, "Cleanup mbedtls");
         mbedtls_ssl_close_notify(&ssl->ctx);
         mbedtls_ssl_session_reset(&ssl->ctx);
         mbedtls_net_free(&ssl->client_fd);
@@ -206,6 +208,7 @@ static int ssl_close(transport_handle_t t)
         mbedtls_ctr_drbg_free(&ssl->ctr_drbg);
         mbedtls_entropy_free(&ssl->entropy);
         mbedtls_ssl_free(&ssl->ctx);
+        ssl->ssl_initialized = false;
     }
     return ret;
 }
