@@ -6,6 +6,7 @@
 #include "transport.h"
 #include "transport_tcp.h"
 #include "transport_ssl.h"
+#include "transport_ws.h"
 #include "platform.h"
 #include "mqtt_outbox.h"
 
@@ -262,9 +263,14 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     mem_assert(client);
 
     client->transport_list = transport_list_init();
+
     transport_handle_t tcp = transport_tcp_init();
     transport_set_default_port(tcp, MQTT_TCP_DEFAULT_PORT);
     transport_list_add(client->transport_list, tcp, "mqtt");
+
+    transport_handle_t ws = transport_ws_init(tcp);
+    transport_set_default_port(ws, MQTT_WS_DEFAULT_PORT);
+    transport_list_add(client->transport_list, ws, "ws");
 
     //#if define SSL
     transport_handle_t ssl = transport_ssl_init();
@@ -275,8 +281,9 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     transport_list_add(client->transport_list, ssl, "mqtts");
     // #endif
 
-    // transport_list_add(client->transport_list, transport_ws_init(), "mqtt+ws");
-    // transport_list_add(client->transport_list, transport_wss_init(), "mqtt+wss");
+    transport_handle_t wss = transport_ws_init(ssl);
+    transport_set_default_port(wss, MQTT_WSS_DEFAULT_PORT);
+    transport_list_add(client->transport_list, wss, "wss");
 
     esp_mqtt_set_config(client, config);
 
@@ -354,6 +361,16 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
 
     if (client->config->path == NULL) {
         client->config->path = create_string(uri + puri.field_data[UF_PATH].off, puri.field_data[UF_PATH].len);
+    }
+    if (client->config->path) {
+        transport_handle_t trans = transport_list_get_transport(client->transport_list, "ws");
+        if (trans) {
+            transport_ws_set_path(trans, client->config->path);
+        }
+        trans = transport_list_get_transport(client->transport_list, "wss");
+        if (trans) {
+            transport_ws_set_path(trans, client->config->path);
+        }
     }
 
     char *port = create_string(uri + puri.field_data[UF_PORT].off, puri.field_data[UF_PORT].len);
@@ -644,7 +661,11 @@ static void esp_mqtt_task(void *pv)
                     esp_mqtt_client_ping(client);
                     client->keepalive_tick = platform_tick_get_ms();
                 }
-                // check need to write keepalive
+
+                //Delete mesaage after 30 senconds
+                outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
+                //
+                outbox_cleanup(client->outbox, OUTBOX_MAX_SIZE);
                 break;
             case MQTT_STATE_WAIT_TIMEOUT:
 

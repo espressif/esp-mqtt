@@ -18,4 +18,13 @@
 #define MQTT_NETWORK_TIMEOUT_MS     (10000)
 #define MQTT_TCP_DEFAULT_PORT       (1883)
 #define MQTT_SSL_DEFAULT_PORT       (8883)
+#define MQTT_WS_DEFAULT_PORT        (80)
+#define MQTT_WSS_DEFAULT_PORT       (443)
+
+#define MQTT_ENABLE_SSL             1
+#define MQTT_ENABLE_WS              1
+#define MQTT_ENABLE_WSS             1
+
+#define OUTBOX_EXPIRED_TIMEOUT_MS   (30*1000)
+#define OUTBOX_MAX_SIZE             (4*1024)
 #endif

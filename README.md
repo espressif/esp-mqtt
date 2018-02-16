@@ -1,5 +1,13 @@
 # ESP32 MQTT Library
 
+## Features
+
+- Based on: https://github.com/tuanpmt/esp_mqtt 
+- Support MQTT over TCP, SSL with mbedtls, MQTT over Websocket, MQTT over Webscoket Secure
+- Easy to setup with URI 
+- Multiple instances (Multiple clients in one application)
+- Support subscribing, publishing, authentication, will messages, keep alive pings and all 3 QoS levels (it should be a fully functional client).
+
 ## How to use
 
 Clone this component to [ESP-IDF](https://github.com/espressif/esp-idf) project (as submodule): 
@@ -10,11 +18,13 @@ git submodule add https://github.com/tuanpmt/espmqtt.git components/espmqtt
 ## Documentation
 ### URI
 
-- Curently support `mqtt` and `mqtts` schemes
+- Curently support `mqtt`, `mqtts`, `ws`, `wss` schemes
 - MQTT over HTTP, default port `1883`: `mqtt://iot.eclipse.org`
 - MQTT over HTTP, port `1884`: `mqtt://iot.eclipse.org:1884`
 - MQTT over HTTP, port `1884`, username and password: `mqtt://username:password@iot.eclipse.org:1884`
 - MQTT over HTTPS, default port `8883`: `mqtts://iot.eclipse.org`
+- MQTT over Websocket: `ws://iot.eclipse.org:80/ws`
+- MQTT over Websocket Secure: `wss://iot.eclipse.org:443/ws`
 - Minimal configurations: 
 
 ```cpp
