@@ -24,6 +24,21 @@ const esp_mqtt_client_config_t mqtt_cfg = {
 };
 ```
 
+### SSL 
+
+- Get Certification from server, example: `iot.eclipse.org` `openssl s_client -showcerts -connect iot.eclipse.org:8883 </dev/null 2>/dev/null|openssl x509 -outform PEM >iot_eclipse_org.pem`
+- Check the sample application: `examples/mqtt_ssl`
+- Configuration: 
+
+```cpp
+const esp_mqtt_client_config_t mqtt_cfg = {
+    .uri = "mqtts://iot.eclipse.org:8883",
+    .event_handle = mqtt_event_handler,
+    .cert_pem = (const char *)iot_eclipse_org_pem_start,
+};
+```
+
+
 ### More options for `esp_mqtt_client_config_t`
 
 -  `event_handle` for MQTT events

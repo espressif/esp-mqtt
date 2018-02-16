@@ -60,7 +60,7 @@ typedef struct {
     int task_prio;
     int task_stack;
     int buffer_size;
-    char *cert_pem;
+    const char *cert_pem;
 } esp_mqtt_client_config_t;
 
 esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *config);

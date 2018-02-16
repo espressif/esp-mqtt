@@ -129,7 +129,7 @@ static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_
     client->connect_info.will_qos = config->lwt_qos;
     client->connect_info.will_retain = config->lwt_retain;
 
-    client->connect_info.clean_session = true//TODO: default is CLEAN
+    client->connect_info.clean_session = true;
     if (config->disable_clean_session) {
         client->connect_info.clean_session = false;
     }
@@ -141,7 +141,7 @@ static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_
     cfg->user_context = config->user_context;
     cfg->event_handle = config->event_handle;
     cfg->auto_reconnect = true;
-    if (cfg->disable_auto_reconnect) {
+    if (config->disable_auto_reconnect) {
         cfg->auto_reconnect = false;
     }
 
@@ -268,7 +268,7 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     transport_handle_t ssl = transport_ssl_init();
     transport_set_default_port(ssl, MQTT_SSL_DEFAULT_PORT);
     if (config->cert_pem) {
-        transport_ssl_set_cert_data(ssl, config->cert_pem, strlen(config->cert_pem) - 1);
+        transport_ssl_set_cert_data(ssl, config->cert_pem, strlen(config->cert_pem));
     }
     transport_list_add(client->transport_list, ssl, "mqtts");
     // #endif
