@@ -401,7 +401,7 @@ static esp_err_t mqtt_write_data(esp_mqtt_client_handle_t client)
                                     (char *)client->mqtt_state.outbound_message->data,
                                     client->mqtt_state.outbound_message->length,
                                     client->config->network_timeout_ms);
-    client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
+    // client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
     if (write_len <= 0) {
         ESP_LOGE(TAG, "Error write data or timeout, written len = %d", write_len);
         return ESP_FAIL;
@@ -497,6 +497,8 @@ static bool is_valid_mqtt_msg(esp_mqtt_client_handle_t client, int msg_type, int
 
 static void mqtt_enqueue(esp_mqtt_client_handle_t client)
 {
+    ESP_LOGD(TAG, "mqtt_enqueue id: %d, type=%d successful",
+        client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
     //lock mutex
     if (client->mqtt_state.pending_msg_count > 0) {
         //Copy to queue buffer
@@ -751,7 +753,7 @@ int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic
         return -1;
     }
 
-    ESP_LOGD(TAG, "Sent subscribe topic=%s, id: %d successful", topic, client->mqtt_state.pending_msg_id);
+    ESP_LOGD(TAG, "Sent subscribe topic=%s, id: %d, type=%d successful", topic, client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
     return client->mqtt_state.pending_msg_id;
 }
 
