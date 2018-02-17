@@ -1,3 +1,12 @@
+[![](https://travis-ci.org/tuanpmt/espmqtt.png?branch=master)](https://travis-ci.org/tuanpmt/espmqtt)
+[![](http://hits.dwyl.io/tuanpmt/espmqtt.svg)](http://hits.dwyl.io/tuanpmt/espmqtt)
+![](https://img.shields.io/github/downloads/tuanpmt/espmqtt/total.svg)
+[![Twitter Follow](https://img.shields.io/twitter/follow/tuanpmt.svg?style=social&label=Follow)](https://twitter.com/tuanpmt)
+
+![GitHub contributors](https://img.shields.io/github/contributors/tuanpmt/espmqtt.svg)
+[![Paypal donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.me/tuanpm)
+
+
 # ESP32 MQTT Library
 
 ## Features
@@ -13,6 +22,15 @@
 Clone this component to [ESP-IDF](https://github.com/espressif/esp-idf) project (as submodule): 
 ```
 git submodule add https://github.com/tuanpmt/espmqtt.git components/espmqtt
+```
+
+Or run a sample (make sure you have `IDF_PATH` env): 
+
+```
+git clonehttps://github.com/tuanpmt/espmqtt.git
+cd espmqtt/examples/mqtt_tcp
+make menuconfig
+make flash monitor
 ```
 
 ## Documentation
@@ -128,4 +146,5 @@ esp_mqtt_client_start(client);
 
 ## License
 
+[@tuanpmt](https://twitter.com/tuanpmt)
 Apache License

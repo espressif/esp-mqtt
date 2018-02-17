@@ -1,3 +1,9 @@
+/*
+ * This file is subject to the terms and conditions defined in
+ * file 'LICENSE', which is part of this source code package.
+ * Tuan PM <tuanpm at live dot com>
+ */
+
 #ifndef _MQTT_CLIENT_H_
 #define _MQTT_CLIENT_H_
 
@@ -7,9 +13,7 @@
 
 #include "mqtt_config.h"
 
-
 typedef struct esp_mqtt_client* esp_mqtt_client_handle_t;
-
 
 typedef enum {
     MQTT_EVENT_ERROR = 0,

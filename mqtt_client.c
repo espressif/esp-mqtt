@@ -437,11 +437,16 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
         mqtt_data_length = length;
         mqtt_data = mqtt_get_publish_data(message, &mqtt_data_length);
 
-        if (total_mqtt_len == 0) {
+        if(total_mqtt_len == 0){
+            mqtt_topic_length = length;
+            mqtt_topic = mqtt_get_publish_topic(message, &mqtt_topic_length);
+            mqtt_data_length = length;
+            mqtt_data = mqtt_get_publish_data(message, &mqtt_data_length);
             total_mqtt_len = client->mqtt_state.message_length - client->mqtt_state.message_length_read + mqtt_data_length;
             mqtt_len = mqtt_data_length;
         } else {
             mqtt_len = len_read;
+            mqtt_data = (const char*)client->mqtt_state.in_buffer;
         }
 
         ESP_LOGD(TAG, "Get data len= %d, topic len=%d", mqtt_data_length, mqtt_topic_length);

@@ -191,7 +191,7 @@ static int ws_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
             buffer[i] = (data_ptr[i] ^ mask_key[i % 4]);
         }
     } else {
-        memcpy(buffer, data_ptr, payload_len);
+        memmove(buffer, data_ptr, payload_len);
     }
     return payload_len;
 }
