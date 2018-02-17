@@ -2,7 +2,6 @@
 [![](http://hits.dwyl.io/tuanpmt/espmqtt.svg)](http://hits.dwyl.io/tuanpmt/espmqtt)
 ![](https://img.shields.io/github/downloads/tuanpmt/espmqtt/total.svg)
 [![Twitter Follow](https://img.shields.io/twitter/follow/tuanpmt.svg?style=social&label=Follow)](https://twitter.com/tuanpmt)
-
 ![GitHub contributors](https://img.shields.io/github/contributors/tuanpmt/espmqtt.svg)
 [![Paypal donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.me/tuanpm)
 
