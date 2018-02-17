@@ -39,13 +39,13 @@ script:
   # Update configuration so that kconfig doesn't start interactive mode
   - make defconfig
   # Build project from the git repository
-  - make
+  - make -j4
   - cd $PROJECT_PATH/examples/mqtt_ssl
   - make defconfig
-  - make
+  - make -j4
   - cd $PROJECT_PATH/examples/mqtt_ws
   - make defconfig
-  - make
+  - make -j4
   - cd $PROJECT_PATH/examples/mqtt_wss
   - make defconfig
-  - make
+  - make -j4
