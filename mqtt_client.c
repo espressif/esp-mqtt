@@ -79,6 +79,7 @@ static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms);
 static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client);
 static int esp_mqtt_client_ping(esp_mqtt_client_handle_t client);
+static char *create_string(const char *ptr, int len);
 
 static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_client_config_t *config)
 {
@@ -267,10 +268,16 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     transport_handle_t tcp = transport_tcp_init();
     transport_set_default_port(tcp, MQTT_TCP_DEFAULT_PORT);
     transport_list_add(client->transport_list, tcp, "mqtt");
+    if (config->transport == MQTT_TRANSPORT_OVER_TCP) {
+        client->config->scheme = create_string("mqtt", 4);
+    }
 
     transport_handle_t ws = transport_ws_init(tcp);
     transport_set_default_port(ws, MQTT_WS_DEFAULT_PORT);
     transport_list_add(client->transport_list, ws, "ws");
+    if (config->transport == MQTT_TRANSPORT_OVER_WS) {
+        client->config->scheme = create_string("ws", 2);
+    }
 
     //#if define SSL
     transport_handle_t ssl = transport_ssl_init();
@@ -279,11 +286,17 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
         transport_ssl_set_cert_data(ssl, config->cert_pem, strlen(config->cert_pem));
     }
     transport_list_add(client->transport_list, ssl, "mqtts");
+    if (config->transport == MQTT_TRANSPORT_OVER_SSL) {
+        client->config->scheme = create_string("mqtts", 5);
+    }
     // #endif
 
     transport_handle_t wss = transport_ws_init(ssl);
     transport_set_default_port(wss, MQTT_WSS_DEFAULT_PORT);
     transport_list_add(client->transport_list, wss, "wss");
+    if (config->transport == MQTT_TRANSPORT_OVER_WSS) {
+        client->config->scheme = create_string("wss", 3);
+    }
 
     esp_mqtt_set_config(client, config);
 
@@ -293,8 +306,9 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
         }
     }
 
-
-    //TODO: reduce connection information storage
+    if (client->config->scheme == NULL) {
+        client->config->scheme = create_string("mqtt", 4);
+    }
 
     client->keepalive_tick = 0;
     client->reconnect_tick = 0;

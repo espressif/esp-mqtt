@@ -33,3 +33,4 @@
 *.su
 build
 examples/**/build
+examples/**/sdkconfig*

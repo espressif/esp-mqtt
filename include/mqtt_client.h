@@ -25,6 +25,14 @@ typedef enum {
     MQTT_EVENT_DATA,
 } esp_mqtt_event_id_t;
 
+typedef enum {
+    MQTT_TRANSPORT_UNKNOWN = 0x0,
+    MQTT_TRANSPORT_OVER_TCP,
+    MQTT_TRANSPORT_OVER_SSL,
+    MQTT_TRANSPORT_OVER_WS,
+    MQTT_TRANSPORT_OVER_WSS
+} esp_mqtt_transport_t;
+
 typedef struct {
     esp_mqtt_event_id_t event_id;
     esp_mqtt_client_handle_t client;
@@ -67,6 +75,7 @@ typedef struct {
     int task_stack;
     int buffer_size;
     const char *cert_pem;
+    esp_mqtt_transport_t transport;
 } esp_mqtt_client_config_t;
 
 esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *config);

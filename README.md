@@ -10,7 +10,7 @@
 ## Features
 
 - Based on: https://github.com/tuanpmt/esp_mqtt 
-- Support MQTT over TCP, SSL with mbedtls, MQTT over Websocket, MQTT over Webscoket Secure
+- Support MQTT over TCP, SSL with mbedtls, MQTT over Websocket, MQTT over Websocket Secure
 - Easy to setup with URI 
 - Multiple instances (Multiple clients in one application)
 - Support subscribing, publishing, authentication, will messages, keep alive pings and all 3 QoS levels (it should be a fully functional client).
@@ -80,6 +80,11 @@ const esp_mqtt_client_config_t mqtt_cfg = {
 -  `task_prio, task_stack` for MQTT task, default priority is 5, and task_stack = 4096 bytes
 -  `buffer_size` for MQTT send/receive buffer, default is 1024
 -  `cert_pem` pointer to CERT file for server verify (with SSL), default is NULL, not required to verify the server
+-  `transport`: override URI transport
+    +  `MQTT_TRANSPORT_OVER_TCP`: MQTT over TCP, using scheme: `mqtt`
+    +  `MQTT_TRANSPORT_OVER_SSL`: MQTT over SSL, using scheme: `mqtts`
+    +  `MQTT_TRANSPORT_OVER_WS`: MQTT over Websocket, using scheme: `ws`
+    +  `MQTT_TRANSPORT_OVER_WSS`: MQTT over Websocket Secure, using scheme: `wss`
 
 
 ## Example
