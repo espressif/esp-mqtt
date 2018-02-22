@@ -127,7 +127,10 @@ static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_
 
     if (config->lwt_msg[0]) {
         client->connect_info.will_message = strdup(config->lwt_msg);
-        client->connect_info.will_length = strlen(config->lwt_msg);
+        if (config->lwt_msg_len > 0)
+        		client->connect_info.will_length = config->lwt_msg_len;
+        else
+    			client->connect_info.will_length = strlen(config->lwt_msg);
     }
 
     client->connect_info.will_qos = config->lwt_qos;
