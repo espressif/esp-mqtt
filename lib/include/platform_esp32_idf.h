@@ -27,5 +27,5 @@
 
 char *platform_create_id_string();
 int platform_random(int max);
-int platform_tick_get_ms();
+long long platform_tick_get_ms();
 #endif

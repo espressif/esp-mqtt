@@ -61,8 +61,8 @@ struct esp_mqtt_client {
     mqtt_state_t  mqtt_state;
     mqtt_connect_info_t connect_info;
     mqtt_client_state_t state;
-    int keepalive_tick;
-    int reconnect_tick;
+    long long keepalive_tick;
+    long long reconnect_tick;
     int wait_timeout_ms;
     int auto_reconnect;
     esp_mqtt_event_t event;
@@ -310,8 +310,8 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
         client->config->scheme = create_string("mqtt", 4);
     }
 
-    client->keepalive_tick = 0;
-    client->reconnect_tick = 0;
+    client->keepalive_tick = platform_tick_get_ms();
+    client->reconnect_tick = platform_tick_get_ms();
 
     int buffer_size = config->buffer_size;
     if (buffer_size <= 0) {
