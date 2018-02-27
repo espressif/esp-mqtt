@@ -32,6 +32,7 @@ typedef struct {
     void                     *cert_pem_data;
     int                      cert_pem_len;
     bool                     ssl_initialized;
+    bool                     verify_server;
 } transport_ssl_t;
 
 static int ssl_connect(transport_handle_t t, const char *host, int port, int timeout_ms)
@@ -64,6 +65,7 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
 
     if (ssl->cert_pem_data) {
         mbedtls_x509_crt_init(&ssl->cacert);
+        ssl->verify_server = true;
         if ((ret = mbedtls_x509_crt_parse(&ssl->cacert, ssl->cert_pem_data, ssl->cert_pem_len + 1)) < 0) {
             ESP_LOGE(TAG, "mbedtls_x509_crt_parse returned -0x%x\n\nDATA=%s,len=%d", -ret, (char*)ssl->cert_pem_data, ssl->cert_pem_len);
             goto exit;
@@ -204,11 +206,14 @@ static int ssl_close(transport_handle_t t)
         mbedtls_ssl_session_reset(&ssl->ctx);
         mbedtls_net_free(&ssl->client_fd);
         mbedtls_ssl_config_free(&ssl->conf);
-        mbedtls_x509_crt_free(&ssl->cacert);
+        if (ssl->verify_server) {
+            mbedtls_x509_crt_free(&ssl->cacert);
+        }
         mbedtls_ctr_drbg_free(&ssl->ctr_drbg);
         mbedtls_entropy_free(&ssl->entropy);
         mbedtls_ssl_free(&ssl->ctx);
         ssl->ssl_initialized = false;
+        ssl->verify_server = false;
     }
     return ret;
 }

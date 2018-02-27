@@ -249,6 +249,7 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
 
 static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
 {
+    transport_close(client->transport);
     client->wait_timeout_ms = MQTT_RECONNECT_TIMEOUT_MS;
     client->reconnect_tick = platform_tick_get_ms();
     client->state = MQTT_STATE_WAIT_TIMEOUT;

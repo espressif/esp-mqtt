@@ -110,7 +110,7 @@ int transport_destroy(transport_handle_t t)
 int transport_connect(transport_handle_t t, const char *host, int port, int timeout_ms)
 {
     int ret = -1;
-    if (t->_connect) {
+    if (t && t->_connect) {
         return t->_connect(t, host, port, timeout_ms);
     }
     return ret;
@@ -118,7 +118,7 @@ int transport_connect(transport_handle_t t, const char *host, int port, int time
 
 int transport_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
 {
-    if (t->_read) {
+    if (t && t->_read) {
         return t->_read(t, buffer, len, timeout_ms);
     }
     return -1;
@@ -126,7 +126,7 @@ int transport_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
 
 int transport_write(transport_handle_t t, char *buffer, int len, int timeout_ms)
 {
-    if (t->_write) {
+    if (t && t->_write) {
         return t->_write(t, buffer, len, timeout_ms);
     }
     return -1;
@@ -134,7 +134,7 @@ int transport_write(transport_handle_t t, char *buffer, int len, int timeout_ms)
 
 int transport_poll_read(transport_handle_t t, int timeout_ms)
 {
-    if (t->_poll_read) {
+    if (t && t->_poll_read) {
         return t->_poll_read(t, timeout_ms);
     }
     return -1;
@@ -142,7 +142,7 @@ int transport_poll_read(transport_handle_t t, int timeout_ms)
 
 int transport_poll_write(transport_handle_t t, int timeout_ms)
 {
-    if (t->_poll_write) {
+    if (t && t->_poll_write) {
         return t->_poll_write(t, timeout_ms);
     }
     return -1;
@@ -150,7 +150,7 @@ int transport_poll_write(transport_handle_t t, int timeout_ms)
 
 int transport_close(transport_handle_t t)
 {
-    if (t->_close) {
+    if (t && t->_close) {
         return t->_close(t);
     }
     return 0;
@@ -158,13 +158,19 @@ int transport_close(transport_handle_t t)
 
 void *transport_get_data(transport_handle_t t)
 {
-    return t->data;
+    if (t) {
+        return t->data;
+    }
+    return NULL;
 }
 
 esp_err_t transport_set_data(transport_handle_t t, void *data)
 {
-    t->data = data;
-    return ESP_OK;
+    if (t) {
+        t->data = data;
+        return ESP_OK;
+    }
+    return ESP_FAIL;
 }
 
 esp_err_t transport_set_func(transport_handle_t t,
@@ -176,6 +182,9 @@ esp_err_t transport_set_func(transport_handle_t t,
                              poll_func _poll_write,
                              trans_func _destroy)
 {
+    if (t == NULL) {
+        return ESP_FAIL;
+    }
     t->_connect = _connect;
     t->_read = _read;
     t->_write = _write;
@@ -185,12 +194,20 @@ esp_err_t transport_set_func(transport_handle_t t,
     t->_destroy = _destroy;
     return ESP_OK;
 }
+
 int transport_get_default_port(transport_handle_t t)
 {
+    if (t == NULL) {
+        return -1;
+    }
     return t->port;
 }
+
 esp_err_t transport_set_default_port(transport_handle_t t, int port)
 {
+    if (t == NULL) {
+        return ESP_FAIL;
+    }
     t->port = port;
     return ESP_OK;
 }
