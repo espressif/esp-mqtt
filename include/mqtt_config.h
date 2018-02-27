@@ -7,7 +7,6 @@
 #define _MQTT_CONFIG_H_
 #define MQTT_PROTOCOL_311           1
 #define MQTT_RECONNECT_TIMEOUT_MS   (10*1000)
-#define MQTT_QUEUE_BUFFER_SIZE_WORD 1024
 #define MQTT_BUFFER_SIZE_BYTE       1024
 #define MQTT_MAX_HOST_LEN           64
 #define MQTT_MAX_CLIENT_LEN         32
