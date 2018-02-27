@@ -734,6 +734,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 {
     client->run = false;
     xEventGroupWaitBits(client->status_bits, STOPPED_BIT, false, true, portMAX_DELAY);
+    client->state = MQTT_STATE_UNKNOW;
     return ESP_OK;
 }
 
