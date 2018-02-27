@@ -67,6 +67,7 @@ typedef struct {
     char lwt_msg[MQTT_MAX_LWT_MSG];
     int lwt_qos;
     int lwt_retain;
+    int lwt_msg_len;
     int disable_clean_session;
     int keepalive;
     bool disable_auto_reconnect;

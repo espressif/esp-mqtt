@@ -12,9 +12,9 @@
 #define MQTT_MAX_HOST_LEN           64
 #define MQTT_MAX_CLIENT_LEN         32
 #define MQTT_MAX_USERNAME_LEN       32
-#define MQTT_MAX_PASSWORD_LEN       32
+#define MQTT_MAX_PASSWORD_LEN       65
 #define MQTT_MAX_LWT_TOPIC          32
-#define MQTT_MAX_LWT_MSG            32
+#define MQTT_MAX_LWT_MSG            128
 #define MQTT_TASK_PRIORITY          5
 #define MQTT_TASK_STACK             (6*1024)
 #define MQTT_KEEPALIVE_TICK         (120)
