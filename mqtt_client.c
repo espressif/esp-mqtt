@@ -698,6 +698,8 @@ static void esp_mqtt_task(void *pv)
                 break;
             case MQTT_STATE_WAIT_TIMEOUT:
 
+                vTaskDelay(1);
+
                 if (!client->config->auto_reconnect) {
                     client->run = false;
                     break;
