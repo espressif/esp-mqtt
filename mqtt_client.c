@@ -125,13 +125,15 @@ static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_
         client->connect_info.will_topic = strdup(config->lwt_topic);
     }
 
-    if (config->lwt_msg[0]) {
-        client->connect_info.will_message = strdup(config->lwt_msg);
+    if (config->lwt_msg[0] || config->lwt_msg_len > 0) {
         if (config->lwt_msg_len > 0) {
+            client->connect_info.will_message = malloc(config->lwt_msg_len);
+            memcpy(client->connect_info.will_message, config->lwt_msg, config->lwt_msg_len);
             client->connect_info.will_length = config->lwt_msg_len;
         }
         else {
-    	    client->connect_info.will_length = strlen(config->lwt_msg);
+            client->connect_info.will_message = strdup(config->lwt_msg);
+            client->connect_info.will_length = strlen(config->lwt_msg);
         }
     }
 
