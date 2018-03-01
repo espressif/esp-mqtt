@@ -1,5 +1,10 @@
 menu "ESPMQTT Configurations"
 
+config MQTT_PROTOCOL_311
+    bool "Enable MQTT protocol 3.1.1"
+    default y
+    help
+        If not, this library will use MQTT protocol 3.1
 
 config MQTT_TRANSPORT_SSL
     bool "Enable MQTT over SSL"
@@ -44,12 +49,25 @@ config MQTT_WS_DEFAULT_PORT
 
 config MQTT_WSS_DEFAULT_PORT
     int "Default MQTT over Websocket Secure port"
-    default 80
+    default 443
     depends on MQTT_USE_CUSTOM_CONFIG
     depends on MQTT_TRANSPORT_WEBSOCKET
     depends on MQTT_TRANSPORT_WEBSOCKET_SECURE
     help
         Default MQTT over Websocket Secure port
 
+config MQTT_BUFFER_SIZE
+    int "Default MQTT Buffer Size"
+    default 1024
+    depends on MQTT_USE_CUSTOM_CONFIG
+    help
+        This buffer size using for both transmit and receive
+
+config MQTT_TASK_STACK_SIZE
+    int "MQTT task stack size"
+    default 6144
+    depends on MQTT_USE_CUSTOM_CONFIG
+    help
+        MQTT task stack size
 
 endmenu

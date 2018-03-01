@@ -277,14 +277,16 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
         client->config->scheme = create_string("mqtt", 4);
     }
 
+#if MQTT_ENABLE_WS
     transport_handle_t ws = transport_ws_init(tcp);
     transport_set_default_port(ws, MQTT_WS_DEFAULT_PORT);
     transport_list_add(client->transport_list, ws, "ws");
     if (config->transport == MQTT_TRANSPORT_OVER_WS) {
         client->config->scheme = create_string("ws", 2);
     }
+#endif
 
-    //#if define SSL
+#if MQTT_ENABLE_SSL
     transport_handle_t ssl = transport_ssl_init();
     transport_set_default_port(ssl, MQTT_SSL_DEFAULT_PORT);
     if (config->cert_pem) {
@@ -294,14 +296,16 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     if (config->transport == MQTT_TRANSPORT_OVER_SSL) {
         client->config->scheme = create_string("mqtts", 5);
     }
-    // #endif
+#endif
 
+#if MQTT_ENABLE_WSS
     transport_handle_t wss = transport_ws_init(ssl);
     transport_set_default_port(wss, MQTT_WSS_DEFAULT_PORT);
     transport_list_add(client->transport_list, wss, "wss");
     if (config->transport == MQTT_TRANSPORT_OVER_WSS) {
         client->config->scheme = create_string("wss", 3);
     }
+#endif
 
     esp_mqtt_set_config(client, config);
 
