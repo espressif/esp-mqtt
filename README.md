@@ -33,21 +33,38 @@ make flash monitor
 ### URI
 
 - Curently support `mqtt`, `mqtts`, `ws`, `wss` schemes
-- MQTT over HTTP, default port `1883`: `mqtt://iot.eclipse.org`
-- MQTT over HTTP, port `1884`: `mqtt://iot.eclipse.org:1884`
-- MQTT over HTTP, port `1884`, username and password: `mqtt://username:password@iot.eclipse.org:1884`
-- MQTT over HTTPS, default port `8883`: `mqtts://iot.eclipse.org`
-- MQTT over Websocket: `ws://iot.eclipse.org:80/ws`
-- MQTT over Websocket Secure: `wss://iot.eclipse.org:443/ws`
+- MQTT over TCP samples:
+    + `mqtt://iot.eclipse.org`: MQTT over TCP, default port 1883: 
+    + `mqtt://iot.eclipse.org:1884` MQTT over TCP, port 1884: 
+    + `mqtt://username:password@iot.eclipse.org:1884` MQTT over TCP, port 1884, with username and password
+- MQTT over SSL samples: 
+    + `mqtts://iot.eclipse.org`: MQTT over SSL, port 8883
+    + `mqtts://iot.eclipse.org:8884`: MQTT over SSL, port 8884
+- MQTT over Websocket samples: 
+    + `ws://iot.eclipse.org:80/ws`
+- MQTT over Websocket Secure samples: 
+    + `wss://iot.eclipse.org:443/ws`
 - Minimal configurations: 
 
-```cpp
+```c
 const esp_mqtt_client_config_t mqtt_cfg = {
     .uri = "mqtt://iot.eclipse.org",
     .event_handle = mqtt_event_handler,
     // .user_context = (void *)your_context
 };
 ```
+
+- If there are any options related to the URI in `esp_mqtt_client_config_t`, the option defined by the URI will be overridden. Sample: 
+
+```c
+const esp_mqtt_client_config_t mqtt_cfg = {
+    .uri = "mqtt://iot.eclipse.org:1234",
+    .event_handle = mqtt_event_handler,
+    .port = 4567,
+};
+//MQTT client will connect to iot.eclipse.org using port 4567
+```
+
 
 ### SSL 
 
@@ -67,12 +84,12 @@ const esp_mqtt_client_config_t mqtt_cfg = {
 ### More options for `esp_mqtt_client_config_t`
 
 -  `event_handle` for MQTT events
--  `host`: replace `uri` host
--  `port`: replace `uri` port
--  `client_id`: replace default client id is `ESP32_%CHIPID%`
+-  `host`: MQTT server domain (ipv4 as string)
+-  `port`: MQTT server port
+-  `client_id`: default client id is `ESP32_%CHIPID%`
 -  `username`: MQTT username 
 -  `password`: MQTT password
--  `lwt_topic, lwt_msg, lwt_qos, lwt_retain`: are mqtt lwt options, default NULL
+-  `lwt_topic, lwt_msg, lwt_qos, lwt_retain, lwt_msg_len`: are mqtt lwt options, default NULL
 -  `disable_clean_session`: mqtt clean session, default clean_session is true
 -  `keepalive`: (value in seconds) mqtt keepalive, default is 120 seconds
 -  `disable_auto_reconnect`: this mqtt client will reconnect to server (when errors/disconnect). Set `disable_auto_reconnect=true` to disable
