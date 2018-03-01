@@ -49,7 +49,7 @@ struct __attribute((__packed__)) mqtt_connect_variable_header
 {
     uint8_t lengthMsb;
     uint8_t lengthLsb;
-#if defined(CONFIG_MQTT_PROTOCOL_311)
+#if defined(MQTT_PROTOCOL_311)
     uint8_t magic[4];
 #else
     uint8_t magic[6];
