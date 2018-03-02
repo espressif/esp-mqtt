@@ -48,10 +48,6 @@ typedef struct {
 
 typedef esp_mqtt_event_t* esp_mqtt_event_handle_t;
 
-
-/**
- * \return True on connect success, false on error
- */
 typedef esp_err_t (* mqtt_event_callback_t)(esp_mqtt_event_handle_t event);
 
 

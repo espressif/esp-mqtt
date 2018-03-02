@@ -708,7 +708,7 @@ static void esp_mqtt_task(void *pv)
                     client->reconnect_tick = platform_tick_get_ms();
                     ESP_LOGD(TAG, "Reconnecting...");
                 }
-                // wait for timeout then change state to INIT
+                vTaskDelay(client->wait_timeout_ms/2/portTICK_RATE_MS);
                 break;
         }
     }
