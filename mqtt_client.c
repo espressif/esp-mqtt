@@ -125,16 +125,13 @@ static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_
         client->connect_info.will_topic = strdup(config->lwt_topic);
     }
 
-    if (config->lwt_msg[0] || config->lwt_msg_len > 0) {
-        if (config->lwt_msg_len > 0) {
-            client->connect_info.will_message = malloc(config->lwt_msg_len);
-            memcpy(client->connect_info.will_message, config->lwt_msg, config->lwt_msg_len);
-            client->connect_info.will_length = config->lwt_msg_len;
-        }
-        else {
-            client->connect_info.will_message = strdup(config->lwt_msg);
-            client->connect_info.will_length = strlen(config->lwt_msg);
-        }
+    if (config->lwt_msg_len) {
+        client->connect_info.will_message = malloc(config->lwt_msg_len);
+        mem_assert(client->connect_info.will_message);
+        memcpy(client->connect_info.will_message, config->lwt_msg, config->lwt_msg_len);
+    } else if (config->lwt_msg[0]) {
+        client->connect_info.will_message = strdup(config->lwt_msg);
+        client->connect_info.will_length = strlen(config->lwt_msg);
     }
 
     client->connect_info.will_qos = config->lwt_qos;
@@ -280,14 +277,16 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
         client->config->scheme = create_string("mqtt", 4);
     }
 
+#if MQTT_ENABLE_WS
     transport_handle_t ws = transport_ws_init(tcp);
     transport_set_default_port(ws, MQTT_WS_DEFAULT_PORT);
     transport_list_add(client->transport_list, ws, "ws");
     if (config->transport == MQTT_TRANSPORT_OVER_WS) {
         client->config->scheme = create_string("ws", 2);
     }
+#endif
 
-    //#if define SSL
+#if MQTT_ENABLE_SSL
     transport_handle_t ssl = transport_ssl_init();
     transport_set_default_port(ssl, MQTT_SSL_DEFAULT_PORT);
     if (config->cert_pem) {
@@ -297,14 +296,16 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     if (config->transport == MQTT_TRANSPORT_OVER_SSL) {
         client->config->scheme = create_string("mqtts", 5);
     }
-    // #endif
+#endif
 
+#if MQTT_ENABLE_WSS
     transport_handle_t wss = transport_ws_init(ssl);
     transport_set_default_port(wss, MQTT_WSS_DEFAULT_PORT);
     transport_list_add(client->transport_list, wss, "wss");
     if (config->transport == MQTT_TRANSPORT_OVER_WSS) {
         client->config->scheme = create_string("wss", 3);
     }
+#endif
 
     esp_mqtt_set_config(client, config);
 
@@ -698,8 +699,6 @@ static void esp_mqtt_task(void *pv)
                 break;
             case MQTT_STATE_WAIT_TIMEOUT:
 
-                vTaskDelay(1);
-
                 if (!client->config->auto_reconnect) {
                     client->run = false;
                     break;
@@ -709,7 +708,7 @@ static void esp_mqtt_task(void *pv)
                     client->reconnect_tick = platform_tick_get_ms();
                     ESP_LOGD(TAG, "Reconnecting...");
                 }
-                // wait for timeout then change state to INIT
+                vTaskDelay(client->wait_timeout_ms/2/portTICK_RATE_MS);
                 break;
         }
     }

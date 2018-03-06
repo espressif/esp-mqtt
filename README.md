@@ -1,8 +1,7 @@
-[![](https://travis-ci.org/tuanpmt/espmqtt.png?branch=master)](https://travis-ci.org/tuanpmt/espmqtt)
+[![](https://travis-ci.org/tuanpmt/espmqtt.svg?branch=master)](https://travis-ci.org/tuanpmt/espmqtt)
 [![](http://hits.dwyl.io/tuanpmt/espmqtt.svg)](http://hits.dwyl.io/tuanpmt/espmqtt)
 [![Twitter Follow](https://img.shields.io/twitter/follow/tuanpmt.svg?style=social&label=Follow)](https://twitter.com/tuanpmt)
 ![GitHub contributors](https://img.shields.io/github/contributors/tuanpmt/espmqtt.svg)
-
 
 # ESP32 MQTT Library
 
@@ -34,21 +33,38 @@ make flash monitor
 ### URI
 
 - Curently support `mqtt`, `mqtts`, `ws`, `wss` schemes
-- MQTT over HTTP, default port `1883`: `mqtt://iot.eclipse.org`
-- MQTT over HTTP, port `1884`: `mqtt://iot.eclipse.org:1884`
-- MQTT over HTTP, port `1884`, username and password: `mqtt://username:password@iot.eclipse.org:1884`
-- MQTT over HTTPS, default port `8883`: `mqtts://iot.eclipse.org`
-- MQTT over Websocket: `ws://iot.eclipse.org:80/ws`
-- MQTT over Websocket Secure: `wss://iot.eclipse.org:443/ws`
+- MQTT over TCP samples:
+    + `mqtt://iot.eclipse.org`: MQTT over TCP, default port 1883: 
+    + `mqtt://iot.eclipse.org:1884` MQTT over TCP, port 1884: 
+    + `mqtt://username:password@iot.eclipse.org:1884` MQTT over TCP, port 1884, with username and password
+- MQTT over SSL samples: 
+    + `mqtts://iot.eclipse.org`: MQTT over SSL, port 8883
+    + `mqtts://iot.eclipse.org:8884`: MQTT over SSL, port 8884
+- MQTT over Websocket samples: 
+    + `ws://iot.eclipse.org:80/ws`
+- MQTT over Websocket Secure samples: 
+    + `wss://iot.eclipse.org:443/ws`
 - Minimal configurations: 
 
-```cpp
+```c
 const esp_mqtt_client_config_t mqtt_cfg = {
     .uri = "mqtt://iot.eclipse.org",
     .event_handle = mqtt_event_handler,
     // .user_context = (void *)your_context
 };
 ```
+
+- If there are any options related to the URI in `esp_mqtt_client_config_t`, the option defined by the URI will be overridden. Sample: 
+
+```c
+const esp_mqtt_client_config_t mqtt_cfg = {
+    .uri = "mqtt://iot.eclipse.org:1234",
+    .event_handle = mqtt_event_handler,
+    .port = 4567,
+};
+//MQTT client will connect to iot.eclipse.org using port 4567
+```
+
 
 ### SSL 
 
@@ -68,15 +84,17 @@ const esp_mqtt_client_config_t mqtt_cfg = {
 ### More options for `esp_mqtt_client_config_t`
 
 -  `event_handle` for MQTT events
--  `host`: replace `uri` host
--  `port`: replace `uri` port
--  `client_id`: replace default client id is `ESP32_%CHIPID%`
--  `lwt_topic, lwt_msg, lwt_qos, lwt_retain`: are mqtt lwt options, default NULL
+-  `host`: MQTT server domain (ipv4 as string)
+-  `port`: MQTT server port
+-  `client_id`: default client id is `ESP32_%CHIPID%`
+-  `username`: MQTT username 
+-  `password`: MQTT password
+-  `lwt_topic, lwt_msg, lwt_qos, lwt_retain, lwt_msg_len`: are mqtt lwt options, default NULL
 -  `disable_clean_session`: mqtt clean session, default clean_session is true
 -  `keepalive`: (value in seconds) mqtt keepalive, default is 120 seconds
 -  `disable_auto_reconnect`: this mqtt client will reconnect to server (when errors/disconnect). Set `disable_auto_reconnect=true` to disable
 -  `user_context` pass user context to this option, then can receive that context in `event->user_context`
--  `task_prio, task_stack` for MQTT task, default priority is 5, and task_stack = 4096 bytes
+-  `task_prio, task_stack` for MQTT task, default priority is 5, and task_stack = 6144 bytes (or default task stack can be set via `make menucofig`).
 -  `buffer_size` for MQTT send/receive buffer, default is 1024
 -  `cert_pem` pointer to CERT file for server verify (with SSL), default is NULL, not required to verify the server
 -  `transport`: override URI transport
@@ -85,6 +103,12 @@ const esp_mqtt_client_config_t mqtt_cfg = {
     +  `MQTT_TRANSPORT_OVER_WS`: MQTT over Websocket, using scheme: `ws`
     +  `MQTT_TRANSPORT_OVER_WSS`: MQTT over Websocket Secure, using scheme: `wss`
 
+### Change settings in `menuconfig`
+
+```
+make menuconfig 
+-> Component config -> ESPMQTT Configuration 
+```
 
 ## Example
 
@@ -126,9 +150,8 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
             break;
         case MQTT_EVENT_DATA:
             ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-            vTaskDelay(500/portTICK_RATE_MS);
-            msg_id = esp_mqtt_client_publish(client, "/topic/qos0", "data", 0, 0, 0);
-            ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
+            printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
+            printf("DATA=%.*s\r\n", event->data_len, event->data);
             break;
         case MQTT_EVENT_ERROR:
             ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
