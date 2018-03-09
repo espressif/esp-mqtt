@@ -600,6 +600,8 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
         case MQTT_MSG_TYPE_PUBACK:
             if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
                 ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBACK, finish QoS1 publish");
+            client->event.event_id = MQTT_EVENT_PUBLISHED;
+            esp_mqtt_dispatch_event(client);
             }
 
             break;
@@ -618,6 +620,8 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBCOMP");
             if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBREL, msg_id)) {
                 ESP_LOGD(TAG, "Receive MQTT_MSG_TYPE_PUBCOMP, finish QoS2 publish");
+            client->event.event_id = MQTT_EVENT_PUBLISHED;
+            esp_mqtt_dispatch_event(client);
             }
             break;
         case MQTT_MSG_TYPE_PINGREQ:
