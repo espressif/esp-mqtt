@@ -692,7 +692,10 @@ static void esp_mqtt_task(void *pv)
                 }
 
                 if (platform_tick_get_ms() - client->keepalive_tick > client->connect_info.keepalive * 1000 / 2) {
-                    esp_mqtt_client_ping(client);
+                    if (esp_mqtt_client_ping(client) == ESP_FAIL) {
+                        esp_mqtt_abort_connection(client);
+                        break;
+                    }
                     client->keepalive_tick = platform_tick_get_ms();
                 }
 
