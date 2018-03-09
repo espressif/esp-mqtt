@@ -747,11 +747,6 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 
 static int esp_mqtt_client_ping(esp_mqtt_client_handle_t client)
 {
-    if (client->state != MQTT_STATE_CONNECTED) {
-        ESP_LOGE(TAG, "Client has not connected");
-        return -1;
-    }
-
     client->mqtt_state.outbound_message = mqtt_msg_pingreq(&client->mqtt_state.mqtt_connection);
 
     if (mqtt_write_data(client) != ESP_OK) {
