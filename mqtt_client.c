@@ -48,7 +48,7 @@ typedef struct {
 
 typedef enum {
     MQTT_STATE_ERROR = -1,
-    MQTT_STATE_UNKNOW = 0,
+    MQTT_STATE_UNKNOWN = 0,
     MQTT_STATE_INIT,
     MQTT_STATE_CONNECTED,
     MQTT_STATE_WAIT_TIMEOUT,
@@ -269,6 +269,8 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     esp_mqtt_client_handle_t client = calloc(1, sizeof(struct esp_mqtt_client));
     mem_assert(client);
 
+    esp_mqtt_set_config(client, config);
+    
     client->transport_list = transport_list_init();
 
     transport_handle_t tcp = transport_tcp_init();
@@ -307,9 +309,6 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
         client->config->scheme = create_string("wss", 3);
     }
 #endif
-
-    esp_mqtt_set_config(client, config);
-
     if (client->config->uri) {
         if (esp_mqtt_client_set_uri(client, client->config->uri) != ESP_OK) {
             return NULL;
@@ -601,6 +600,8 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
         case MQTT_MSG_TYPE_PUBACK:
             if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
                 ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBACK, finish QoS1 publish");
+            client->event.event_id = MQTT_EVENT_PUBLISHED;
+            esp_mqtt_dispatch_event(client);
             }
 
             break;
@@ -619,6 +620,8 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBCOMP");
             if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBREL, msg_id)) {
                 ESP_LOGD(TAG, "Receive MQTT_MSG_TYPE_PUBCOMP, finish QoS2 publish");
+            client->event.event_id = MQTT_EVENT_PUBLISHED;
+            esp_mqtt_dispatch_event(client);
             }
             break;
         case MQTT_MSG_TYPE_PINGREQ:
@@ -738,7 +741,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 {
     client->run = false;
     xEventGroupWaitBits(client->status_bits, STOPPED_BIT, false, true, portMAX_DELAY);
-    client->state = MQTT_STATE_UNKNOW;
+    client->state = MQTT_STATE_UNKNOWN;
     return ESP_OK;
 }
 
