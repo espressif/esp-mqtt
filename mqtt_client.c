@@ -48,7 +48,7 @@ typedef struct {
 
 typedef enum {
     MQTT_STATE_ERROR = -1,
-    MQTT_STATE_UNKNOW = 0,
+    MQTT_STATE_UNKNOWN = 0,
     MQTT_STATE_INIT,
     MQTT_STATE_CONNECTED,
     MQTT_STATE_WAIT_TIMEOUT,
@@ -737,7 +737,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 {
     client->run = false;
     xEventGroupWaitBits(client->status_bits, STOPPED_BIT, false, true, portMAX_DELAY);
-    client->state = MQTT_STATE_UNKNOW;
+    client->state = MQTT_STATE_UNKNOWN;
     return ESP_OK;
 }
 
