@@ -131,8 +131,8 @@ static int tcp_close(transport_handle_t t)
 static esp_err_t tcp_destroy(transport_handle_t t)
 {
     transport_tcp_t *tcp = transport_get_data(t);
-    free(tcp);
     transport_close(t);
+    free(tcp);
     return 0;
 }
 
