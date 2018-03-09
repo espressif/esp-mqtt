@@ -39,6 +39,14 @@ config MQTT_TCP_DEFAULT_PORT
     help
         Default MQTT over TCP port
 
+config MQTT_SSL_DEFAULT_PORT
+    int "Default MQTT over SSL port"
+    default 8883
+    depends on MQTT_USE_CUSTOM_CONFIG
+    depends on MQTT_TRANSPORT_SSL
+    help
+        Default MQTT over SSL port
+        
 config MQTT_WS_DEFAULT_PORT
     int "Default MQTT over Websocket port"
     default 80
