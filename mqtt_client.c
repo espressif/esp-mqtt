@@ -269,6 +269,8 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     esp_mqtt_client_handle_t client = calloc(1, sizeof(struct esp_mqtt_client));
     mem_assert(client);
 
+    esp_mqtt_set_config(client, config);
+    
     client->transport_list = transport_list_init();
 
     transport_handle_t tcp = transport_tcp_init();
@@ -307,9 +309,6 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
         client->config->scheme = create_string("wss", 3);
     }
 #endif
-
-    esp_mqtt_set_config(client, config);
-
     if (client->config->uri) {
         if (esp_mqtt_client_set_uri(client, client->config->uri) != ESP_OK) {
             return NULL;
