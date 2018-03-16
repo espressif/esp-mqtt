@@ -78,7 +78,7 @@ static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_
 static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms);
 static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client);
-static int esp_mqtt_client_ping(esp_mqtt_client_handle_t client);
+static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client);
 static char *create_string(const char *ptr, int len);
 
 static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_client_config_t *config)
@@ -692,7 +692,10 @@ static void esp_mqtt_task(void *pv)
                 }
 
                 if (platform_tick_get_ms() - client->keepalive_tick > client->connect_info.keepalive * 1000 / 2) {
-                    esp_mqtt_client_ping(client);
+                    if (esp_mqtt_client_ping(client) == ESP_FAIL) {
+                        esp_mqtt_abort_connection(client);
+                        break;
+                    }
                     client->keepalive_tick = platform_tick_get_ms();
                 }
 
@@ -745,21 +748,16 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
     return ESP_OK;
 }
 
-static int esp_mqtt_client_ping(esp_mqtt_client_handle_t client)
+static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client)
 {
-    if (client->state != MQTT_STATE_CONNECTED) {
-        ESP_LOGE(TAG, "Client has not connected");
-        return -1;
-    }
-
     client->mqtt_state.outbound_message = mqtt_msg_pingreq(&client->mqtt_state.mqtt_connection);
 
     if (mqtt_write_data(client) != ESP_OK) {
         ESP_LOGE(TAG, "Error sending ping");
-        return -1;
+        return ESP_FAIL;
     }
     ESP_LOGD(TAG, "Sent PING successful");
-    return 0;
+    return ESP_OK;
 }
 
 int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic, int qos)
