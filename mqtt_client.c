@@ -429,6 +429,10 @@ static esp_err_t mqtt_write_data(esp_mqtt_client_handle_t client)
         ESP_LOGE(TAG, "Error write data or timeout, written len = %d", write_len);
         return ESP_FAIL;
     }
+    /* we've just sent a mqtt control packet, update keepalive counter
+     * [MQTT-3.1.2-23]
+     */
+    client->keepalive_tick = platform_tick_get_ms();
     return ESP_OK;
 }
 
@@ -692,7 +696,6 @@ static void esp_mqtt_task(void *pv)
                         esp_mqtt_abort_connection(client);
                         break;
                     }
-                    client->keepalive_tick = platform_tick_get_ms();
                 }
 
                 //Delete mesaage after 30 senconds
