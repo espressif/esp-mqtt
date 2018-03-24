@@ -24,6 +24,7 @@
 #define MQTT_MAX_LWT_TOPIC          32
 #define MQTT_MAX_LWT_MSG            128
 #define MQTT_TASK_PRIORITY          5
+#define MQTT_OUT_MSGS_QUEUE_LEN     5
 
 #if CONFIG_MQTT_TASK_STACK_SIZE
 #define MQTT_TASK_STACK             CONFIG_MQTT_TASK_STACK_SIZE

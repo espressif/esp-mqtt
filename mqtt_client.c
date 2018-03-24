@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "platform.h"
 
+#include "freertos/queue.h"
 #include "mqtt_client.h"
 #include "mqtt_msg.h"
 #include "transport.h"
@@ -68,6 +69,7 @@ struct esp_mqtt_client {
     esp_mqtt_event_t event;
     bool run;
     outbox_handle_t outbox;
+    QueueHandle_t out_msgs_queue;
     EventGroupHandle_t status_bits;
 };
 
@@ -80,6 +82,8 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
 static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client);
 static char *create_string(const char *ptr, int len);
+static mqtt_connection_t *mqtt_connection_alloc(esp_mqtt_client_handle_t client);
+static void mqtt_connection_free(mqtt_connection_t *connection);
 
 static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_client_config_t *config)
 {
@@ -335,6 +339,10 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     client->mqtt_state.out_buffer_length = buffer_size;
     client->mqtt_state.connect_info = &client->connect_info;
     client->outbox = outbox_init();
+    client->out_msgs_queue = xQueueCreate(
+        config->out_msgs_queue_len > 0 ? config->out_msgs_queue_len : MQTT_OUT_MSGS_QUEUE_LEN,
+        sizeof(mqtt_connection_t));
+    assert(client->out_msgs_queue != NULL);
     client->status_bits = xEventGroupCreate();
     return client;
 }
@@ -345,6 +353,7 @@ esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client)
     esp_mqtt_destroy_config(client);
     transport_list_destroy(client->transport_list);
     outbox_destroy(client->outbox);
+    vQueueDelete(client->out_msgs_queue);
     vEventGroupDelete(client->status_bits);
     free(client->mqtt_state.in_buffer);
     free(client->mqtt_state.out_buffer);
@@ -526,7 +535,6 @@ static void mqtt_enqueue(esp_mqtt_client_handle_t client)
 {
     ESP_LOGD(TAG, "mqtt_enqueue id: %d, type=%d successful",
         client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
-    //lock mutex
     if (client->mqtt_state.pending_msg_count > 0) {
         //Copy to queue buffer
         outbox_enqueue(client->outbox,
@@ -536,7 +544,6 @@ static void mqtt_enqueue(esp_mqtt_client_handle_t client)
                        client->mqtt_state.pending_msg_type,
                        platform_tick_get_ms());
     }
-    //unlock
 }
 
 static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
@@ -637,6 +644,39 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
     return ESP_OK;
 }
 
+static esp_err_t mqtt_process_send(esp_mqtt_client_handle_t client)
+{
+    mqtt_connection_t *out_msg;
+
+    /* process all out_msgs from the queue (does not block if queue is empty) */
+    while (xQueueReceive(client->out_msgs_queue, &out_msg, 0) == pdPASS) {
+        ESP_LOGD(TAG, "%s: sending out_msg->message.data=%p, out_msg->message.length=%d",
+            __func__, (void *)out_msg->message.data, out_msg->message.length);
+        int msg_type = mqtt_get_type(out_msg->message.data);
+        int msg_id = mqtt_get_id(out_msg->message.data, out_msg->message.length);
+        if ((msg_type != MQTT_MSG_TYPE_PUBLISH) || (mqtt_get_qos(out_msg->message.data) > 0)) {
+            mqtt_enqueue(client);
+            client->mqtt_state.pending_msg_type = msg_type;
+            client->mqtt_state.pending_msg_id = msg_id;
+            client->mqtt_state.pending_msg_count ++;
+        }
+        client->mqtt_state.outbound_message = &out_msg->message;
+        ESP_LOGD(TAG, "%s: launching mqtt_write_data()", __func__);
+        if (mqtt_write_data(client) != ESP_OK) {
+            ESP_LOGE(TAG, "%s: failed to send a message: type=%d, id=%d", __func__, msg_type, msg_id);
+            mqtt_connection_free(out_msg);
+            return ESP_FAIL;
+        }
+        mqtt_connection_free(out_msg);
+    }
+
+    /* send a ping if keepalive counter says so [MQTT-3.1.2-23] */
+    if (platform_tick_get_ms() - client->keepalive_tick > client->connect_info.keepalive * 1000 / 2) {
+        return esp_mqtt_client_ping(client);
+    }
+    return ESP_OK;
+}
+
 static void esp_mqtt_task(void *pv)
 {
     esp_mqtt_client_handle_t client = (esp_mqtt_client_handle_t) pv;
@@ -686,16 +726,18 @@ static void esp_mqtt_task(void *pv)
                 break;
             case MQTT_STATE_CONNECTED:
                 // receive and process data
+                ESP_LOGD(TAG, "%s: launching mqtt_process_receive()", __func__);
                 if (mqtt_process_receive(client) == ESP_FAIL) {
+                    ESP_LOGW(TAG, "%s: mqtt_process_receive() failed, aborting connection", __func__);
                     esp_mqtt_abort_connection(client);
                     break;
                 }
-
-                if (platform_tick_get_ms() - client->keepalive_tick > client->connect_info.keepalive * 1000 / 2) {
-                    if (esp_mqtt_client_ping(client) == ESP_FAIL) {
-                        esp_mqtt_abort_connection(client);
-                        break;
-                    }
+                /* send data */
+                ESP_LOGD(TAG, "%s: launching mqtt_process_send()", __func__);
+                if (mqtt_process_send(client) == ESP_FAIL) {
+                    ESP_LOGW(TAG, "%s: mqtt_process_send() failed, aborting connection", __func__);
+                    esp_mqtt_abort_connection(client);
+                    break;
                 }
 
                 //Delete mesaage after 30 senconds
@@ -758,82 +800,112 @@ static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client)
     return ESP_OK;
 }
 
+/* returns -1 in case of failure */
 int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic, int qos)
 {
-    if (client->state != MQTT_STATE_CONNECTED) {
-        ESP_LOGE(TAG, "Client has not connected");
+    uint16_t message_id = 0;
+    mqtt_connection_t *out_msg;
+
+    if ((out_msg = mqtt_connection_alloc(client)) == NULL) {
+        ESP_LOGE(TAG, "%s: mqtt_connection_alloc() failed", __func__);
         return -1;
     }
-    mqtt_enqueue(client); //move pending msg to outbox (if have)
-    client->mqtt_state.outbound_message = mqtt_msg_subscribe(&client->mqtt_state.mqtt_connection,
-                                          topic, qos,
-                                          &client->mqtt_state.pending_msg_id);
-
-    client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
-    client->mqtt_state.pending_msg_count ++;
-
-    if (mqtt_write_data(client) != ESP_OK) {
-        ESP_LOGE(TAG, "Error to subscribe topic=%s, qos=%d", topic, qos);
+    mqtt_msg_subscribe(out_msg, topic, qos, &message_id);
+    ESP_LOGD(TAG, "%s: out_msg->message.data=%p, out_msg->message.length=%d",
+        __func__, (void *)out_msg->message.data, out_msg->message.length);
+    if (out_msg->message.length == 0) {
+        ESP_LOGE(TAG, "%s: mqtt_msg_subscribe() failed", __func__);
+        mqtt_connection_free(out_msg);
         return -1;
     }
-
-    ESP_LOGD(TAG, "Sent subscribe topic=%s, id: %d, type=%d successful", topic, client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
-    return client->mqtt_state.pending_msg_id;
+    /* does not block */
+    if (xQueueSendToBack(client->out_msgs_queue, &out_msg, 0) != pdPASS) {
+        ESP_LOGE(TAG, "%s: failed to enqueue a message with topic=%s", __func__, topic);
+        mqtt_connection_free(out_msg);
+        return -1;
+    }
+    return message_id;
 }
 
+/* returns -1 in case of failure */
 int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *topic)
 {
-    if (client->state != MQTT_STATE_CONNECTED) {
-        ESP_LOGE(TAG, "Client has not connected");
+    uint16_t message_id = 0;
+    mqtt_connection_t *out_msg;
+
+    if ((out_msg = mqtt_connection_alloc(client)) == NULL) {
+        ESP_LOGE(TAG, "%s: mqtt_connection_alloc() failed", __func__);
         return -1;
     }
-    mqtt_enqueue(client);
-    client->mqtt_state.outbound_message = mqtt_msg_unsubscribe(&client->mqtt_state.mqtt_connection,
-                                          topic,
-                                          &client->mqtt_state.pending_msg_id);
-    ESP_LOGD(TAG, "unsubscribe, topic\"%s\", id: %d", topic, client->mqtt_state.pending_msg_id);
-
-    client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
-    client->mqtt_state.pending_msg_count ++;
-
-    if (mqtt_write_data(client) != ESP_OK) {
-        ESP_LOGE(TAG, "Error to unsubscribe topic=%s", topic);
+    mqtt_msg_unsubscribe(out_msg, topic, &message_id);
+    ESP_LOGD(TAG, "%s: out_msg->message.data=%p, out_msg->message.length=%d",
+        __func__, (void *)out_msg->message.data, out_msg->message.length);
+    if (out_msg->message.length == 0) {
+        ESP_LOGE(TAG, "%s: mqtt_msg_unsubscribe() failed", __func__);
+        mqtt_connection_free(out_msg);
         return -1;
     }
-
-    ESP_LOGD(TAG, "Sent Unsubscribe topic=%s, id: %d, successful", topic, client->mqtt_state.pending_msg_id);
-    return client->mqtt_state.pending_msg_id;
+    /* does not block */
+    if (xQueueSendToBack(client->out_msgs_queue, &out_msg, 0) != pdPASS) {
+        ESP_LOGE(TAG, "%s: failed to enqueue a message with topic=%s", __func__, topic);
+        mqtt_connection_free(out_msg);
+        return -1;
+    }
+    return message_id;
 }
 
+/* returns -1 in case of failure */
 int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain)
 {
-    uint16_t pending_msg_id = 0;
-    if (client->state != MQTT_STATE_CONNECTED) {
-        ESP_LOGE(TAG, "Client has not connected");
+    uint16_t message_id = 0;
+    mqtt_connection_t *out_msg;
+
+    if ((out_msg = mqtt_connection_alloc(client)) == NULL) {
+        ESP_LOGE(TAG, "%s: mqtt_connection_alloc() failed", __func__);
         return -1;
     }
     if (len <= 0) {
         len = strlen(data);
     }
-    if (qos > 0) {
-        mqtt_enqueue(client);
-    }
-
-    client->mqtt_state.outbound_message = mqtt_msg_publish(&client->mqtt_state.mqtt_connection,
-                                          topic, data, len,
-                                          qos, retain,
-                                          &pending_msg_id);
-    if (qos > 0) {
-        client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
-        client->mqtt_state.pending_msg_id = pending_msg_id;
-        client->mqtt_state.pending_msg_count ++;
-    }
-
-    if (mqtt_write_data(client) != ESP_OK) {
-        ESP_LOGE(TAG, "Error to public data to topic=%s, qos=%d", topic, qos);
+    mqtt_msg_publish(out_msg, topic, data, len, qos, retain, &message_id);
+    ESP_LOGD(TAG, "%s: out_msg->message.data=%p, out_msg->message.length=%d", __func__, (void *)out_msg->message.data, out_msg->message.length);
+    if (out_msg->message.length == 0) {
+        ESP_LOGE(TAG, "%s: mqtt_msg_publish() failed", __func__);
+        mqtt_connection_free(out_msg);
         return -1;
     }
-    return pending_msg_id;
+    /* does not block */
+    if (xQueueSendToBack(client->out_msgs_queue, &out_msg, 0) != pdPASS) {
+        ESP_LOGE(TAG, "%s: failed to enqueue a message with topic=%s", __func__, topic);
+        mqtt_connection_free(out_msg);
+        return -1;
+    }
+    return message_id;
 }
 
+static mqtt_connection_t *mqtt_connection_alloc(esp_mqtt_client_handle_t client)
+{
+    uint8_t *buffer;
+    int buffer_size = client->mqtt_state.out_buffer_length;
+    mqtt_connection_t *connection;
 
+    buffer = (uint8_t *)malloc(buffer_size);
+    if (buffer == NULL) {
+        ESP_LOGE(TAG, "%s: failed to allocate a buffer", __func__);
+        return NULL;
+    }
+    connection = (mqtt_connection_t *)malloc(sizeof(mqtt_connection_t));
+    if (connection == NULL) {
+        ESP_LOGE(TAG, "%s: failed to allocate a connection", __func__);
+        free(buffer);
+        return NULL;
+    }
+    mqtt_msg_init(connection, buffer, buffer_size);
+    return connection;
+}
+
+static void mqtt_connection_free(mqtt_connection_t *connection)
+{
+    free(connection->buffer);
+    free(connection);
+}

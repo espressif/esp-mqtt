@@ -72,6 +72,7 @@ typedef struct {
     int task_prio;
     int task_stack;
     int buffer_size;
+    int out_msgs_queue_len;
     const char *cert_pem;
     esp_mqtt_transport_t transport;
 } esp_mqtt_client_config_t;
