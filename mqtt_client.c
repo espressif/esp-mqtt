@@ -573,6 +573,10 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             break;
         case MQTT_MSG_TYPE_PUBLISH:
             ESP_LOGD(TAG, "%s: received MQTT_MSG_TYPE_PUBLISH", __func__);
+            client->mqtt_state.message_length_read = read_len;
+            client->mqtt_state.message_length = mqtt_get_total_length(client->mqtt_state.in_buffer, client->mqtt_state.message_length_read);
+            ESP_LOGI(TAG, "deliver_publish, message_length_read=%d, message_length=%d", read_len, client->mqtt_state.message_length);
+            deliver_publish(client, client->mqtt_state.in_buffer, client->mqtt_state.message_length_read);
             if (msg_qos == 1) {
                 client->mqtt_state.outbound_message = mqtt_msg_puback(&client->mqtt_state.mqtt_connection, msg_id);
             }
@@ -590,11 +594,6 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
                     // return ESP_FAIL;
                 }
             }
-            client->mqtt_state.message_length_read = read_len;
-            client->mqtt_state.message_length = mqtt_get_total_length(client->mqtt_state.in_buffer, client->mqtt_state.message_length_read);
-            ESP_LOGI(TAG, "deliver_publish, message_length_read=%d, message_length=%d", read_len, client->mqtt_state.message_length);
-
-            deliver_publish(client, client->mqtt_state.in_buffer, client->mqtt_state.message_length_read);
             break;
         case MQTT_MSG_TYPE_PUBACK:
             ESP_LOGD(TAG, "%s: received MQTT_MSG_TYPE_PUBACK", __func__);
