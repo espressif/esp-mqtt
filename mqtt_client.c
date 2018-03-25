@@ -27,10 +27,7 @@ typedef struct mqtt_state
     uint16_t message_length_read;
     mqtt_message_t *outbound_message;
     mqtt_connection_t mqtt_connection;
-    uint16_t pending_msg_id;
-    int pending_msg_type;
     int pending_publish_qos;
-    int pending_msg_count;
 } mqtt_state_t;
 
 typedef struct {
@@ -427,7 +424,6 @@ static esp_err_t mqtt_write_data(esp_mqtt_client_handle_t client)
                                     (char *)client->mqtt_state.outbound_message->data,
                                     client->mqtt_state.outbound_message->length,
                                     client->config->network_timeout_ms);
-    // client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
     if (write_len <= 0) {
         ESP_LOGE(TAG, "Error write data or timeout, written len = %d", write_len);
         return ESP_FAIL;
@@ -509,36 +505,28 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
 
 static bool is_valid_mqtt_msg(esp_mqtt_client_handle_t client, int msg_type, int msg_id)
 {
-    ESP_LOGD(TAG, "%s: client->mqtt_state.pending_msg_id=%d, client->mqtt_state.pending_msg_count=%d, client->mqtt_state.pending_msg_type=%d",
-        __func__, client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_count, client->mqtt_state.pending_msg_type);
-    if (client->mqtt_state.pending_msg_count == 0) {
-        return false;
-    }
     if (outbox_delete(client->outbox, msg_id, msg_type) == ESP_OK) {
-        client->mqtt_state.pending_msg_count --;
+        ESP_LOGD(TAG, "%s: msg_id=%d, msg_type=%d found", __func__, msg_id, msg_type);
         return true;
     }
-    if (client->mqtt_state.pending_msg_type == msg_type && client->mqtt_state.pending_msg_id == msg_id) {
-        client->mqtt_state.pending_msg_count --;
-        return true;
-    }
-
+    ESP_LOGW(TAG, "%s: msg_id=%d, msg_type=%d not found", __func__, msg_id, msg_type);
     return false;
 }
 
-static void mqtt_enqueue(esp_mqtt_client_handle_t client)
+
+/*
+ * Copy client->mqtt_state.outbound_message to the Singly-linked Tail queue
+ * of sent messages for it's later identification as being "recent" in
+ * further communication with the broker.
+ */
+static void mqtt_enqueue(esp_mqtt_client_handle_t client, int msg_type, int msg_id)
 {
-    ESP_LOGD(TAG, "mqtt_enqueue id: %d, type=%d successful",
-        client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
-    if (client->mqtt_state.pending_msg_count > 0) {
-        //Copy to queue buffer
-        outbox_enqueue(client->outbox,
-                       client->mqtt_state.outbound_message->data,
-                       client->mqtt_state.outbound_message->length,
-                       client->mqtt_state.pending_msg_id,
-                       client->mqtt_state.pending_msg_type,
-                       platform_tick_get_ms());
-    }
+    outbox_enqueue(client->outbox,
+                   client->mqtt_state.outbound_message->data,
+                   client->mqtt_state.outbound_message->length,
+                   msg_id,
+                   msg_type,
+                   platform_tick_get_ms());
 }
 
 static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
@@ -658,10 +646,7 @@ static esp_err_t mqtt_process_send(esp_mqtt_client_handle_t client)
         int msg_type = mqtt_get_type(out_msg->message.data);
         int msg_id = mqtt_get_id(out_msg->message.data, out_msg->message.length);
         if ((msg_type != MQTT_MSG_TYPE_PUBLISH) || (mqtt_get_qos(out_msg->message.data) > 0)) {
-            mqtt_enqueue(client);
-            client->mqtt_state.pending_msg_type = msg_type;
-            client->mqtt_state.pending_msg_id = msg_id;
-            client->mqtt_state.pending_msg_count ++;
+            mqtt_enqueue(client, msg_type, msg_id);
         }
         client->mqtt_state.outbound_message = &out_msg->message;
         ESP_LOGD(TAG, "%s: launching mqtt_write_data()", __func__);
