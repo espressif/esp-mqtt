@@ -204,13 +204,7 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
                   client->mqtt_state.out_buffer_length);
     client->mqtt_state.outbound_message = mqtt_msg_connect(&client->mqtt_state.mqtt_connection,
                                           client->mqtt_state.connect_info);
-    client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
-    client->mqtt_state.pending_msg_id = mqtt_get_id(client->mqtt_state.outbound_message->data,
-                                        client->mqtt_state.outbound_message->length);
-    ESP_LOGI(TAG, "Sending MQTT CONNECT message, type: %d, id: %04X",
-             client->mqtt_state.pending_msg_type,
-             client->mqtt_state.pending_msg_id);
-
+    ESP_LOGI(TAG, "Sending MQTT CONNECT message (type: %d)", MQTT_MSG_TYPE_CONNECT);
     write_len = transport_write(client->transport,
                                 (char *)client->mqtt_state.outbound_message->data,
                                 client->mqtt_state.outbound_message->length,
