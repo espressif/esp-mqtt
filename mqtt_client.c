@@ -645,15 +645,15 @@ static esp_err_t mqtt_process_send(esp_mqtt_client_handle_t client)
             __func__, (void *)out_msg->message.data, out_msg->message.length);
         int msg_type = mqtt_get_type(out_msg->message.data);
         int msg_id = mqtt_get_id(out_msg->message.data, out_msg->message.length);
-        if ((msg_type != MQTT_MSG_TYPE_PUBLISH) || (mqtt_get_qos(out_msg->message.data) > 0)) {
-            mqtt_enqueue(client, msg_type, msg_id);
-        }
         client->mqtt_state.outbound_message = &out_msg->message;
         ESP_LOGD(TAG, "%s: launching mqtt_write_data()", __func__);
         if (mqtt_write_data(client) != ESP_OK) {
             ESP_LOGE(TAG, "%s: failed to send a message: type=%d, id=%d", __func__, msg_type, msg_id);
             mqtt_connection_free(out_msg);
             return ESP_FAIL;
+        }
+        if ((msg_type != MQTT_MSG_TYPE_PUBLISH) || (mqtt_get_qos(out_msg->message.data) > 0)) {
+            mqtt_enqueue(client, msg_type, msg_id);
         }
         mqtt_connection_free(out_msg);
     }
