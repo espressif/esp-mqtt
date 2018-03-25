@@ -503,7 +503,7 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
 
 }
 
-static bool is_valid_mqtt_msg(esp_mqtt_client_handle_t client, int msg_type, int msg_id)
+static bool is_recent_mqtt_msg(esp_mqtt_client_handle_t client, int msg_type, int msg_id)
 {
     if (outbox_delete(client->outbox, msg_id, msg_type) == ESP_OK) {
         ESP_LOGD(TAG, "%s: msg_id=%d, msg_type=%d found", __func__, msg_id, msg_type);
@@ -553,7 +553,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
     {
         case MQTT_MSG_TYPE_SUBACK:
             ESP_LOGD(TAG, "%s: received MQTT_MSG_TYPE_SUBACK", __func__);
-            if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_SUBSCRIBE, msg_id)) {
+            if (is_recent_mqtt_msg(client, MQTT_MSG_TYPE_SUBSCRIBE, msg_id)) {
                 ESP_LOGD(TAG, "%s: subscribe successful", __func__);
                 client->event.event_id = MQTT_EVENT_SUBSCRIBED;
                 esp_mqtt_dispatch_event(client);
@@ -563,7 +563,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             break;
         case MQTT_MSG_TYPE_UNSUBACK:
             ESP_LOGD(TAG, "%s: received MQTT_MSG_TYPE_UNSUBACK", __func__);
-            if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_UNSUBSCRIBE, msg_id)) {
+            if (is_recent_mqtt_msg(client, MQTT_MSG_TYPE_UNSUBSCRIBE, msg_id)) {
                 ESP_LOGD(TAG, "%s: unsubscribe successful", __func__);
                 client->event.event_id = MQTT_EVENT_UNSUBSCRIBED;
                 esp_mqtt_dispatch_event(client);
@@ -597,7 +597,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             break;
         case MQTT_MSG_TYPE_PUBACK:
             ESP_LOGD(TAG, "%s: received MQTT_MSG_TYPE_PUBACK", __func__);
-            if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
+            if (is_recent_mqtt_msg(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
                 ESP_LOGD(TAG, "%s: publishing of msg_id=%d, QoS=1 succeeded", __func__, msg_id);
                 client->event.event_id = MQTT_EVENT_PUBLISHED;
                 esp_mqtt_dispatch_event(client);
@@ -618,7 +618,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             break;
         case MQTT_MSG_TYPE_PUBCOMP:
             ESP_LOGD(TAG, "%s: received MQTT_MSG_TYPE_PUBCOMP", __func__);
-            if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBREL, msg_id)) {
+            if (is_recent_mqtt_msg(client, MQTT_MSG_TYPE_PUBREL, msg_id)) {
                 ESP_LOGD(TAG, "%s: publishing of msg_id=%d, QoS=2 succeeded", __func__, msg_id);
                 client->event.event_id = MQTT_EVENT_PUBLISHED;
                 esp_mqtt_dispatch_event(client);
