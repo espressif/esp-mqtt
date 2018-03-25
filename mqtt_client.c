@@ -572,26 +572,21 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             }
             break;
         case MQTT_MSG_TYPE_PUBLISH:
-            ESP_LOGD(TAG, "%s: received MQTT_MSG_TYPE_PUBLISH", __func__);
+            ESP_LOGD(TAG, "%s: received MQTT_MSG_TYPE_PUBLISH, QoS=%d", __func__, msg_qos);
             client->mqtt_state.message_length_read = read_len;
             client->mqtt_state.message_length = mqtt_get_total_length(client->mqtt_state.in_buffer, client->mqtt_state.message_length_read);
             ESP_LOGI(TAG, "deliver_publish, message_length_read=%d, message_length=%d", read_len, client->mqtt_state.message_length);
             deliver_publish(client, client->mqtt_state.in_buffer, client->mqtt_state.message_length_read);
-            if (msg_qos == 1) {
-                client->mqtt_state.outbound_message = mqtt_msg_puback(&client->mqtt_state.mqtt_connection, msg_id);
-            }
-            else if (msg_qos == 2) {
-                client->mqtt_state.outbound_message = mqtt_msg_pubrec(&client->mqtt_state.mqtt_connection, msg_id);
-                mqtt_enqueue(client, MQTT_MSG_TYPE_PUBREC, msg_id);
-            }
-
-            if (msg_qos == 1 || msg_qos == 2) {
-                ESP_LOGD(TAG, "Queue response QoS: %d", msg_qos);
-
+            if (msg_qos > 0) {
+                if (msg_qos == 1) {
+                    client->mqtt_state.outbound_message = mqtt_msg_puback(&client->mqtt_state.mqtt_connection, msg_id);
+                } else {  /* msg_qos == 2 */
+                    client->mqtt_state.outbound_message = mqtt_msg_pubrec(&client->mqtt_state.mqtt_connection, msg_id);
+                    mqtt_enqueue(client, MQTT_MSG_TYPE_PUBREC, msg_id);
+                }
                 if (mqtt_write_data(client) != ESP_OK) {
-                    ESP_LOGE(TAG, "Error write qos msg repsonse, qos = %d", msg_qos);
-                    // TODO: Shoule reconnect?
-                    // return ESP_FAIL;
+                    ESP_LOGE(TAG, "%s: error sending repsonse to PUBLISH, msg_id=%d, QoS=%d", __func__, msg_id, msg_qos);
+                    return ESP_FAIL;
                 }
             }
             break;
@@ -609,7 +604,10 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             ESP_LOGD(TAG, "%s: received MQTT_MSG_TYPE_PUBREC", __func__);
             if (is_recent_mqtt_msg(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
                 client->mqtt_state.outbound_message = mqtt_msg_pubrel(&client->mqtt_state.mqtt_connection, msg_id);
-                mqtt_write_data(client);
+                if (mqtt_write_data(client) != ESP_OK) {
+                    ESP_LOGE(TAG, "%s: error sending repsonse to PUBREC, msg_id=%d", __func__, msg_id);
+                    return ESP_FAIL;
+                }
                 mqtt_enqueue(client, MQTT_MSG_TYPE_PUBREL, msg_id);
             } else {
                 ESP_LOGW(TAG, "%s: received PUBREC for unknown msg_id: %d", __func__, msg_id);
@@ -619,7 +617,10 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             ESP_LOGD(TAG, "%s: received MQTT_MSG_TYPE_PUBREL", __func__);
             if (is_recent_mqtt_msg(client, MQTT_MSG_TYPE_PUBREC, msg_id)) {
                 client->mqtt_state.outbound_message = mqtt_msg_pubcomp(&client->mqtt_state.mqtt_connection, msg_id);
-                mqtt_write_data(client);
+                if (mqtt_write_data(client) != ESP_OK) {
+                    ESP_LOGE(TAG, "%s: error sending repsonse to PUBREL, msg_id=%d", __func__, msg_id);
+                    return ESP_FAIL;
+                }
             } else {
                 ESP_LOGW(TAG, "%s: received PUBREL for unknown msg_id: %d", __func__, msg_id);
             }
