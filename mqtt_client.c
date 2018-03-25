@@ -578,6 +578,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             }
             else if (msg_qos == 2) {
                 client->mqtt_state.outbound_message = mqtt_msg_pubrec(&client->mqtt_state.mqtt_connection, msg_id);
+                mqtt_enqueue(client, MQTT_MSG_TYPE_PUBREC, msg_id);
             }
 
             if (msg_qos == 1 || msg_qos == 2) {
@@ -607,14 +608,22 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             break;
         case MQTT_MSG_TYPE_PUBREC:
             ESP_LOGD(TAG, "%s: received MQTT_MSG_TYPE_PUBREC", __func__);
-            client->mqtt_state.outbound_message = mqtt_msg_pubrel(&client->mqtt_state.mqtt_connection, msg_id);
-            mqtt_write_data(client);
+            if (is_recent_mqtt_msg(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
+                client->mqtt_state.outbound_message = mqtt_msg_pubrel(&client->mqtt_state.mqtt_connection, msg_id);
+                mqtt_write_data(client);
+                mqtt_enqueue(client, MQTT_MSG_TYPE_PUBREL, msg_id);
+            } else {
+                ESP_LOGW(TAG, "%s: received PUBREC for unknown msg_id: %d", __func__, msg_id);
+            }
             break;
         case MQTT_MSG_TYPE_PUBREL:
             ESP_LOGD(TAG, "%s: received MQTT_MSG_TYPE_PUBREL", __func__);
-            client->mqtt_state.outbound_message = mqtt_msg_pubcomp(&client->mqtt_state.mqtt_connection, msg_id);
-            mqtt_write_data(client);
-
+            if (is_recent_mqtt_msg(client, MQTT_MSG_TYPE_PUBREC, msg_id)) {
+                client->mqtt_state.outbound_message = mqtt_msg_pubcomp(&client->mqtt_state.mqtt_connection, msg_id);
+                mqtt_write_data(client);
+            } else {
+                ESP_LOGW(TAG, "%s: received PUBREL for unknown msg_id: %d", __func__, msg_id);
+            }
             break;
         case MQTT_MSG_TYPE_PUBCOMP:
             ESP_LOGD(TAG, "%s: received MQTT_MSG_TYPE_PUBCOMP", __func__);
