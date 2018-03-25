@@ -53,6 +53,7 @@ outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox)
 }
 esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type)
 {
+    esp_err_t ret = ESP_FAIL;
     outbox_item_handle_t item, tmp;
     STAILQ_FOREACH_SAFE(item, outbox, next, tmp) {
         if (item->msg_id == msg_id && item->msg_type == msg_type) {
@@ -60,11 +61,11 @@ esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type)
             ESP_LOGD(TAG, "%s: DELETED msgid=%d, msg_type=%d, len=%d, remaining total len=%d", __func__, msg_id, msg_type, item->len, outbox_get_size(outbox));
             free(item->buffer);
             free(item);
-            return ESP_OK;
+            ret = ESP_OK;
         }
 
     }
-    return ESP_FAIL;
+    return ret;
 }
 esp_err_t outbox_delete_msgid(outbox_handle_t outbox, int msg_id)
 {
