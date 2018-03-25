@@ -582,11 +582,13 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
                     client->mqtt_state.outbound_message = mqtt_msg_puback(&client->mqtt_state.mqtt_connection, msg_id);
                 } else {  /* msg_qos == 2 */
                     client->mqtt_state.outbound_message = mqtt_msg_pubrec(&client->mqtt_state.mqtt_connection, msg_id);
-                    mqtt_enqueue(client, MQTT_MSG_TYPE_PUBREC, msg_id);
                 }
                 if (mqtt_write_data(client) != ESP_OK) {
                     ESP_LOGE(TAG, "%s: error sending repsonse to PUBLISH, msg_id=%d, QoS=%d", __func__, msg_id, msg_qos);
                     return ESP_FAIL;
+                }
+                if (msg_qos == 2) {
+                    mqtt_enqueue(client, MQTT_MSG_TYPE_PUBREC, msg_id);
                 }
             }
             break;
