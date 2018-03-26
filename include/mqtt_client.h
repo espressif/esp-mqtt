@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include "esp_err.h"
 
 #include "mqtt_config.h"
 
