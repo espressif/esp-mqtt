@@ -60,8 +60,6 @@ struct esp_mqtt_client {
     mqtt_connect_info_t connect_info;
     mqtt_client_state_t state;
     long long keepalive_tick;
-    long long reconnect_tick;
-    int wait_timeout_ms;
     int auto_reconnect;
     esp_mqtt_event_t event;
     bool run;
@@ -249,11 +247,9 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
 
 static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
 {
+    ESP_LOGI(TAG, "%s: closing connection", __func__);
     transport_close(client->transport);
-    client->wait_timeout_ms = MQTT_RECONNECT_TIMEOUT_MS;
-    client->reconnect_tick = platform_tick_get_ms();
     client->state = MQTT_STATE_WAIT_TIMEOUT;
-    ESP_LOGI(TAG, "Reconnect after %d ms", client->wait_timeout_ms);
     client->event.event_id = MQTT_EVENT_DISCONNECTED;
     esp_mqtt_dispatch_event(client);
     return ESP_OK;
@@ -315,7 +311,6 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     }
 
     client->keepalive_tick = platform_tick_get_ms();
-    client->reconnect_tick = platform_tick_get_ms();
 
     int buffer_size = config->buffer_size;
     if (buffer_size <= 0) {
@@ -703,7 +698,8 @@ static void esp_mqtt_task(void *pv)
                     ESP_LOGE(TAG, "There are no transport");
                     client->run = false;
                 }
-
+                ESP_LOGI(TAG, "%s: connecting to %s://%s:%d", __func__,
+                    client->config->scheme, client->config->host, client->config->port);
                 if (transport_connect(client->transport,
                                       client->config->host,
                                       client->config->port,
@@ -745,17 +741,13 @@ static void esp_mqtt_task(void *pv)
                 outbox_cleanup(client->outbox, OUTBOX_MAX_SIZE);
                 break;
             case MQTT_STATE_WAIT_TIMEOUT:
-
                 if (!client->config->auto_reconnect) {
                     client->run = false;
                     break;
                 }
-                if (platform_tick_get_ms() - client->reconnect_tick > client->wait_timeout_ms) {
-                    client->state = MQTT_STATE_INIT;
-                    client->reconnect_tick = platform_tick_get_ms();
-                    ESP_LOGD(TAG, "Reconnecting...");
-                }
-                vTaskDelay(client->wait_timeout_ms/2/portTICK_RATE_MS);
+                ESP_LOGI(TAG, "%s: reconnect after %d ms", __func__, MQTT_RECONNECT_TIMEOUT_MS);
+                vTaskDelay(pdMS_TO_TICKS(MQTT_RECONNECT_TIMEOUT_MS));
+                client->state = MQTT_STATE_INIT;
                 break;
         }
     }
