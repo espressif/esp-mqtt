@@ -14,6 +14,17 @@
 /* using uri parser */
 #include "http_parser.h"
 
+#if MQTT_TASK_USE_WATCHDOG == 1
+#include "esp_task_wdt.h"
+#define WATCHDOG_REGISTER    ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
+#define WATCHDOG_RESET       ESP_ERROR_CHECK(esp_task_wdt_reset());
+#define WATCHDOG_UNREGISTER  ESP_ERROR_CHECK(esp_task_wdt_delete(NULL));
+#else
+#define WATCHDOG_REGISTER    /* nothing */
+#define WATCHDOG_RESET       /* nothing */
+#define WATCHDOG_UNREGISTER  /* nothing */
+#endif
+
 static const char *TAG = "MQTT_CLIENT";
 
 typedef struct mqtt_state
@@ -690,8 +701,9 @@ static void esp_mqtt_task(void *pv)
 
     client->state = MQTT_STATE_INIT;
     xEventGroupClearBits(client->status_bits, STOPPED_BIT);
+    WATCHDOG_REGISTER;  /* register this task to watchdog */
     while (client->run) {
-
+        WATCHDOG_RESET;  /* reset watchdog */
         switch ((int)client->state) {
             case MQTT_STATE_INIT:
                 if (client->transport == NULL) {
@@ -751,6 +763,7 @@ static void esp_mqtt_task(void *pv)
                 break;
         }
     }
+    WATCHDOG_UNREGISTER;  /* unregister this task from watchdog */
     transport_close(client->transport);
     xEventGroupSetBits(client->status_bits, STOPPED_BIT);
 

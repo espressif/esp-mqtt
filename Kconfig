@@ -78,4 +78,11 @@ config MQTT_TASK_STACK_SIZE
     help
         MQTT task stack size
 
+config MQTT_TASK_USE_WATCHDOG
+    bool "Register the MQTT task to watchdog"
+    default y
+    help
+        Use the esp_task_wdt_* functions to supervise that the mqtt task is
+        making progress.
+
 endmenu

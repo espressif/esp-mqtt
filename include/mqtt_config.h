@@ -32,6 +32,8 @@
 #define MQTT_TASK_STACK             (6*1024)
 #endif
 
+#define MQTT_TASK_USE_WATCHDOG      CONFIG_MQTT_TASK_USE_WATCHDOG
+
 #define MQTT_KEEPALIVE_TICK         (120)
 #define MQTT_CMD_QUEUE_SIZE         (10)
 #define MQTT_NETWORK_TIMEOUT_MS     (10000)
