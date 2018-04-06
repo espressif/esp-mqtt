@@ -558,6 +558,14 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
             return 0;
         }
         ESP_LOGD(TAG, "%s: first byte: 0x%x", __func__, *buf);
+        /*
+         * Verify the flags and act according to MQTT protocol: close connection
+         * if the flags are set incorrectly.
+         */
+        if (!mqtt_has_valid_msg_hdr(buf, read_len)) {
+            ESP_LOGE(TAG, "%s: received a message with an invalid header=0x%x", __func__, *buf);
+            goto err;
+        }
         buf++;
         client->mqtt_state.in_buffer_read_len++;
     }

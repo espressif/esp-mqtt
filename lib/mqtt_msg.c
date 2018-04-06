@@ -133,6 +133,47 @@ void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint16_t buff
     connection->buffer_length = buffer_length;
 }
 
+/*
+ * check flags: [MQTT-2.2.2-1], [MQTT-2.2.2-2]
+ * returns 0 if flags are invalid, otherwise returns 1
+ */
+int mqtt_has_valid_msg_hdr(uint8_t* buffer, uint16_t length)
+{
+    int qos, dup;
+
+    if (length < 1) {
+        return 0;
+    }
+    switch (mqtt_get_type(buffer))
+    {
+        case MQTT_MSG_TYPE_CONNECT:
+        case MQTT_MSG_TYPE_CONNACK:
+        case MQTT_MSG_TYPE_PUBACK:
+        case MQTT_MSG_TYPE_PUBREC:
+        case MQTT_MSG_TYPE_PUBCOMP:
+        case MQTT_MSG_TYPE_SUBACK:
+        case MQTT_MSG_TYPE_UNSUBACK:
+        case MQTT_MSG_TYPE_PINGREQ:
+        case MQTT_MSG_TYPE_PINGRESP:
+        case MQTT_MSG_TYPE_DISCONNECT:
+            return (buffer[0] & 0x0f) == 0;  /* all flag bits are 0 */
+        case MQTT_MSG_TYPE_PUBREL:
+        case MQTT_MSG_TYPE_SUBSCRIBE:
+        case MQTT_MSG_TYPE_UNSUBSCRIBE:
+            return (buffer[0] & 0x0f) == 0x02;  /* only bit 1 is set */
+        case MQTT_MSG_TYPE_PUBLISH:
+            qos = mqtt_get_qos(buffer);
+            dup = mqtt_get_dup(buffer);
+            /*
+             * there is no qos=3  [MQTT-3.3.1-4]
+             * dup flag must be set to 0 for all qos=0 messages [MQTT-3.3.1-2]
+             */
+            return (qos < 3) && ((qos > 0) || (dup == 0));
+        default:
+            return 0;
+    }
+}
+
 int mqtt_get_total_length(uint8_t* buffer, uint16_t length)
 {
     int i;
