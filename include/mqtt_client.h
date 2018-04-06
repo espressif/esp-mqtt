@@ -40,8 +40,6 @@ typedef struct {
     void *user_context;
     char *data;
     int data_len;
-    int total_data_len;
-    int current_data_offset;
     char *topic;
     int topic_len;
     int msg_id;
