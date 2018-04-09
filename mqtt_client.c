@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <errno.h>
 #include "platform.h"
 
 #include "freertos/queue.h"
