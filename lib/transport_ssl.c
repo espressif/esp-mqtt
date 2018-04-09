@@ -193,8 +193,11 @@ static int ssl_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
 {
     int poll = -1, ret;
     transport_ssl_t *ssl = transport_get_data(t);
-    if ((poll = transport_poll_read(t, timeout_ms)) <= 0) {
-        return poll;
+
+    if (mbedtls_ssl_get_bytes_avail(&ssl->ctx) <= 0) {
+        if ((poll = transport_poll_read(t, timeout_ms)) <= 0) {
+            return poll;
+        }
     }
     ret = mbedtls_ssl_read(&ssl->ctx, (unsigned char *)buffer, len);
     if (ret == 0) {
