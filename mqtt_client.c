@@ -326,6 +326,13 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     if (buffer_size <= 0) {
         buffer_size = MQTT_BUFFER_SIZE_BYTE;
     }
+    /*
+     * minimal length of a MQTT CONNECT packet is 14 bytes:
+     * fixed header: 2 B
+     * variable header: 10 B
+     * payload (empty ClientId string - [MQTT-3.1.3-6]): 2 B
+     */
+    assert(buffer_size >= 14);
 
     client->mqtt_state.in_buffer = (uint8_t *)malloc(buffer_size);
     mem_assert(client->mqtt_state.in_buffer);
