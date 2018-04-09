@@ -172,14 +172,21 @@ static int ssl_poll_write(transport_handle_t t, int timeout_ms)
 static int ssl_write(transport_handle_t t, char *buffer, int len, int timeout_ms)
 {
     int poll, ret;
+    int written = 0;
     transport_ssl_t *ssl = transport_get_data(t);
 
     if ((poll = transport_poll_write(t, timeout_ms)) <= 0) {
         return poll;
     }
-    ret = mbedtls_ssl_write(&ssl->ctx, (const unsigned char *) buffer, len);
-    //TODO: Debug here
-    return ret;
+    /* mbedtls_ssl_write() will do partial writes in some cases */
+    while (written < len) {
+        ret = mbedtls_ssl_write(&ssl->ctx, (const unsigned char *) (buffer + written), len - written);
+        if (ret < 0) {
+            return ret;
+        }
+        written += ret;
+    }
+    return written;
 }
 
 static int ssl_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
