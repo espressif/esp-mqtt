@@ -83,7 +83,7 @@ const static int STOPPED_BIT = BIT0;
 static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_client_config_t *config);
 static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client);
-static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms);
+static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client);
 static char *create_string(const char *ptr, int len);
@@ -201,7 +201,7 @@ static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
     return ESP_OK;
 }
 
-static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms)
+static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client)
 {
     int write_len, read_len, connect_rsp_code;
     mqtt_msg_init(&client->mqtt_state.mqtt_connection,
@@ -720,7 +720,7 @@ static void esp_mqtt_task(void *pv)
                     break;
                 }
                 ESP_LOGD(TAG, "Transport connected to %s://%s:%d", client->config->scheme, client->config->host, client->config->port);
-                if (esp_mqtt_connect(client, client->config->network_timeout_ms) != ESP_OK) {
+                if (esp_mqtt_connect(client) != ESP_OK) {
                     ESP_LOGI(TAG, "Error MQTT Connected");
                     esp_mqtt_abort_connection(client);
                     break;
