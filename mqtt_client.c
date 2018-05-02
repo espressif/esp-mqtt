@@ -22,8 +22,8 @@ typedef struct mqtt_state
     uint8_t *out_buffer;
     int in_buffer_length;
     int out_buffer_length;
-    uint16_t message_length;
-    uint16_t message_length_read;
+    uint32_t message_length;
+    uint32_t message_length_read;
     mqtt_message_t *outbound_message;
     mqtt_connection_t mqtt_connection;
     uint16_t pending_msg_id;
@@ -442,25 +442,20 @@ static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
         return client->config->event_handle(&client->event);
     }
     return ESP_FAIL;
-}
+} 
 
 
 
 static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, int length)
 {
     const char *mqtt_topic, *mqtt_data;
-    uint16_t mqtt_topic_length, mqtt_data_length, total_mqtt_len = 0;
-    uint16_t mqtt_len, mqtt_offset = 0;
+    uint32_t mqtt_topic_length, mqtt_data_length;
+    uint32_t mqtt_len, mqtt_offset = 0, total_mqtt_len = 0;
     int len_read;
 
     do
     {
-        mqtt_topic_length = length;
-        mqtt_topic = mqtt_get_publish_topic(message, &mqtt_topic_length);
-        mqtt_data_length = length;
-        mqtt_data = mqtt_get_publish_data(message, &mqtt_data_length);
-
-        if(total_mqtt_len == 0){
+        if (total_mqtt_len == 0){
             mqtt_topic_length = length;
             mqtt_topic = mqtt_get_publish_topic(message, &mqtt_topic_length);
             mqtt_data_length = length;
@@ -472,7 +467,7 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
             mqtt_data = (const char*)client->mqtt_state.in_buffer;
         }
 
-        ESP_LOGD(TAG, "Get data len= %d, topic len=%d", mqtt_data_length, mqtt_topic_length);
+        ESP_LOGD(TAG, "Get data len= %d, topic len=%d", mqtt_len, mqtt_topic_length);
         client->event.event_id = MQTT_EVENT_DATA;
         client->event.data = (char *)mqtt_data;
         client->event.data_len = mqtt_len;
@@ -488,7 +483,8 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
 
         len_read = transport_read(client->transport,
                                       (char *)client->mqtt_state.in_buffer,
-                                      client->mqtt_state.in_buffer_length,
+                                      client->mqtt_state.message_length - client->mqtt_state.message_length_read > client->mqtt_state.in_buffer_length ? 
+                                        client->mqtt_state.in_buffer_length : client->mqtt_state.message_length - client->mqtt_state.message_length_read,
                                       client->config->network_timeout_ms);
         if (len_read <= 0) {
             ESP_LOGE(TAG, "Read error or timeout: %d", errno);

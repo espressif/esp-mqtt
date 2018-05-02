@@ -71,7 +71,7 @@ enum mqtt_connect_return_code
 typedef struct mqtt_message
 {
     uint8_t* data;
-    uint16_t length;
+    uint32_t length;
 
 } mqtt_message_t;
 
@@ -108,9 +108,9 @@ static inline int mqtt_get_qos(uint8_t* buffer) { return (buffer[0] & 0x06) >> 1
 static inline int mqtt_get_retain(uint8_t* buffer) { return (buffer[0] & 0x01); }
 
 void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint16_t buffer_length);
-int mqtt_get_total_length(uint8_t* buffer, uint16_t length);
-const char* mqtt_get_publish_topic(uint8_t* buffer, uint16_t* length);
-const char* mqtt_get_publish_data(uint8_t* buffer, uint16_t* length);
+uint32_t mqtt_get_total_length(uint8_t* buffer, uint16_t length);
+const char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length);
+const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length);
 uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length);
 
 mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_info_t* info);
