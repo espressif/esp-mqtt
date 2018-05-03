@@ -133,10 +133,10 @@ void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint16_t buff
     connection->buffer_length = buffer_length;
 }
 
-int mqtt_get_total_length(uint8_t* buffer, uint16_t length)
+uint32_t mqtt_get_total_length(uint8_t* buffer, uint16_t length)
 {
     int i;
-    int totlen = 0;
+    uint32_t totlen = 0;
 
     for (i = 1; i < length; ++i)
     {
@@ -148,11 +148,11 @@ int mqtt_get_total_length(uint8_t* buffer, uint16_t length)
         }
     }
     totlen += i;
-
+    
     return totlen;
 }
 
-const char* mqtt_get_publish_topic(uint8_t* buffer, uint16_t* length)
+const char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length)
 {
     int i;
     int totlen = 0;
@@ -179,9 +179,9 @@ const char* mqtt_get_publish_topic(uint8_t* buffer, uint16_t* length)
 
     *length = topiclen;
     return (const char*)(buffer + i);
-}
+} 
 
-const char* mqtt_get_publish_data(uint8_t* buffer, uint16_t* length)
+const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
 {
     int i;
     int totlen = 0;
