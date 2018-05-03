@@ -9,7 +9,7 @@ static const char *TAG = "OUTBOX";
 outbox_handle_t outbox_init()
 {
     outbox_handle_t outbox = calloc(1, sizeof(struct outbox_list_t));
-    mem_assert(outbox);
+    ESP_MEM_CHECK(TAG, outbox, return NULL);
     STAILQ_INIT(outbox);
     return outbox;
 }
@@ -17,13 +17,16 @@ outbox_handle_t outbox_init()
 outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, uint8_t *data, int len, int msg_id, int msg_type, int tick)
 {
     outbox_item_handle_t item = calloc(1, sizeof(outbox_item_t));
-    mem_assert(item);
+    ESP_MEM_CHECK(TAG, item, return NULL);
     item->msg_id = msg_id;
     item->msg_type = msg_type;
     item->tick = tick;
     item->len = len;
     item->buffer = malloc(len);
-    mem_assert(item->buffer);
+    ESP_MEM_CHECK(TAG, item->buffer, {
+        free(item);
+        return NULL;
+    });
     memcpy(item->buffer, data, len);
     STAILQ_INSERT_TAIL(outbox, item, next);
     ESP_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%d, size=%d", msg_id, msg_type, len, outbox_get_size(outbox));

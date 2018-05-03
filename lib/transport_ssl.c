@@ -1,6 +1,14 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "lwip/err.h"
+#include "lwip/sockets.h"
+#include "lwip/sys.h"
+#include "lwip/netdb.h"
+#include "lwip/dns.h"
+
 #include "mbedtls/platform.h"
 #include "mbedtls/net_sockets.h"
 #include "mbedtls/esp_debug.h"
@@ -13,12 +21,12 @@
 
 #include "esp_log.h"
 #include "esp_system.h"
-
 #include "platform.h"
+
 #include "transport.h"
 #include "transport_ssl.h"
 
-static const char *TAG = "TRANSPORT_SSL";
+static const char *TAG = "TRANS_SSL";
 /**
  *  mbedtls specific transport data
  */
@@ -35,11 +43,13 @@ typedef struct {
     bool                     verify_server;
 } transport_ssl_t;
 
+static int ssl_close(transport_handle_t t);
+
 static int ssl_connect(transport_handle_t t, const char *host, int port, int timeout_ms)
 {
     int ret = -1, flags;
     struct timeval tv;
-    transport_ssl_t *ssl = transport_get_data(t);
+    transport_ssl_t *ssl = transport_get_context_data(t);
 
     if (!ssl) {
         return -1;
@@ -95,12 +105,8 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
 
     mbedtls_net_init(&ssl->client_fd);
 
-    tv.tv_sec = 10; //default timeout is 10 seconds
+    ms_to_timeval(timeout_ms, &tv);
 
-    if (timeout_ms) {
-        tv.tv_sec = timeout_ms;
-    }
-    tv.tv_usec = 0;
     setsockopt(ssl->client_fd.fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     ESP_LOGD(TAG, "Connect to %s:%d", host, port);
     char port_str[8] = {0};
@@ -111,6 +117,11 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
     }
 
     mbedtls_ssl_set_bio(&ssl->ctx, &ssl->client_fd, mbedtls_net_send, mbedtls_net_recv, NULL);
+
+    if((ret = mbedtls_ssl_set_hostname(&ssl->ctx, host)) != 0) {
+        ESP_LOGE(TAG, " failed\n  ! mbedtls_ssl_set_hostname returned %d\n\n", ret);
+        goto exit;
+    }
 
     ESP_LOGD(TAG, "Performing the SSL/TLS handshake...");
 
@@ -127,68 +138,62 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
         /* In real life, we probably want to close connection if ret != 0 */
         ESP_LOGW(TAG, "Failed to verify peer certificate!");
         if (ssl->cert_pem_data) {
-            return -1;
+            goto exit;
         }
-        // bzero(buf, sizeof(buf));
-        // mbedtls_x509_crt_verify_info(buf, sizeof(buf), "  ! ", flags);
-        // ESP_LOGW(TAG, "verification info: %s", buf);
     } else {
         ESP_LOGD(TAG, "Certificate verified.");
     }
 
     ESP_LOGD(TAG, "Cipher suite is %s", mbedtls_ssl_get_ciphersuite(&ssl->ctx));
+    return ret;
 exit:
-
+    ssl_close(t);
     return ret;
 }
 
 static int ssl_poll_read(transport_handle_t t, int timeout_ms)
 {
-    transport_ssl_t *ssl = transport_get_data(t);
+    transport_ssl_t *ssl = transport_get_context_data(t);
     fd_set readset;
     FD_ZERO(&readset);
     FD_SET(ssl->client_fd.fd, &readset);
     struct timeval timeout;
-
-    timeout.tv_sec = timeout_ms / 1000;
-    timeout.tv_usec = (timeout_ms % 1000) * 1000;
+    ms_to_timeval(timeout_ms, &timeout);
 
     return select(ssl->client_fd.fd + 1, &readset, NULL, NULL, &timeout);
 }
 
 static int ssl_poll_write(transport_handle_t t, int timeout_ms)
 {
-    transport_ssl_t *ssl = transport_get_data(t);
+    transport_ssl_t *ssl = transport_get_context_data(t);
     fd_set writeset;
     FD_ZERO(&writeset);
     FD_SET(ssl->client_fd.fd, &writeset);
     struct timeval timeout;
-
-    timeout.tv_sec = timeout_ms / 1000;
-    timeout.tv_usec = (timeout_ms % 1000) * 1000;
+    ms_to_timeval(timeout_ms, &timeout);
     return select(ssl->client_fd.fd + 1, NULL, &writeset, NULL, &timeout);
 }
 
-static int ssl_write(transport_handle_t t, char *buffer, int len, int timeout_ms)
+static int ssl_write(transport_handle_t t, const char *buffer, int len, int timeout_ms)
 {
     int poll, ret;
-    transport_ssl_t *ssl = transport_get_data(t);
+    transport_ssl_t *ssl = transport_get_context_data(t);
 
     if ((poll = transport_poll_write(t, timeout_ms)) <= 0) {
+        ESP_LOGW(TAG, "Poll timeout or error, errno=%s, fd=%d, timeout_ms=%d", strerror(errno), ssl->client_fd.fd, timeout_ms);
         return poll;
     }
     ret = mbedtls_ssl_write(&ssl->ctx, (const unsigned char *) buffer, len);
-    //TODO: Debug here
+    if (ret <= 0) {
+        ESP_LOGE(TAG, "mbedtls_ssl_write error, errno=%s", strerror(errno));
+    }
     return ret;
 }
 
 static int ssl_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
 {
-    int poll = -1, ret;
-    transport_ssl_t *ssl = transport_get_data(t);
-    if ((poll = transport_poll_read(t, timeout_ms)) <= 0) {
-        return poll;
-    }
+    int ret;
+    transport_ssl_t *ssl = transport_get_context_data(t);
     ret = mbedtls_ssl_read(&ssl->ctx, (unsigned char *)buffer, len);
     if (ret == 0) {
         return -1;
@@ -199,7 +204,7 @@ static int ssl_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
 static int ssl_close(transport_handle_t t)
 {
     int ret = -1;
-    transport_ssl_t *ssl = transport_get_data(t);
+    transport_ssl_t *ssl = transport_get_context_data(t);
     if (ssl->ssl_initialized) {
         ESP_LOGD(TAG, "Cleanup mbedtls");
         mbedtls_ssl_close_notify(&ssl->ctx);
@@ -218,10 +223,9 @@ static int ssl_close(transport_handle_t t)
     return ret;
 }
 
-
 static int ssl_destroy(transport_handle_t t)
 {
-    transport_ssl_t *ssl = transport_get_data(t);
+    transport_ssl_t *ssl = transport_get_context_data(t);
     transport_close(t);
     free(ssl);
     return 0;
@@ -229,12 +233,10 @@ static int ssl_destroy(transport_handle_t t)
 
 void transport_ssl_set_cert_data(transport_handle_t t, const char *data, int len)
 {
-    transport_ssl_t *ssl = transport_get_data(t);
-    if (t) {
-        if (t && ssl) {
-            ssl->cert_pem_data = (void *)data;
-            ssl->cert_pem_len = len;
-        }
+    transport_ssl_t *ssl = transport_get_context_data(t);
+    if (t && ssl) {
+        ssl->cert_pem_data = (void *)data;
+        ssl->cert_pem_len = len;
     }
 }
 
@@ -242,9 +244,10 @@ transport_handle_t transport_ssl_init()
 {
     transport_handle_t t = transport_init();
     transport_ssl_t *ssl = calloc(1, sizeof(transport_ssl_t));
-    assert(ssl);
+    ESP_MEM_CHECK(TAG, ssl, return NULL);
     mbedtls_net_init(&ssl->client_fd);
-    transport_set_data(t, ssl);
+    transport_set_context_data(t, ssl);
     transport_set_func(t, ssl_connect, ssl_read, ssl_write, ssl_close, ssl_poll_read, ssl_poll_write, ssl_destroy);
     return t;
 }
+

@@ -23,9 +23,13 @@
 #include "esp_log.h"
 #include "esp_system.h"
 
-#define mem_assert(x) assert(x)
-
 char *platform_create_id_string();
 int platform_random(int max);
 long long platform_tick_get_ms();
+void ms_to_timeval(int timeout_ms, struct timeval *tv);
+
+#define ESP_MEM_CHECK(TAG, a, action) if (!(a)) {                                                      \
+        ESP_LOGE(TAG,"%s:%d (%s): %s", __FILE__, __LINE__, __FUNCTION__, "Memory exhausted");       \
+        action;                                                                                         \
+        }
 #endif

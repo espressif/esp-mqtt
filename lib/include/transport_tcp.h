@@ -13,11 +13,9 @@ extern "C" {
 #endif
 
 /**
- * @brief      Create TCP transport
+ * @brief      Create TCP transport, the transport handle must be release transport_destroy callback
  *
- * @return
- *  - transport
- *  - NULL
+ * @return  the allocated transport_handle_t, or NULL if the handle can not be allocated
  */
 transport_handle_t transport_tcp_init();
 

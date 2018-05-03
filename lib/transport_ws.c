@@ -58,7 +58,7 @@ static char *get_http_header(const char *buffer, const char *key)
 
 static int ws_connect(transport_handle_t t, const char *host, int port, int timeout_ms)
 {
-    transport_ws_t *ws = transport_get_data(t);
+    transport_ws_t *ws = transport_get_context_data(t);
     if (transport_connect(ws->parent, host, port, timeout_ms) < 0) {
         ESP_LOGE(TAG, "Error connect to ther server");
     }
@@ -109,13 +109,13 @@ static int ws_connect(transport_handle_t t, const char *host, int port, int time
     return 0;
 }
 
-static int ws_write(transport_handle_t t, char *buffer, int len, int timeout_ms)
+static int ws_write(transport_handle_t t, const char *buff, int len, int timeout_ms)
 {
-    transport_ws_t *ws = transport_get_data(t);
+    transport_ws_t *ws = transport_get_context_data(t);
     char ws_header[MAX_WEBSOCKET_HEADER_SIZE];
     char *mask;
     int header_len = 0, i;
-
+    char *buffer = (char *)buff;
     int poll_write;
     if ((poll_write = transport_poll_write(ws->parent, timeout_ms)) <= 0) {
         return poll_write;
@@ -149,7 +149,7 @@ static int ws_write(transport_handle_t t, char *buffer, int len, int timeout_ms)
 
 static int ws_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
 {
-    transport_ws_t *ws = transport_get_data(t);
+    transport_ws_t *ws = transport_get_context_data(t);
     int payload_len;
     char *data_ptr = buffer, opcode, mask, *mask_key = NULL;
     int rlen;
@@ -198,25 +198,25 @@ static int ws_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
 
 static int ws_poll_read(transport_handle_t t, int timeout_ms)
 {
-    transport_ws_t *ws = transport_get_data(t);
+    transport_ws_t *ws = transport_get_context_data(t);
     return transport_poll_read(ws->parent, timeout_ms);
 }
 
 static int ws_poll_write(transport_handle_t t, int timeout_ms)
 {
-    transport_ws_t *ws = transport_get_data(t);
+    transport_ws_t *ws = transport_get_context_data(t);
     return transport_poll_write(ws->parent, timeout_ms);;
 }
 
 static int ws_close(transport_handle_t t)
 {
-    transport_ws_t *ws = transport_get_data(t);
+    transport_ws_t *ws = transport_get_context_data(t);
     return transport_close(ws->parent);
 }
 
 static esp_err_t ws_destroy(transport_handle_t t)
 {
-    transport_ws_t *ws = transport_get_data(t);
+    transport_ws_t *ws = transport_get_context_data(t);
     free(ws->buffer);
     free(ws->path);
     free(ws);
@@ -224,7 +224,7 @@ static esp_err_t ws_destroy(transport_handle_t t)
 }
 void transport_ws_set_path(transport_handle_t t, const char *path)
 {
-    transport_ws_t *ws = transport_get_data(t);
+    transport_ws_t *ws = transport_get_context_data(t);
     ws->path = realloc(ws->path, strlen(path) + 1);
     strcpy(ws->path, path);
 }
@@ -232,16 +232,20 @@ transport_handle_t transport_ws_init(transport_handle_t parent_handle)
 {
     transport_handle_t t = transport_init();
     transport_ws_t *ws = calloc(1, sizeof(transport_ws_t));
-    assert(ws);
+    ESP_MEM_CHECK(TAG, ws, return NULL);
     ws->parent = parent_handle;
-    ws->buffer = malloc(DEFAULT_WS_BUFFER);
-    mem_assert(ws->buffer);
-    ws->path = calloc(1, 2);
-    ws->path[0] = '/';
 
-    mem_assert(ws->buffer);
+    ws->path = strdup("/");
+    ESP_MEM_CHECK(TAG, ws->path, return NULL);
+    ws->buffer = malloc(DEFAULT_WS_BUFFER);
+    ESP_MEM_CHECK(TAG, ws->buffer, {
+        free(ws->path);
+        free(ws);
+        return NULL;
+    });
+
     transport_set_func(t, ws_connect, ws_read, ws_write, ws_close, ws_poll_read, ws_poll_write, ws_destroy);
-    transport_set_data(t, ws);
+    transport_set_context_data(t, ws);
     return t;
 }
 
