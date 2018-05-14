@@ -438,6 +438,10 @@ static esp_err_t mqtt_write_data(esp_mqtt_client_handle_t client)
         ESP_LOGE(TAG, "Error write data or timeout, written len = %d", write_len);
         return ESP_FAIL;
     }
+    /* we've just sent a mqtt control packet, update keepalive counter
+     * [MQTT-3.1.2-23]
+     */
+    client->keepalive_tick = platform_tick_get_ms();
     return ESP_OK;
 }
 
@@ -630,10 +634,6 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
                 esp_mqtt_dispatch_event(client);
             }
             break;
-        case MQTT_MSG_TYPE_PINGREQ:
-            client->mqtt_state.outbound_message = mqtt_msg_pingresp(&client->mqtt_state.mqtt_connection);
-            mqtt_write_data(client);
-            break;
         case MQTT_MSG_TYPE_PINGRESP:
             ESP_LOGD(TAG, "MQTT_MSG_TYPE_PINGRESP");
             // Ignore
@@ -702,7 +702,6 @@ static void esp_mqtt_task(void *pv)
                         esp_mqtt_abort_connection(client);
                         break;
                     }
-                    client->keepalive_tick = platform_tick_get_ms();
                 }
 
                 //Delete mesaage after 30 senconds
@@ -741,7 +740,6 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
         ESP_LOGE(TAG, "Error create mqtt task");
         return ESP_FAIL;
     }
-    xEventGroupClearBits(client->status_bits, STOPPED_BIT);
     return ESP_OK;
 }
 
