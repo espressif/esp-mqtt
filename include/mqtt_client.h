@@ -14,6 +14,10 @@
 
 #include "mqtt_config.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct esp_mqtt_client* esp_mqtt_client_handle_t;
 
 typedef enum {
@@ -84,5 +88,9 @@ esp_err_t esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char 
 esp_err_t esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *topic);
 int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain);
 esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client);
+
+#ifdef __cplusplus
+}
+#endif //__cplusplus
 
 #endif
