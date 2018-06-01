@@ -327,7 +327,7 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
 
     client->keepalive_tick = platform_tick_get_ms();
     client->reconnect_tick = platform_tick_get_ms();
-
+    client->wait_for_ping_resp = false;
     int buffer_size = config->buffer_size;
     if (buffer_size <= 0) {
         buffer_size = MQTT_BUFFER_SIZE_BYTE;
