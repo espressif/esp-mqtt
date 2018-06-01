@@ -65,7 +65,6 @@ const esp_mqtt_client_config_t mqtt_cfg = {
 //MQTT client will connect to iot.eclipse.org using port 4567
 ```
 
-
 ### SSL 
 
 - Get Certification from server, example: `iot.eclipse.org` `openssl s_client -showcerts -connect iot.eclipse.org:8883 </dev/null 2>/dev/null|openssl x509 -outform PEM >iot_eclipse_org.pem`
@@ -170,6 +169,6 @@ esp_mqtt_client_start(client);
 ```
 
 ## License
-
-[@tuanpmt](https://twitter.com/tuanpmt)
+- MQTT Package - [Stephen Robinson - contiki-mqtt](https://github.com/esar/contiki-mqtt)
+- Others [@tuanpmt](https://twitter.com/tuanpmt)
 Apache License
