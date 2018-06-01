@@ -191,6 +191,7 @@ static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
 static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms)
 {
     int write_len, read_len, connect_rsp_code;
+    client->wait_for_ping_resp = false;
     mqtt_msg_init(&client->mqtt_state.mqtt_connection,
                   client->mqtt_state.out_buffer,
                   client->mqtt_state.out_buffer_length);
@@ -256,6 +257,7 @@ static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
     client->state = MQTT_STATE_WAIT_TIMEOUT;
     ESP_LOGI(TAG, "Reconnect after %d ms", client->wait_timeout_ms);
     client->event.event_id = MQTT_EVENT_DISCONNECTED;
+    client->wait_for_ping_resp = false;
     esp_mqtt_dispatch_event(client);
     return ESP_OK;
 }
