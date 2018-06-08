@@ -49,3 +49,6 @@ script:
   - cd $PROJECT_PATH/examples/mqtt_wss
   - make defconfig
   - make -j4
+  - cd $PROJECT_PATH/examples/emitter-client
+  - make defconfig
+  - make -j4
