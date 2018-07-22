@@ -628,7 +628,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             break;
         case MQTT_MSG_TYPE_PUBCOMP:
             ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBCOMP");
-            if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBREL, msg_id)) {
+            if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
                 ESP_LOGD(TAG, "Receive MQTT_MSG_TYPE_PUBCOMP, finish QoS2 publish");
                 client->event.event_id = MQTT_EVENT_PUBLISHED;
                 esp_mqtt_dispatch_event(client);
@@ -821,9 +821,6 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
     if (len <= 0) {
         len = strlen(data);
     }
-    if (qos > 0) {
-        mqtt_enqueue(client);
-    }
 
     client->mqtt_state.outbound_message = mqtt_msg_publish(&client->mqtt_state.mqtt_connection,
                                           topic, data, len,
@@ -833,6 +830,7 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
         client->mqtt_state.pending_msg_id = pending_msg_id;
         client->mqtt_state.pending_msg_count ++;
+        mqtt_enqueue(client);
     }
 
     if (mqtt_write_data(client) != ESP_OK) {
