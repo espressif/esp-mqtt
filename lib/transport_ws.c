@@ -98,7 +98,7 @@ static int ws_connect(transport_handle_t t, const char *host, int port, int time
 
     unsigned char client_key_b64[64], valid_client_key[20], accept_key[32] = {0};
     int key_len = sprintf((char*)client_key_b64, "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", (char*)client_key);
-    mbedtls_sha1(client_key_b64, (size_t)key_len, valid_client_key);
+    mbedtls_sha1_ret(client_key_b64, (size_t)key_len, valid_client_key);
     mbedtls_base64_encode(accept_key, 32,  &outlen, valid_client_key, 20);
     accept_key[outlen] = 0;
     ESP_LOGD(TAG, "server key=%s, send_key=%s, accept_key=%s", (char *)server_key, (char*)client_key, accept_key);

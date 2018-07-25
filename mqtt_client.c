@@ -844,6 +844,10 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
     if (len <= 0) {
         len = strlen(data);
     }
+    // Note: Need to enqueue the qos>0 msg
+    // if (qos > 0) {
+    //     mqtt_enqueue(client);
+    // }
 
     client->mqtt_state.outbound_message = mqtt_msg_publish(&client->mqtt_state.mqtt_connection,
                                           topic, data, len,
@@ -853,6 +857,7 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
         client->mqtt_state.pending_msg_id = pending_msg_id;
         client->mqtt_state.pending_msg_count ++;
+        // Note: Need to enqueue the qos>0 msg to pass https://code.google.com/archive/p/mqtt4erl/wikis/QualityOfServiceUseCases.wiki
         mqtt_enqueue(client);
     }
 
