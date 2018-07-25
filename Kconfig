@@ -78,4 +78,19 @@ config MQTT_TASK_STACK_SIZE
     help
         MQTT task stack size
 
+config MQTT_TASK_CORE_SELECTION_ENABLED
+	bool "Enable MQTT task core selection"
+	default false
+	help
+		This will enable core selection
+		
+choice
+    depends on MQTT_TASK_CORE_SELECTION_ENABLED
+    prompt "Core to use ?"
+    config MQTT_USE_CORE_0
+          bool "Core 0"
+    config MQTT_USE_CORE_1
+          bool "Core 1"
+ endchoice
+		
 endmenu
