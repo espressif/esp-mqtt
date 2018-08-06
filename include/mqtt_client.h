@@ -83,6 +83,8 @@ typedef struct {
     int task_stack;                         /*!< MQTT task stack size, default is 6144 bytes, can be changed in ``make menuconfig`` */
     int buffer_size;                        /*!< size of MQTT send/receive buffer, default is 1024 */
     const char *cert_pem;                   /*!< pointer to CERT file for server verify (with SSL), default is NULL, not required to verify the server */
+    const char *client_cert_pem;            /*!< pointer to CERT file for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_key_pem` has to be provided. */
+    const char *client_key_pem;             /*!< pointer to PEM private key file for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_cert_pem` has to be provided. */
     esp_mqtt_transport_t transport;         /*!< overrides URI transport */
 } esp_mqtt_client_config_t;
 
