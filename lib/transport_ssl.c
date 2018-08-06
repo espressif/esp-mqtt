@@ -35,10 +35,17 @@ typedef struct {
     mbedtls_ctr_drbg_context ctr_drbg;
     mbedtls_ssl_context      ctx;
     mbedtls_x509_crt         cacert;
+    mbedtls_x509_crt         client_cert;
+    mbedtls_pk_context       client_key;
     mbedtls_ssl_config       conf;
     mbedtls_net_context      client_fd;
     void                     *cert_pem_data;
     int                      cert_pem_len;
+    void                     *client_cert_pem_data;
+    int                      client_cert_pem_len;
+    void                     *client_key_pem_data;
+    int                      client_key_pem_len;
+    bool                     mutual_authentication;
     bool                     ssl_initialized;
     bool                     verify_server;
 } transport_ssl_t;
@@ -91,6 +98,27 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
         mbedtls_ssl_conf_authmode(&ssl->conf, MBEDTLS_SSL_VERIFY_NONE);
     }
 
+    if (ssl->client_cert_pem_data && ssl->client_key_pem_data) {
+        mbedtls_x509_crt_init(&ssl->client_cert);
+        mbedtls_pk_init(&ssl->client_key);
+        ssl->mutual_authentication = true;
+        if ((ret = mbedtls_x509_crt_parse(&ssl->client_cert, ssl->client_cert_pem_data, ssl->client_cert_pem_len + 1)) < 0) {
+            ESP_LOGE(TAG, "mbedtls_x509_crt_parse returned -0x%x\n\nDATA=%s,len=%d", -ret, (char*)ssl->client_cert_pem_data, ssl->client_cert_pem_len);
+            goto exit;
+        }
+        if ((ret = mbedtls_pk_parse_key(&ssl->client_key, ssl->client_key_pem_data, ssl->client_key_pem_len + 1, NULL, 0)) < 0) {
+            ESP_LOGE(TAG, "mbedtls_pk_parse_keyfile returned -0x%x\n\nDATA=%s,len=%d", -ret, (char*)ssl->client_key_pem_data, ssl->client_key_pem_len);
+            goto exit;
+        }
+
+        if ((ret = mbedtls_ssl_conf_own_cert(&ssl->conf, &ssl->client_cert, &ssl->client_key)) < 0) {
+            ESP_LOGE(TAG, "mbedtls_ssl_conf_own_cert returned -0x%x\n", -ret);
+            goto exit;
+        }
+    } else if (ssl->client_cert_pem_data || ssl->client_key_pem_data) {
+        ESP_LOGE(TAG, "You have to provide both client_cert_pem and client_key_pem for mutual authentication");
+        goto exit;
+    }
 
     mbedtls_ssl_conf_rng(&ssl->conf, mbedtls_ctr_drbg_random, &ssl->ctr_drbg);
 
@@ -220,9 +248,14 @@ static int ssl_close(transport_handle_t t)
         if (ssl->verify_server) {
             mbedtls_x509_crt_free(&ssl->cacert);
         }
+        if (ssl->mutual_authentication) {
+            mbedtls_x509_crt_free(&ssl->client_cert);
+            mbedtls_pk_free(&ssl->client_key);
+        }
         mbedtls_ctr_drbg_free(&ssl->ctr_drbg);
         mbedtls_entropy_free(&ssl->entropy);
         mbedtls_ssl_free(&ssl->ctx);
+        ssl->mutual_authentication = false;
         ssl->ssl_initialized = false;
         ssl->verify_server = false;
     }
@@ -243,6 +276,24 @@ void transport_ssl_set_cert_data(transport_handle_t t, const char *data, int len
     if (t && ssl) {
         ssl->cert_pem_data = (void *)data;
         ssl->cert_pem_len = len;
+    }
+}
+
+void transport_ssl_set_client_cert_data(transport_handle_t t, const char *data, int len)
+{
+    transport_ssl_t *ssl = transport_get_context_data(t);
+    if (t && ssl) {
+        ssl->client_cert_pem_data = (void *)data;
+        ssl->client_cert_pem_len = len;
+    }
+}
+
+void transport_ssl_set_client_key_data(transport_handle_t t, const char *data, int len)
+{
+    transport_ssl_t *ssl = transport_get_context_data(t);
+    if (t && ssl) {
+        ssl->client_key_pem_data = (void *)data;
+        ssl->client_key_pem_len = len;
     }
 }
 

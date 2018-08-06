@@ -30,6 +30,8 @@ transport_handle_t transport_ssl_init();
  * @param[in]  len   The length
  */
 void transport_ssl_set_cert_data(transport_handle_t t, const char *data, int len);
+void transport_ssl_set_client_cert_data(transport_handle_t t, const char *data, int len);
+void transport_ssl_set_client_key_data(transport_handle_t t, const char *data, int len);
 
 
 #ifdef __cplusplus
