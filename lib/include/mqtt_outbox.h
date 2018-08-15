@@ -11,21 +11,10 @@
 extern "C" {
 #endif
 
-typedef struct outbox_item {
-    char *buffer;
-    int len;
-    int msg_id;
-    int msg_type;
-    int tick;
-    int retry_count;
-    bool pending;
-    STAILQ_ENTRY(outbox_item) next;
-} outbox_item_t;
-
-STAILQ_HEAD(outbox_list_t, outbox_item);
+struct outbox_item;
 
 typedef struct outbox_list_t * outbox_handle_t;
-typedef outbox_item_t *outbox_item_handle_t;
+typedef struct outbox_item * outbox_item_handle_t;
 
 outbox_handle_t outbox_init();
 outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, uint8_t *data, int len, int msg_id, int msg_type, int tick);

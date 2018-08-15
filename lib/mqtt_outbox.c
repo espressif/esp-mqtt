@@ -4,7 +4,24 @@
 #include "rom/queue.h"
 #include "esp_log.h"
 
+#ifndef CONFIG_MQTT_CUSTOM_OUTBOX
+
+
 static const char *TAG = "OUTBOX";
+
+typedef struct outbox_item {
+    char *buffer;
+    int len;
+    int msg_id;
+    int msg_type;
+    int tick;
+    int retry_count;
+    bool pending;
+    STAILQ_ENTRY(outbox_item) next;
+} outbox_item_t;
+
+STAILQ_HEAD(outbox_list_t, outbox_item);
+
 
 outbox_handle_t outbox_init()
 {
@@ -149,3 +166,5 @@ void outbox_destroy(outbox_handle_t outbox)
     outbox_cleanup(outbox, 0);
     free(outbox);
 }
+
+#endif /* CONFIG_MQTT_CUSTOM_OUTBOX */

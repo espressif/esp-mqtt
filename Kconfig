@@ -79,11 +79,11 @@ config MQTT_TASK_STACK_SIZE
         MQTT task stack size
 
 config MQTT_TASK_CORE_SELECTION_ENABLED
-	bool "Enable MQTT task core selection"
-	default false
-	help
-		This will enable core selection
-		
+    bool "Enable MQTT task core selection"
+    default false
+    help
+        This will enable core selection
+
 choice
     depends on MQTT_TASK_CORE_SELECTION_ENABLED
     prompt "Core to use ?"
@@ -92,5 +92,11 @@ choice
     config MQTT_USE_CORE_1
           bool "Core 1"
  endchoice
-		
+
+config MQTT_CUSTOM_OUTBOX
+    bool "Enable custom outbox implementation"
+    default n
+    help
+        Set to true if a specific implementation of message outbox is needed (e.g. persistant outbox in NVM or similar).
+
 endmenu
