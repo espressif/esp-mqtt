@@ -1,4 +1,4 @@
-menu "ESPMQTT Configurations"
+menu "ESP-MQTT Configurations"
 
 config MQTT_PROTOCOL_311
     bool "Enable MQTT protocol 3.1.1"

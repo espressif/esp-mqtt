@@ -461,6 +461,11 @@ static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
 }
 
 
+typedef struct {
+    char *path;
+    char *buffer;
+    transport_handle_t parent;
+} transport_ws_t;
 
 static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, int length)
 {
@@ -468,6 +473,7 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
     uint32_t mqtt_topic_length, mqtt_data_length;
     uint32_t mqtt_len, mqtt_offset = 0, total_mqtt_len = 0;
     int len_read;
+    transport_handle_t transport = client->transport;
 
     do
     {
@@ -478,9 +484,13 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
             mqtt_data = mqtt_get_publish_data(message, &mqtt_data_length);
             total_mqtt_len = client->mqtt_state.message_length - client->mqtt_state.message_length_read + mqtt_data_length;
             mqtt_len = mqtt_data_length;
+            /* any further reading only the underlying payload */
+            transport = transport_get_payload_transport_handle(transport);
         } else {
             mqtt_len = len_read;
             mqtt_data = (const char*)client->mqtt_state.in_buffer;
+            mqtt_topic = NULL;
+            mqtt_topic_length = 0;
         }
 
         ESP_LOGD(TAG, "Get data len= %d, topic len=%d", mqtt_len, mqtt_topic_length);
@@ -498,7 +508,7 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
             break;
         }
 
-        len_read = transport_read(client->transport,
+        len_read = transport_read(transport,
                                   (char *)client->mqtt_state.in_buffer,
                                   client->mqtt_state.message_length - client->mqtt_state.message_length_read > client->mqtt_state.in_buffer_length ?
                                   client->mqtt_state.in_buffer_length : client->mqtt_state.message_length - client->mqtt_state.message_length_read,

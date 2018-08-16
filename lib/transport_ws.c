@@ -19,6 +19,12 @@ typedef struct {
     transport_handle_t parent;
 } transport_ws_t;
 
+transport_handle_t ws_transport_get_payload_transport_handle(transport_handle_t t)
+{
+    transport_ws_t *ws = transport_get_context_data(t);
+    return ws->parent;
+}
+
 static char *trimwhitespace(const char *str)
 {
     char *end;
@@ -151,6 +157,7 @@ static int ws_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
 {
     transport_ws_t *ws = transport_get_context_data(t);
     int payload_len;
+    int payload_len_buff = len;
     char *data_ptr = buffer, opcode, mask, *mask_key = NULL;
     int rlen;
     int poll_read;
@@ -161,7 +168,6 @@ static int ws_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
         ESP_LOGE(TAG, "Error read data");
         return rlen;
     }
-
     opcode = (*data_ptr & 0x0F);
     data_ptr ++;
     mask = ((*data_ptr >> 7) & 0x01);
@@ -171,6 +177,7 @@ static int ws_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
     if (payload_len == 126) {
         // headerLen += 2;
         payload_len = data_ptr[0] << 8 | data_ptr[1];
+        payload_len_buff = len - 4;
         data_ptr += 2;
     } else if (payload_len == 127) {
         // headerLen += 8;
@@ -182,6 +189,11 @@ static int ws_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
             payload_len = data_ptr[4] << 24 | data_ptr[5] << 16 | data_ptr[6] << 8 | data_ptr[7];
         }
         data_ptr += 8;
+        payload_len_buff = len - 10;
+    }
+    if (payload_len > payload_len_buff) {
+        ESP_LOGD(TAG, "Actual data received (%d) are longer than mqtt buffer (%d)", payload_len, payload_len_buff);
+        payload_len = payload_len_buff;
     }
 
     if (mask) {
@@ -244,7 +256,7 @@ transport_handle_t transport_ws_init(transport_handle_t parent_handle)
         return NULL;
     });
 
-    transport_set_func(t, ws_connect, ws_read, ws_write, ws_close, ws_poll_read, ws_poll_write, ws_destroy);
+    transport_set_func(t, ws_connect, ws_read, ws_write, ws_close, ws_poll_read, ws_poll_write, ws_destroy, ws_transport_get_payload_transport_handle);
     transport_set_context_data(t, ws);
     return t;
 }
