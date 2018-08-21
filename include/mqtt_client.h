@@ -38,28 +38,33 @@ typedef enum {
     MQTT_TRANSPORT_OVER_WSS       /*!< MQTT over Websocket Secure, using scheme: ``wss`` */
 } esp_mqtt_transport_t;
 
+/**
+ * MQTT event configuration structure
+ */
 typedef struct {
-    esp_mqtt_event_id_t event_id;
-    esp_mqtt_client_handle_t client;
-    void *user_context;
-    char *data;
-    int data_len;
-    int total_data_len;
-    int current_data_offset;
-    char *topic;
-    int topic_len;
-    int msg_id;
+    esp_mqtt_event_id_t event_id;       /*!< MQTT event type */
+    esp_mqtt_client_handle_t client;    /*!< MQTT client handle for this event */
+    void *user_context;                 /*!< User context passed from MQTT client config */
+    char *data;                         /*!< Data asociated with this event */
+    int data_len;                       /*!< Lenght of the data for this event */
+    int total_data_len;                 /*!< Total length of the data (longer data are supplied with multiple events) */
+    int current_data_offset;            /*!< Actual offset for the data asociated with this event */
+    char *topic;                        /*!< Topic asociated with this event */
+    int topic_len;                      /*!< Length of the topic for this event asociated with this event */
+    int msg_id;                         /*!< MQTT messaged id of message */
 } esp_mqtt_event_t;
 
 typedef esp_mqtt_event_t* esp_mqtt_event_handle_t;
 
 typedef esp_err_t (* mqtt_event_callback_t)(esp_mqtt_event_handle_t event);
 
-
+/**
+ * MQTT client configuration structure
+ */
 typedef struct {
     mqtt_event_callback_t event_handle;     /*!< handle for MQTT events */
     const char *host;                       /*!< MQTT server domain (ipv4 as string) */
-    const char *uri;
+    const char *uri;                        /*!< Complete MQTT broker URI */
     uint32_t port;                          /*!< MQTT server port */
     const char *client_id;                  /*!< default client id is ``ESP32_%CHIPID%`` where %CHIPID% are last 3 bytes of MAC address in hex format */
     const char *username;                   /*!< MQTT username */
