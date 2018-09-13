@@ -96,6 +96,8 @@ const esp_mqtt_client_config_t mqtt_cfg = {
 -  `task_prio, task_stack` for MQTT task, default priority is 5, and task_stack = 6144 bytes (or default task stack can be set via `make menucofig`).
 -  `buffer_size` for MQTT send/receive buffer, default is 1024
 -  `cert_pem` pointer to CERT file for server verify (with SSL), default is NULL, not required to verify the server
+-  `client_cert_pem` pointer to CERT file for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_key_pem` has to be provided.
+-  `client_key_pem` pointer to PEM private key file for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_cert_pem` has to be provided.
 -  `transport`: override URI transport
     +  `MQTT_TRANSPORT_OVER_TCP`: MQTT over TCP, using scheme: `mqtt`
     +  `MQTT_TRANSPORT_OVER_SSL`: MQTT over SSL, using scheme: `mqtts`
