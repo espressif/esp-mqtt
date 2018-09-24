@@ -256,7 +256,7 @@ transport_handle_t transport_ws_init(transport_handle_t parent_handle)
         return NULL;
     });
 
-    transport_set_func(t, ws_connect, ws_read, ws_write, ws_close, ws_poll_read, ws_poll_write, ws_destroy, NULL, ws_transport_get_payload_transport_handle);
+    transport_set_func(t, ws_connect, ws_read, ws_write, ws_close, ws_poll_read, ws_poll_write, ws_destroy, ws_transport_get_payload_transport_handle);
     transport_set_context_data(t, ws);
     return t;
 }
