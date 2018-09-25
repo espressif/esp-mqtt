@@ -3,10 +3,10 @@
 
 #include "mqtt_client.h"
 #include "mqtt_msg.h"
-#include "transport.h"
-#include "transport_tcp.h"
-#include "transport_ssl.h"
-#include "transport_ws.h"
+#include "esp_transport.h"
+#include "esp_transport_tcp.h"
+#include "esp_transport_ssl.h"
+#include "esp_transport_ws.h"
 #include "platform.h"
 #include "mqtt_outbox.h"
 
