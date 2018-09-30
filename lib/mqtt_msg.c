@@ -90,6 +90,12 @@ static uint16_t append_message_id(mqtt_connection_t* connection, uint16_t messag
     return message_id;
 }
 
+/**
+ * \brief Initialize an empty message
+ *
+ * \param[inout] connection Connection on which to build the message
+ * \return int Length of the message created
+ */
 static int init_message(mqtt_connection_t* connection)
 {
     connection->message.length = MQTT_MAX_FIXED_HEADER_SIZE;
@@ -103,10 +109,21 @@ static mqtt_message_t* fail_message(mqtt_connection_t* connection)
     return &connection->message;
 }
 
+/**
+ * \brief Finish to build a message from data in connection
+ *
+ * \param[inout] connection Connection on which to build the message
+ * \param[in] type Type of MQTT message
+ * \param[in] dup DUPlicate flag
+ * \param[in] qos Quality of service
+ * \param[in] retain Retain flag
+ * \return mqtt_message_t* Pointer on the message completely built
+ */
 static mqtt_message_t* fini_message(mqtt_connection_t* connection, int type, int dup, int qos, int retain)
 {
     int remaining_length = connection->message.length - MQTT_MAX_FIXED_HEADER_SIZE;
 
+    // If the remaining length won't fit on one byte
     if (remaining_length > 127)
     {
         connection->buffer[0] = ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
@@ -126,6 +143,13 @@ static mqtt_message_t* fini_message(mqtt_connection_t* connection, int type, int
     return &connection->message;
 }
 
+/**
+ * \brief Initialize a message with data
+ *
+ * \param[inout] connection Connection on which to initialize the message
+ * \param[in] buffer Buffer of bytes containing the MQTT message
+ * \param[in] buffer_length Length of the MQTT message
+ */
 void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint16_t buffer_length)
 {
     memset(connection, 0, sizeof(mqtt_connection_t));
@@ -133,31 +157,55 @@ void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint16_t buff
     connection->buffer_length = buffer_length;
 }
 
+/**
+ * \brief Get the total length of a MQTT message
+ *
+ * \param[in] buffer Buffer of bytes containing the MQTT message
+ * \param[in] length Maximum length to read in the buffer
+ * \return uint32_t Total length of the MQTT message
+ *
+ * MQTT messages must contain a "remaining length" info as part of the fixed header of MQTT messages. It starts at byte 2 and is coded using a variable length encoding. Length <= 127 bytes are coded on a single byte. In other case, each byte is composed as follows : MSB continuation bit | length (7 bits) LSB. The maximum number of bytes for remaining length is 4.
+ *
+ */
 uint32_t mqtt_get_total_length(uint8_t* buffer, uint16_t length)
 {
     int i;
     uint32_t totlen = 0;
 
+    // Remaining length info starts at byte 2
     for (i = 1; i < length; ++i)
     {
         totlen += (buffer[i] & 0x7f) << (7 * (i - 1));
+        // If there's no continuation bit, we can stop
         if ((buffer[i] & 0x80) == 0)
         {
             ++i;
             break;
         }
     }
+    // Add to the total length the size of the fixed header (1 byte + length of remaining length info)
     totlen += i;
-    
+
     return totlen;
 }
 
+/**
+ * \brief Get the topic of the publish message
+ *
+ * \param[in] buffer Buffer of bytes containing the MQTT message
+ * \param[inout] length Acts first as the total length of the message but modified to contain the topic's length
+ * \return const char* String containing the topic
+ *
+ * A publish message contains : the fixed header (1 byte + variable number of bytes for "remaining length" info) then a variable header. The topic MUST be the first field of this variable header. As all strings in MQTT, it is UTF8 encoded and the format is the following : 2 bytes to describe the length then N bytes for the string, N being described in the first 2 bytes.
+ *
+ */
 const char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length)
 {
     int i;
     int totlen = 0;
     int topiclen;
 
+    // Go past the fixed header of the message
     for (i = 1; i < *length; ++i)
     {
         totlen += (buffer[i] & 0x7f) << (7 * (i - 1));
@@ -169,18 +217,27 @@ const char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length)
     }
     totlen += i;
 
+    // First field in variable header is the topic. As all strings, 2 bytes are used to described its length.
     if (i + 2 >= *length)
         return NULL;
     topiclen = buffer[i++] << 8;
     topiclen |= buffer[i++];
 
+    // Stop if the remaining size of the buffer isn't big enough to contain the topic
     if (i + topiclen > *length)
         return NULL;
 
     *length = topiclen;
     return (const char*)(buffer + i);
-} 
+}
 
+/**
+ * \brief Get the data of the publish message
+ *
+ * \param[in] buffer Buffer of bytes containing the MQTT message
+ * \param[inout] length Acts first as total length of the message but modified to contain the data's length
+ * \return const char* Pointer on the first byte of the data contained in the message
+ */
 const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
 {
     int i;
@@ -189,6 +246,7 @@ const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
     int blength = *length;
     *length = 0;
 
+    // Go past the fixed header of the message
     for (i = 1; i < blength; ++i)
     {
         totlen += (buffer[i] & 0x7f) << (7 * (i - 1));
@@ -200,6 +258,7 @@ const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
     }
     totlen += i;
 
+    // Go past the topic (first field of variable header)
     if (i + 2 >= blength)
         return NULL;
     topiclen = buffer[i++] << 8;
@@ -210,6 +269,7 @@ const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
 
     i += topiclen;
 
+    // Messages with quality of service greater than 0 have two bytes for the packet identifier
     if (mqtt_get_qos(buffer) > 0)
     {
         if (i + 2 >= blength)
@@ -227,6 +287,13 @@ const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
     return (const char*)(buffer + i);
 }
 
+/**
+ * \brief Get the packed identifier of a message
+ *
+ * \param buffer Buffer of bytes containing the MQTT message
+ * \param length Total length of the message
+ * \return uint16_t Packed identitifier of the message
+ */
 uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length)
 {
     if (length < 1)
@@ -234,11 +301,13 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length)
 
     switch (mqtt_get_type(buffer))
     {
+        // Fetching packet identifier in case of publish message is non trivial
         case MQTT_MSG_TYPE_PUBLISH:
             {
                 int i;
                 int topiclen;
 
+                // Go past fixed header
                 for (i = 1; i < length; ++i)
                 {
                     if ((buffer[i] & 0x80) == 0)
@@ -248,6 +317,7 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length)
                     }
                 }
 
+                // Go past the first field of the variable header (topic)
                 if (i + 2 >= length)
                     return 0;
                 topiclen = buffer[i++] << 8;
@@ -257,17 +327,19 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length)
                     return 0;
                 i += topiclen;
 
+                // Only publish messages with quality of service greater than 0 have a non-zero packet identifier
                 if (mqtt_get_qos(buffer) > 0)
                 {
                     if (i + 2 >= length)
                         return 0;
-                    //i += 2;
                 } else {
                     return 0;
                 }
 
                 return (buffer[i] << 8) | buffer[i + 1];
             }
+
+        // For all other types of messages containing a packet identifier, retrieval is trivial
         case MQTT_MSG_TYPE_PUBACK:
         case MQTT_MSG_TYPE_PUBREC:
         case MQTT_MSG_TYPE_PUBREL:
@@ -289,6 +361,13 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length)
     }
 }
 
+/**
+ * \brief Build a CONNECT message
+ *
+ * \param[inout] connection Connection on which to build this message
+ * \param[in] info Connection information (among others : will, keep alive...)
+ * \return mqtt_message_t* Pointer on the message completely built
+ */
 mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_info_t* info)
 {
     struct mqtt_connect_variable_header* variable_header;
@@ -326,6 +405,7 @@ mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_inf
     else
         return fail_message(connection);
 
+    // Append the will if there's one specified
     if (info->will_topic != NULL && info->will_topic[0] != '\0')
     {
         if (append_string(connection, info->will_topic, strlen(info->will_topic)) < 0)
@@ -340,6 +420,7 @@ mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_inf
         variable_header->flags |= (info->will_qos & 3) << 3;
     }
 
+    // Append username if there's one specified
     if (info->username != NULL && info->username[0] != '\0')
     {
         if (append_string(connection, info->username, strlen(info->username)) < 0)
@@ -348,6 +429,7 @@ mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_inf
         variable_header->flags |= MQTT_CONNECT_FLAG_USERNAME;
     }
 
+    // Append password if there's one specified
     if (info->password != NULL && info->password[0] != '\0')
     {
         if (append_string(connection, info->password, strlen(info->password)) < 0)
@@ -356,19 +438,33 @@ mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_inf
         variable_header->flags |= MQTT_CONNECT_FLAG_PASSWORD;
     }
 
+    // Finish to build the message and return the pointer on it
     return fini_message(connection, MQTT_MSG_TYPE_CONNECT, 0, 0, 0);
 }
 
+/**
+ * \brief Build a publish a message on the specified topic with the specified quality of service
+ *
+ * \param[inout] connection Connection on which to build the message
+ * \param[in] topic The topic to publish on
+ * \param[in] data Data to be published
+ * \param[in] data_length The data length, in bytes
+ * \param[in] qos The quality of service for this publish
+ * \param[in] retain Retain flag
+ * \param[out] message_id ID of the message generated
+ * \return mqtt_message_t*
+ */
 mqtt_message_t* mqtt_msg_publish(mqtt_connection_t* connection, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id)
 {
     init_message(connection);
 
+    // Append topic to the connection if everything's right with it
     if (topic == NULL || topic[0] == '\0')
         return fail_message(connection);
-
     if (append_string(connection, topic, strlen(topic)) < 0)
         return fail_message(connection);
 
+    // For QoS > 0, a message ID is necessary for acknowledgement process
     if (qos > 0)
     {
         if ((*message_id = append_message_id(connection, 0)) == 0)
@@ -377,6 +473,7 @@ mqtt_message_t* mqtt_msg_publish(mqtt_connection_t* connection, const char* topi
     else
         *message_id = 0;
 
+    // Append message if enough space left in buffer
     if (connection->message.length + data_length > connection->buffer_length)
         return fail_message(connection);
     memcpy(connection->buffer + connection->message.length, data, data_length);
@@ -385,6 +482,16 @@ mqtt_message_t* mqtt_msg_publish(mqtt_connection_t* connection, const char* topi
     return fini_message(connection, MQTT_MSG_TYPE_PUBLISH, 0, qos, retain);
 }
 
+/**
+ * \brief Build the "PUBlish ACKnowledgement" message on the current connection
+ *
+ * \param[inout] connection Connection on which to build the message
+ * \param[in] message_id ID of the message of the acknowledgement sequence
+ * \return mqtt_message_t* The pointer on the message built
+ *
+ * A PUBACK packet is the response to a PUBLISH packet with QoS level 1.
+ *
+ */
 mqtt_message_t* mqtt_msg_puback(mqtt_connection_t* connection, uint16_t message_id)
 {
     init_message(connection);
@@ -393,6 +500,16 @@ mqtt_message_t* mqtt_msg_puback(mqtt_connection_t* connection, uint16_t message_
     return fini_message(connection, MQTT_MSG_TYPE_PUBACK, 0, 0, 0);
 }
 
+/**
+ * \brief Build the "PUBlish RECeived" message on the current connection
+ *
+ * \param[inout] connection Connection on which to build the message
+ * \param[in] message_id ID of the message of the acknowledgement sequence
+ * \return mqtt_message_t* The pointer on the message built
+ *
+ * A PUBREC packet is the response to a PUBLISH packet with QoS 2. It is the second packet of the QoS 2 protocol exchange.
+ *
+ */
 mqtt_message_t* mqtt_msg_pubrec(mqtt_connection_t* connection, uint16_t message_id)
 {
     init_message(connection);
@@ -401,6 +518,16 @@ mqtt_message_t* mqtt_msg_pubrec(mqtt_connection_t* connection, uint16_t message_
     return fini_message(connection, MQTT_MSG_TYPE_PUBREC, 0, 0, 0);
 }
 
+/**
+ * \brief Build the "PUBlish RELease" message on the current connection
+ *
+ * \param[inout] connection Connection on which to build the message
+ * \param[in] message_id ID of the message of the acknowledgement sequence
+ * \return mqtt_message_t* The pointer on the message built
+ *
+ * A PUBREL packet is the response to a PUBREC packet. It is the third packet of the QoS 2 protocol exchange.
+ *
+ */
 mqtt_message_t* mqtt_msg_pubrel(mqtt_connection_t* connection, uint16_t message_id)
 {
     init_message(connection);
@@ -409,6 +536,16 @@ mqtt_message_t* mqtt_msg_pubrel(mqtt_connection_t* connection, uint16_t message_
     return fini_message(connection, MQTT_MSG_TYPE_PUBREL, 0, 1, 0);
 }
 
+/**
+ * \brief Build the "PUBlish COMPlete" message on the current connection
+ *
+ * \param[inout] connection Connection on which to build the message
+ * \param[in] message_id ID of the message of the acknowledgement sequence
+ * \return mqtt_message_t* The pointer on the message built
+ *
+ * The PUBCOMP packet is the response to a PUBREL packet. It is the fourth and final packet of the QoS 2 protocol exchange.
+ *
+ */
 mqtt_message_t* mqtt_msg_pubcomp(mqtt_connection_t* connection, uint16_t message_id)
 {
     init_message(connection);
@@ -417,6 +554,15 @@ mqtt_message_t* mqtt_msg_pubcomp(mqtt_connection_t* connection, uint16_t message
     return fini_message(connection, MQTT_MSG_TYPE_PUBCOMP, 0, 0, 0);
 }
 
+/**
+ * \brief Build a message to subscribe tp the specified topic
+ *
+ * \param[inout] connection Connection on whioh to build the message
+ * \param[in] topic The topic to subscribe to
+ * \param[in] qos The Quality of Service wanted for this subscription
+ * \param[out] message_id ID of the message generated
+ * \return mqtt_message_t* The pointer on the message built
+ */
 mqtt_message_t* mqtt_msg_subscribe(mqtt_connection_t* connection, const char* topic, int qos, uint16_t* message_id)
 {
     init_message(connection);
@@ -437,6 +583,14 @@ mqtt_message_t* mqtt_msg_subscribe(mqtt_connection_t* connection, const char* to
     return fini_message(connection, MQTT_MSG_TYPE_SUBSCRIBE, 0, 1, 0);
 }
 
+/**
+ * \brief Build a message to unsubscribe from the specified topic
+ *
+ * \param[inout] connection Connection on which to build the message
+ * \param[in] topic The topic to unsubscribe from
+ * \param[out] message_id ID of the message generated
+ * \return mqtt_message_t* The pointer on the message built
+ */
 mqtt_message_t* mqtt_msg_unsubscribe(mqtt_connection_t* connection, const char* topic, uint16_t* message_id)
 {
     init_message(connection);
@@ -453,18 +607,50 @@ mqtt_message_t* mqtt_msg_unsubscribe(mqtt_connection_t* connection, const char* 
     return fini_message(connection, MQTT_MSG_TYPE_UNSUBSCRIBE, 0, 1, 0);
 }
 
+/**
+ * \brief Build the "PING request" message on the current connection
+ *
+ * \param[inout] connection Connection on which to build the message
+ * \return mqtt_message_t* The pointer on the message built
+ *
+ * The PINGREQ packet is sent from a client to the server. It can be used to:
+ *  - Indicate to the server that the client is alive in the absence of any other Control packets being sent from the client to the server.
+ *  - Request that the server responds to confirm that it is alive.
+ *  - Exercise the network to indicate that the network connection is active.
+ *
+ * This packet is used in Keep Alive processing.
+ *
+ */
 mqtt_message_t* mqtt_msg_pingreq(mqtt_connection_t* connection)
 {
     init_message(connection);
     return fini_message(connection, MQTT_MSG_TYPE_PINGREQ, 0, 0, 0);
 }
 
+/**
+ * \brief Build the "PING response" message on the current connection
+ *
+ * \param[inout] connection Connection on which to build the message
+ * \return mqtt_message_t* The pointer on the message built
+ *
+ * A PINGRESP packet is sent by the server to the client in response to a PINGREQ packet. It indicates that the server is alive.
+ *
+ */
 mqtt_message_t* mqtt_msg_pingresp(mqtt_connection_t* connection)
 {
     init_message(connection);
     return fini_message(connection, MQTT_MSG_TYPE_PINGRESP, 0, 0, 0);
 }
 
+/**
+ * \brief Build the "DISCONNECT" message on the current connection
+ *
+ * \param[inout] connection Connection on which to build the message
+ * \return mqtt_message_t* The pointer on the message built
+ *
+ * The DISCONNECT packet is the final control packet sent from the client to the server. It indicates that the client is disconnecting cleanly.
+ *
+ */
 mqtt_message_t* mqtt_msg_disconnect(mqtt_connection_t* connection)
 {
     init_message(connection);
