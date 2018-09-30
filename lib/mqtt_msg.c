@@ -102,6 +102,50 @@ static uint16_t append_message_id(mqtt_connection_t* connection, uint16_t messag
 }
 
 /**
+ * \brief Get the remaining length information
+ *
+ * \param buffer Buffer of bytes containing the MQTT message
+ * \return uint32_t The remaining length
+ */
+static uint32_t get_remaining_length(uint8_t* buffer, uint32_t length = MQTT_MAX_FIXED_HEADER_SIZE){
+    uint32_t remaining_length = 0 ;
+
+    // Remaining length info starts at byte 2
+    for (uint8_t i_byte = 1; i_byte < length; ++i_byte) {
+        remaining_length += (buffer[i_byte] & 0x7f) << (7 * (i_byte - 1));
+        // If there's no continuation bit, we can stop
+        if ((buffer[i_byte] & 0x80) == 0){
+            break;
+        }
+    }
+
+    return remaining_length ;
+}
+
+/**
+ * \brief Get the number of bytes on which is coded the remaining length information
+ *
+ * \param remaining_length The remaining length
+ * \return uint8_t The number of bytes it takes to encode the remaining length
+ *
+ * Remaining length is coded using a variable length encoding. It cannot contain more than 4 bytes. Each byte contains as its MSB a continuation bit. If set to 1, it means the next byte also contain a part of the remaining length information. Due to this continuation bit, the length is coded in a base 128. First limit is 128-1, second limit (128*128)-1 and so on.
+ *
+ */
+static uint8_t get_nb_bytes_remaining_length(uint32_t remaining_length) {
+    if ( remaining_length <= 127) {
+        return 1 ;
+    } else if ( remaining_length <= 16383 ) {
+        return 2 ;
+    } else if ( remaining_length <= 2097151 ) {
+        return 3 ;
+    } else if ( remaining_length <= 268435455 ) {
+        return 4 ;
+    } else {
+        return 0 ;
+    }
+}
+
+/**
  * \brief Initialize an empty message
  *
  * \param[inout] connection Connection on which to build the message
