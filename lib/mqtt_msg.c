@@ -36,6 +36,7 @@
 
 #define MQTT_MAX_NB_BYTES_REMAINING_LENGTH 4
 #define MQTT_MAX_FIXED_HEADER_SIZE (1 + MQTT_MAX_NB_BYTES_REMAINING_LENGTH)
+#define MQTT_NB_BYTES_SIZE_STRING 2
 
 enum mqtt_connect_flag
 {
@@ -74,7 +75,7 @@ struct __attribute((__packed__)) mqtt_connect_variable_header
  */
 static int32_t append_string(mqtt_connection_t* connection, const char* string, uint16_t len)
 {
-    if (connection->message.length + len + 2 > connection->buffer_length)
+    if (connection->message.length + len + MQTT_NB_BYTES_SIZE_STRING > connection->buffer_length)
         return -1;
 
     connection->buffer[connection->message.length++] = len >> 8;
@@ -82,7 +83,7 @@ static int32_t append_string(mqtt_connection_t* connection, const char* string, 
     memcpy(connection->buffer + connection->message.length, string, len);
     connection->message.length += len;
 
-    return len + 2;
+    return len + MQTT_NB_BYTES_SIZE_STRING;
 }
 
 static uint16_t append_message_id(mqtt_connection_t* connection, uint16_t message_id)
@@ -145,6 +146,17 @@ static uint8_t get_nb_bytes_remaining_length(uint32_t remaining_length) {
         return 0 ;
     }
 }
+
+
+static uint8_t get_fixed_header_size(uint8_t* buffer, uint32_t length = MQTT_MAX_FIXED_HEADER_SIZE) {
+    uint8_t nb_bytes_remaining_length = get_nb_bytes_remaining_length(get_remaining_length(buffer, length)) ;
+    if ( nb_bytes_remaining_length == 0) {
+        return 0 ;
+    } else {
+        return nb_bytes_remaining_length + 1 ;
+    }
+}
+
 
 /**
  * \brief Initialize an empty message
@@ -236,22 +248,16 @@ void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint32_t buff
  */
 uint32_t mqtt_get_total_length(uint8_t* buffer, uint32_t length)
 {
-    uint32_t i;
-    uint32_t totlen = 0;
+    uint32_t total_length = 1;
+    uint32_t remaining_length = get_remaining_length(buffer) ;
+    uint8_t nb_bytes_remaining_length = get_nb_bytes_remaining_length(remaining_length) ;
 
-    // Remaining length info starts at byte 2
-    for (i = 1; i < length; ++i)
-    {
-        totlen += (buffer[i] & 0x7f) << (7 * (i - 1));
-        // If there's no continuation bit, we can stop
-        if ((buffer[i] & 0x80) == 0)
-        {
-            ++i;
-            break;
-        }
+    if ( nb_bytes_remaining_length == 0 ){
+        return 0 ;
+    } else {
+        total_length += remaining_length + nb_bytes_remaining_length ;
+        return total_length ;
     }
-    // Add to the total length the size of the fixed header (1 byte + length of remaining length info)
-    totlen += i;
 
     return totlen;
 }
@@ -268,34 +274,27 @@ uint32_t mqtt_get_total_length(uint8_t* buffer, uint32_t length)
  */
 const char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length)
 {
-    uint32_t i;
-    uint32_t totlen = 0;
-    uint16_t topiclen;
+    uint32_t i_byte;
+    uint16_t topic_length;
 
     // Go past the fixed header of the message
-    for (i = 1; i < *length; ++i)
-    {
-        totlen += (buffer[i] & 0x7f) << (7 * (i - 1));
-        if ((buffer[i] & 0x80) == 0)
-        {
-            ++i;
-            break;
-        }
+    i_byte = get_fixed_header_size(buffer, length) ;
+    if ( i_byte == 0 ) {
+        return NULL ;
     }
-    totlen += i;
 
     // First field in variable header is the topic. As all strings, 2 bytes are used to described its length.
-    if (i + 2 >= *length)
+    if (i_byte + MQTT_NB_BYTES_SIZE_STRING >= *length)
         return NULL;
-    topiclen = buffer[i++] << 8;
-    topiclen |= buffer[i++];
+    topic_length = buffer[i_byte++] << 8;
+    topic_length |= buffer[i_byte++];
 
     // Stop if the remaining size of the buffer isn't big enough to contain the topic
-    if (i + topiclen > *length)
+    if (i_byte + topic_length > *length)
         return NULL;
 
-    *length = topiclen;
-    return (const char*)(buffer + i);
+    *length = topic_length;
+    return (const char*)(buffer + i_byte);
 }
 
 /**
@@ -307,51 +306,46 @@ const char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length)
  */
 const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
 {
-    uint32_t i;
+    uint32_t i_byte;
     uint32_t totlen = 0;
     uint16_t topiclen;
     uint32_t buffer_length = *length;
     *length = 0;
 
     // Go past the fixed header of the message
-    for (i = 1; i < buffer_length; ++i)
-    {
-        totlen += (buffer[i] & 0x7f) << (7 * (i - 1));
-        if ((buffer[i] & 0x80) == 0)
-        {
-            ++i;
-            break;
-        }
+    i_byte = get_fixed_header_size(buffer, length) ;
+    if ( i_byte == 0 ) {
+        return NULL ;
     }
-    totlen += i;
+    totlen = mqtt_get_total_length(buffer, length) ;
 
     // Go past the topic (first field of variable header)
-    if (i + 2 >= buffer_length)
+    if (i_byte + MQTT_NB_BYTES_SIZE_STRING >= buffer_length)
         return NULL;
-    topiclen = buffer[i++] << 8;
-    topiclen |= buffer[i++];
+    topiclen = buffer[i_byte++] << 8;
+    topiclen |= buffer[i_byte++];
 
-    if (i + topiclen >= buffer_length)
+    if (i_byte + topiclen >= buffer_length)
         return NULL;
 
-    i += topiclen;
+    i_byte += topiclen;
 
     // Messages with quality of service greater than 0 have two bytes for the packet identifier
     if (mqtt_get_qos(buffer) > 0)
     {
-        if (i + 2 >= buffer_length)
+        if (i_byte + 2 >= buffer_length)
             return NULL;
-        i += 2;
+        i_byte += 2;
     }
 
-    if (totlen < i)
+    if (totlen < i_byte)
         return NULL;
 
     if (totlen <= buffer_length)
-        *length = totlen - i;
+        *length = totlen - i_byte;
     else
-        *length = buffer_length - i;
-    return (const char*)(buffer + i);
+        *length = buffer_length - i_byte;
+    return (const char*)(buffer + i_byte);
 }
 
 /**
@@ -375,17 +369,13 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length)
                 uint16_t topiclen;
 
                 // Go past fixed header
-                for (i = 1; i < length; ++i)
-                {
-                    if ((buffer[i] & 0x80) == 0)
-                    {
-                        ++i;
-                        break;
-                    }
+                i = get_fixed_header_size(buffer, length) ;
+                if ( i == 0 ) {
+                    return 0 ;
                 }
 
                 // Go past the first field of the variable header (topic)
-                if (i + 2 >= length)
+                if (i + MQTT_NB_BYTES_SIZE_STRING >= length)
                     return 0;
                 topiclen = buffer[i++] << 8;
                 topiclen |= buffer[i++];
