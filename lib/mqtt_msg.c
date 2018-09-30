@@ -34,7 +34,8 @@
 #include "mqtt_config.h"
 #include "platform.h"
 
-#define MQTT_MAX_FIXED_HEADER_SIZE 3
+#define MQTT_MAX_NB_BYTES_REMAINING_LENGTH 4
+#define MQTT_MAX_FIXED_HEADER_SIZE (1 + MQTT_MAX_NB_BYTES_REMAINING_LENGTH)
 
 enum mqtt_connect_flag
 {
@@ -173,26 +174,37 @@ static mqtt_message_t* fail_message(mqtt_connection_t* connection)
  * \param[in] qos Quality of service
  * \param[in] retain Retain flag
  * \return mqtt_message_t* Pointer on the message completely built
+ *
+ * Due to the variable number of bytes to encode the remaining length information, the buffer was initialized with the maximum size of the fixed header in mind. Which means the rest of the message has been put at the position MQTT_MAX_FIXED_HEADER_SIZE in the buffer. So, for example, for a remaining length of 112 bytes, the fixed header will have two bytes : one for the flags and one for remaining length. This data must be written at position MQTT_MAX_FIXED_HEADER_SIZE - 1 and MQTT_MAX_FIXED_HEADER_SIZE - 2. This offset is computed to put the fixed header at the appropriate position and indicate the "true" start position of the message data.
+ *
  */
 static mqtt_message_t* fini_message(mqtt_connection_t* connection, int type, int dup, int qos, int retain)
 {
     uint32_t remaining_length = connection->message.length - MQTT_MAX_FIXED_HEADER_SIZE;
+    int8_t nb_bytes_remaining_length = get_nb_bytes_remaining_length(remaining_length) ;
 
-    // If the remaining length won't fit on one byte
-    if (remaining_length > 127)
-    {
-        connection->buffer[0] = ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
-        connection->buffer[1] = 0x80 | (remaining_length % 128);
-        connection->buffer[2] = remaining_length / 128;
-        connection->message.length = remaining_length + 3;
-        connection->message.data = connection->buffer;
-    }
-    else
-    {
-        connection->buffer[1] = ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
-        connection->buffer[2] = remaining_length;
-        connection->message.length = remaining_length + 2;
-        connection->message.data = connection->buffer + 1;
+    if ( nb_bytes_remaining_length == 0 ) {
+        return fail_message(connection) ;
+    } else {
+        // Set the length taking into account the fixed header
+        connection->message.length = 1 + nb_bytes_remaining_length + remaining_length ;
+
+        // First byte contains all the flags
+        int offset_buffer = MQTT_MAX_NB_BYTES_REMAINING_LENGTH - nb_bytes_remaining_length ;
+        connection->buffer[offset_buffer] = ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
+
+        // Build the remaining length bytes
+        uint32_t divider = 1 ;
+        for ( int8_t i_byte_remaining_length = 1 ; i_byte_remaining_length <= nb_bytes_remaining_length ; i_byte_remaining_length++ ) {
+            connection->buffer[offset_buffer + i_byte_remaining_length] = (remaining_length / divider) %  ;
+            if ( i_byte_remaining_length != nb_bytes_remaining_length) {
+                connection->buffer[offset_buffer + i_byte_remaining_length] |= 0x80 ;
+                divider *= 128 ;
+            }
+        }
+
+        // Set the pointer for the data to the right position
+        connection->message.data = connection->buffer + offset_buffer ;
     }
 
     return &connection->message;
