@@ -20,8 +20,8 @@ typedef struct mqtt_state
     mqtt_connect_info_t *connect_info;
     uint8_t *in_buffer;
     uint8_t *out_buffer;
-    int in_buffer_length;
-    int out_buffer_length;
+    uint32_t in_buffer_length;
+    uint32_t out_buffer_length;
     uint32_t message_length;
     uint32_t message_length_read;
     mqtt_message_t *outbound_message;
@@ -80,7 +80,7 @@ static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms);
 static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client);
-static char *create_string(const char *ptr, int len);
+static char *create_string(const char *ptr, uint16_t len);
 
 static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_client_config_t *config)
 {
@@ -190,7 +190,8 @@ static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
 
 static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms)
 {
-    int write_len, read_len, connect_rsp_code;
+    int32_t write_len, read_len ;
+    int connect_rsp_code;
     client->wait_for_ping_resp = false;
     mqtt_msg_init(&client->mqtt_state.mqtt_connection,
                   client->mqtt_state.out_buffer,
@@ -372,7 +373,7 @@ esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client)
     return ESP_OK;
 }
 
-static char *create_string(const char *ptr, int len)
+static char *create_string(const char *ptr, uint16_t len)
 {
     char *ret;
     if (len <= 0) {
@@ -438,7 +439,7 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
 
 static esp_err_t mqtt_write_data(esp_mqtt_client_handle_t client)
 {
-    int write_len = transport_write(client->transport,
+    int32_t write_len = transport_write(client->transport,
                                     (char *)client->mqtt_state.outbound_message->data,
                                     client->mqtt_state.outbound_message->length,
                                     client->config->network_timeout_ms);
@@ -468,12 +469,12 @@ static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
 
 
 
-static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, int length)
+static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, uint32_t length)
 {
     const char *mqtt_topic, *mqtt_data;
     uint32_t mqtt_topic_length, mqtt_data_length;
     uint32_t mqtt_len, mqtt_offset = 0, total_mqtt_len = 0;
-    int len_read;
+    int32_t len_read;
 
     do
     {
@@ -519,7 +520,7 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
 
 }
 
-static bool is_valid_mqtt_msg(esp_mqtt_client_handle_t client, int msg_type, int msg_id)
+static bool is_valid_mqtt_msg(esp_mqtt_client_handle_t client, int msg_type, uint16_t msg_id)
 {
     ESP_LOGD(TAG, "pending_id=%d, pending_msg_count = %d", client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_count);
     if (client->mqtt_state.pending_msg_count == 0) {
@@ -556,7 +557,7 @@ static void mqtt_enqueue(esp_mqtt_client_handle_t client)
 
 static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
 {
-    int read_len;
+    int32_t read_len;
     uint8_t msg_type;
     uint8_t msg_qos;
     uint16_t msg_id;
@@ -840,7 +841,21 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
     return client->mqtt_state.pending_msg_id;
 }
 
-int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain)
+/**
+ * \brief Publish a message on a topic
+ *
+ * \param client MQTT client to send the message
+ * \param topic Topic of the message
+ * \param data Data
+ * \param len Length of the data
+ * \param qos Quality of service
+ * \param retain Retain flag
+ * \return int32_t The message id or -1 in case of error
+ *
+ * The function returns an int32 while the message id fits on an uint16_t because of the negative return value to indicate an error
+ *
+ */
+int32_t esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, uint32_t len, int qos, int retain)
 {
     uint16_t pending_msg_id = 0;
     if (client->state != MQTT_STATE_CONNECTED) {
