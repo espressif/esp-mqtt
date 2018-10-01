@@ -1,14 +1,13 @@
 #include <stdio.h>
-#include "platform.h"
 
 #include "mqtt_client.h"
-#include "mqtt_msg.h"
-#include "transport.h"
-#include "transport_tcp.h"
-#include "transport_ssl.h"
-#include "transport_ws.h"
-#include "platform.h"
-#include "mqtt_outbox.h"
+#include "lib/include/mqtt_msg.h"
+#include "lib/include/transport.h"
+#include "lib/include/transport_tcp.h"
+#include "lib/include/transport_ssl.h"
+#include "lib/include/transport_ws.h"
+#include "lib/include/platform.h"
+#include "lib/include/mqtt_outbox.h"
 
 /* using uri parser */
 #include "http_parser.h"
