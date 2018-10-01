@@ -336,18 +336,20 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     client->keepalive_tick = platform_tick_get_ms();
     client->reconnect_tick = platform_tick_get_ms();
     client->wait_for_ping_resp = false;
+
+    // Define the buffer sizes for receiving and writing data : if not in config, use default value
     int buffer_size = config->buffer_size;
     if (buffer_size <= 0) {
         buffer_size = MQTT_BUFFER_SIZE_BYTE;
     }
-
+    // Initialize buffers and set the length of buffers in MQTT state
     client->mqtt_state.in_buffer = (uint8_t *)malloc(buffer_size);
     ESP_MEM_CHECK(TAG, client->mqtt_state.in_buffer, goto _mqtt_init_failed);
     client->mqtt_state.in_buffer_length = buffer_size;
     client->mqtt_state.out_buffer = (uint8_t *)malloc(buffer_size);
     ESP_MEM_CHECK(TAG, client->mqtt_state.out_buffer, goto _mqtt_init_failed);
-
     client->mqtt_state.out_buffer_length = buffer_size;
+
     client->mqtt_state.connect_info = &client->connect_info;
     client->outbox = outbox_init();
     ESP_MEM_CHECK(TAG, client->outbox, goto _mqtt_init_failed);
@@ -477,6 +479,7 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
 
     do
     {
+        // First read of potential fragmented packet : get topic, message data and its length
         if (total_mqtt_len == 0) {
             mqtt_topic_length = length;
             mqtt_topic = mqtt_get_publish_topic(message, &mqtt_topic_length);
@@ -509,6 +512,8 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
                                   client->mqtt_state.message_length - client->mqtt_state.message_length_read > client->mqtt_state.in_buffer_length ?
                                   client->mqtt_state.in_buffer_length : client->mqtt_state.message_length - client->mqtt_state.message_length_read,
                                   client->config->network_timeout_ms);
+
+        // Make sure the read was successful and update the number of bytes read
         if (len_read <= 0) {
             ESP_LOGE(TAG, "Read error or timeout: %d", errno);
             break;
@@ -519,6 +524,16 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
 
 }
 
+/**
+ * \brief Check that a message defined by its id and type exists in the list of pending messages. Delete the message from the list if found
+ *
+ * \param client
+ * \param msg_type Type of the message to search
+ * \param msg_id Id of the message to search
+ * \return true The message has been found and deleted from the list of pending messages
+ * \return false The message hasn't been found
+ * \todo For QoS2, we should be able to check the existence of the message without deleting it
+ */
 static bool is_valid_mqtt_msg(esp_mqtt_client_handle_t client, int msg_type, int msg_id)
 {
     ESP_LOGD(TAG, "pending_id=%d, pending_msg_count = %d", client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_count);
@@ -554,6 +569,13 @@ static void mqtt_enqueue(esp_mqtt_client_handle_t client)
     //unlock
 }
 
+/**
+ * \brief Receive a message from the transport
+ *
+ * \param client Client that receives the message
+ * \return esp_err_t
+ * \todo For MQTT_MSG_TYPE_PUBREC, we should also check that the message id matches the message id of the message sent. Requires a change to is_valid_mqtt_msg
+ */
 static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
 {
     int read_len;
@@ -561,24 +583,25 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
     uint8_t msg_qos;
     uint16_t msg_id;
 
+    // Read message from the transport and make sure it's valid
     read_len = transport_read(client->transport, (char *)client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_length, 1000);
-
     if (read_len < 0) {
         ESP_LOGE(TAG, "Read error or end of stream");
         return ESP_FAIL;
     }
-
     if (read_len == 0) {
         return ESP_OK;
     }
 
+    // If the message was valid, get the type, quality of service and id of the message
     msg_type = mqtt_get_type(client->mqtt_state.in_buffer);
     msg_qos = mqtt_get_qos(client->mqtt_state.in_buffer);
     msg_id = mqtt_get_id(client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_length);
-
     ESP_LOGD(TAG, "msg_type=%d, msg_id=%d", msg_type, msg_id);
+
     switch (msg_type)
     {
+        // Subscription acknowledgement : verify that it is an acknowledgement of a message we did send and flag corresponding event
         case MQTT_MSG_TYPE_SUBACK:
             if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_SUBSCRIBE, msg_id)) {
                 ESP_LOGD(TAG, "Subscribe successful");
@@ -586,6 +609,8 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
                 esp_mqtt_dispatch_event(client);
             }
             break;
+
+        // Unsubscription acknowledgement : verify that it is an acknowledgement of a message we did send and flag corresponding event
         case MQTT_MSG_TYPE_UNSUBACK:
             if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_UNSUBSCRIBE, msg_id)) {
                 ESP_LOGD(TAG, "UnSubscribe successful");
@@ -593,7 +618,10 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
                 esp_mqtt_dispatch_event(client);
             }
             break;
+
+        // Publish message
         case MQTT_MSG_TYPE_PUBLISH:
+            // If the quality of service is greater than 0, some acknowledgement process will occur
             if (msg_qos == 1) {
                 client->mqtt_state.outbound_message = mqtt_msg_puback(&client->mqtt_state.mqtt_connection, msg_id);
             }
@@ -601,6 +629,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
                 client->mqtt_state.outbound_message = mqtt_msg_pubrec(&client->mqtt_state.mqtt_connection, msg_id);
             }
 
+            // Send the acknowledgement if needed
             if (msg_qos == 1 || msg_qos == 2) {
                 ESP_LOGD(TAG, "Queue response QoS: %d", msg_qos);
 
@@ -610,12 +639,16 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
                     // return ESP_FAIL;
                 }
             }
+
+            // Deliver the publish message
             client->mqtt_state.message_length_read = read_len;
             client->mqtt_state.message_length = mqtt_get_total_length(client->mqtt_state.in_buffer, client->mqtt_state.message_length_read);
             ESP_LOGI(TAG, "deliver_publish, message_length_read=%d, message_length=%d", read_len, client->mqtt_state.message_length);
-
             deliver_publish(client, client->mqtt_state.in_buffer, client->mqtt_state.message_length_read);
+
             break;
+
+        // QoS 1 : Publish acknowledgement, verify that it is an acknowledgement of a message we did send and flag that the publish was a success
         case MQTT_MSG_TYPE_PUBACK:
             if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
                 ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBACK, finish QoS1 publish");
@@ -624,17 +657,22 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             }
 
             break;
+
+        // QoS 2 : Publish received, send the next step : PUB REL
         case MQTT_MSG_TYPE_PUBREC:
             ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBREC");
             client->mqtt_state.outbound_message = mqtt_msg_pubrel(&client->mqtt_state.mqtt_connection, msg_id);
             mqtt_write_data(client);
             break;
+
+        // QoS 2 : Publish released, since we are in a receive function, we shouldn't receive it
         case MQTT_MSG_TYPE_PUBREL:
             ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBREL");
             client->mqtt_state.outbound_message = mqtt_msg_pubcomp(&client->mqtt_state.mqtt_connection, msg_id);
             mqtt_write_data(client);
-
             break;
+
+        // QoS 2 : Publish complete, verify that it is an acknowledgement of a message we did send and flag that the publish was a success
         case MQTT_MSG_TYPE_PUBCOMP:
             ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBCOMP");
             if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
@@ -643,6 +681,8 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
                 esp_mqtt_dispatch_event(client);
             }
             break;
+
+        // Ping response
         case MQTT_MSG_TYPE_PINGRESP:
             ESP_LOGD(TAG, "MQTT_MSG_TYPE_PINGRESP");
             client->wait_for_ping_resp = false;
@@ -855,6 +895,7 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
                                           topic, data, len,
                                           qos, retain,
                                           &pending_msg_id);
+    // If the quality of sevice is greater than 0, add the message (id + type only) to the list of messages pending acknowledgement
     if (qos > 0) {
         client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
         client->mqtt_state.pending_msg_id = pending_msg_id;
