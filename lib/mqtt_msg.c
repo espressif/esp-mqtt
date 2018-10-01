@@ -108,7 +108,7 @@ static uint16_t append_message_id(mqtt_connection_t* connection, uint16_t messag
  * \param buffer Buffer of bytes containing the MQTT message
  * \return uint32_t The remaining length
  */
-static uint32_t get_remaining_length(uint8_t* buffer, uint32_t length = MQTT_MAX_FIXED_HEADER_SIZE){
+static uint32_t get_remaining_length(uint8_t* buffer, uint32_t length){
     uint32_t remaining_length = 0 ;
 
     // Remaining length info starts at byte 2
@@ -147,7 +147,7 @@ static uint8_t get_nb_bytes_remaining_length(uint32_t remaining_length) {
 }
 
 
-static uint8_t get_fixed_header_size(uint8_t* buffer, uint32_t length = MQTT_MAX_FIXED_HEADER_SIZE) {
+static uint8_t get_fixed_header_size(uint8_t* buffer, uint32_t length) {
     uint8_t nb_bytes_remaining_length = get_nb_bytes_remaining_length(get_remaining_length(buffer, length)) ;
     if ( nb_bytes_remaining_length == 0) {
         return 0 ;
@@ -207,7 +207,7 @@ static mqtt_message_t* fini_message(mqtt_connection_t* connection, int type, int
         // Build the remaining length bytes
         uint32_t divider = 1 ;
         for ( int8_t i_byte_remaining_length = 1 ; i_byte_remaining_length <= nb_bytes_remaining_length ; i_byte_remaining_length++ ) {
-            connection->buffer[offset_buffer + i_byte_remaining_length] = (remaining_length / divider) %  ;
+            connection->buffer[offset_buffer + i_byte_remaining_length] = (remaining_length / divider) % 128 ;
             if ( i_byte_remaining_length != nb_bytes_remaining_length) {
                 connection->buffer[offset_buffer + i_byte_remaining_length] |= 0x80 ;
                 divider *= 128 ;
@@ -248,7 +248,7 @@ void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint32_t buff
 uint32_t mqtt_get_total_length(uint8_t* buffer, uint32_t length)
 {
     uint32_t total_length = 1;
-    uint32_t remaining_length = get_remaining_length(buffer) ;
+    uint32_t remaining_length = get_remaining_length(buffer, length) ;
     uint8_t nb_bytes_remaining_length = get_nb_bytes_remaining_length(remaining_length) ;
 
     if ( nb_bytes_remaining_length == 0 ){
@@ -257,8 +257,6 @@ uint32_t mqtt_get_total_length(uint8_t* buffer, uint32_t length)
         total_length += remaining_length + nb_bytes_remaining_length ;
         return total_length ;
     }
-
-    return totlen;
 }
 
 /**
@@ -277,7 +275,7 @@ const char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length)
     uint16_t topic_length;
 
     // Go past the fixed header of the message
-    i_byte = get_fixed_header_size(buffer, length) ;
+    i_byte = get_fixed_header_size(buffer, *length) ;
     if ( i_byte == 0 ) {
         return NULL ;
     }
@@ -312,11 +310,11 @@ const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
     *length = 0;
 
     // Go past the fixed header of the message
-    i_byte = get_fixed_header_size(buffer, length) ;
+    i_byte = get_fixed_header_size(buffer, buffer_length) ;
     if ( i_byte == 0 ) {
         return NULL ;
     }
-    totlen = mqtt_get_total_length(buffer, length) ;
+    totlen = mqtt_get_total_length(buffer, buffer_length) ;
 
     // Go past the topic (first field of variable header)
     if (i_byte + MQTT_NB_BYTES_SIZE_STRING >= buffer_length)
@@ -354,7 +352,7 @@ const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
  * \param length Total length of the message
  * \return uint16_t Packed identitifier of the message
  */
-uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length)
+uint16_t mqtt_get_id(uint8_t* buffer, uint32_t length)
 {
     if (length < 1)
         return 0;
