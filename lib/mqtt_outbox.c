@@ -14,7 +14,7 @@ outbox_handle_t outbox_init()
     return outbox;
 }
 
-outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, uint8_t *data, int len, int msg_id, int msg_type, int tick)
+outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, uint8_t *data, uint32_t len, uint16_t msg_id, int msg_type, uint32_t tick)
 {
     outbox_item_handle_t item = calloc(1, sizeof(outbox_item_t));
     ESP_MEM_CHECK(TAG, item, return NULL);
@@ -33,7 +33,7 @@ outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, uint8_t *data, int l
     return item;
 }
 
-outbox_item_handle_t outbox_get(outbox_handle_t outbox, int msg_id)
+outbox_item_handle_t outbox_get(outbox_handle_t outbox, uint16_t msg_id)
 {
     outbox_item_handle_t item;
     STAILQ_FOREACH(item, outbox, next) {
@@ -54,7 +54,7 @@ outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox)
     }
     return NULL;
 }
-esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type)
+esp_err_t outbox_delete(outbox_handle_t outbox, uint16_t msg_id, int msg_type)
 {
     outbox_item_handle_t item, tmp;
     STAILQ_FOREACH_SAFE(item, outbox, next, tmp) {
@@ -69,7 +69,7 @@ esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type)
     }
     return ESP_FAIL;
 }
-esp_err_t outbox_delete_msgid(outbox_handle_t outbox, int msg_id)
+esp_err_t outbox_delete_msgid(outbox_handle_t outbox, uint16_t msg_id)
 {
     outbox_item_handle_t item, tmp;
     STAILQ_FOREACH_SAFE(item, outbox, next, tmp) {
@@ -82,7 +82,7 @@ esp_err_t outbox_delete_msgid(outbox_handle_t outbox, int msg_id)
     }
     return ESP_OK;
 }
-esp_err_t outbox_set_pending(outbox_handle_t outbox, int msg_id)
+esp_err_t outbox_set_pending(outbox_handle_t outbox, uint16_t msg_id)
 {
     outbox_item_handle_t item = outbox_get(outbox, msg_id);
     if (item) {
@@ -106,7 +106,7 @@ esp_err_t outbox_delete_msgtype(outbox_handle_t outbox, int msg_type)
     return ESP_OK;
 }
 
-esp_err_t outbox_delete_expired(outbox_handle_t outbox, int current_tick, int timeout)
+esp_err_t outbox_delete_expired(outbox_handle_t outbox, uint32_t current_tick, uint32_t timeout)
 {
     outbox_item_handle_t item, tmp;
     STAILQ_FOREACH_SAFE(item, outbox, next, tmp) {
@@ -120,9 +120,9 @@ esp_err_t outbox_delete_expired(outbox_handle_t outbox, int current_tick, int ti
     return ESP_OK;
 }
 
-int outbox_get_size(outbox_handle_t outbox)
+uint32_t outbox_get_size(outbox_handle_t outbox)
 {
-    int siz = 0;
+    uint32_t siz = 0;
     outbox_item_handle_t item;
     STAILQ_FOREACH(item, outbox, next) {
         siz += item->len;
@@ -130,7 +130,7 @@ int outbox_get_size(outbox_handle_t outbox)
     return siz;
 }
 
-esp_err_t outbox_cleanup(outbox_handle_t outbox, int max_size)
+esp_err_t outbox_cleanup(outbox_handle_t outbox, uint32_t max_size)
 {
     while(outbox_get_size(outbox) > max_size) {
         outbox_item_handle_t item = outbox_dequeue(outbox);
