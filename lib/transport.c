@@ -121,7 +121,7 @@ int transport_connect(transport_handle_t t, const char *host, int port, int time
     return ret;
 }
 
-int transport_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
+int32_t transport_read(transport_handle_t t, char *buffer, uint32_t len, int timeout_ms)
 {
     if (t && t->_read) {
         return t->_read(t, buffer, len, timeout_ms);
@@ -129,7 +129,7 @@ int transport_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
     return -1;
 }
 
-int transport_write(transport_handle_t t, const char *buffer, int len, int timeout_ms)
+int32_t transport_write(transport_handle_t t, const char *buffer, uint32_t len, int timeout_ms)
 {
     if (t && t->_write) {
         return t->_write(t, buffer, len, timeout_ms);

@@ -6,6 +6,7 @@
 #ifndef _TRANSPORT_H_
 #define _TRANSPORT_H_
 
+#include <stdint.h>
 #include <esp_err.h>
 
 #ifdef __cplusplus
@@ -17,8 +18,8 @@ typedef struct transport_list_t* transport_list_handle_t;
 typedef struct transport_item_t* transport_handle_t;
 
 typedef int (*connect_func)(transport_handle_t t, const char *host, int port, int timeout_ms);
-typedef int (*io_func)(transport_handle_t t, const char *buffer, int len, int timeout_ms);
-typedef int (*io_read_func)(transport_handle_t t, char *buffer, int len, int timeout_ms);
+typedef int32_t (*io_func)(transport_handle_t t, const char *buffer, uint32_t len, int timeout_ms);
+typedef int32_t (*io_read_func)(transport_handle_t t, char *buffer, uint32_t len, int timeout_ms);
 typedef int (*trans_func)(transport_handle_t t);
 typedef int (*poll_func)(transport_handle_t t, int timeout_ms);
 
@@ -140,7 +141,7 @@ int transport_connect(transport_handle_t t, const char *host, int port, int time
  *  - Number of bytes was read
  *  - (-1) if there are any errors, should check errno
  */
-int transport_read(transport_handle_t t, char *buffer, int len, int timeout_ms);
+int32_t transport_read(transport_handle_t t, char *buffer, uint32_t len, int timeout_ms);
 
 /**
  * @brief      Poll the transport until readable or timeout
@@ -167,7 +168,7 @@ int transport_poll_read(transport_handle_t t, int timeout_ms);
  *  - Number of bytes was written
  *  - (-1) if there are any errors, should check errno
  */
-int transport_write(transport_handle_t t, const char *buffer, int len, int timeout_ms);
+int32_t transport_write(transport_handle_t t, const char *buffer, uint32_t len, int timeout_ms);
 
 /**
  * @brief      Poll the transport until writeable or timeout

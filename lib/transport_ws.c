@@ -109,7 +109,7 @@ static int ws_connect(transport_handle_t t, const char *host, int port, int time
     return 0;
 }
 
-static int ws_write(transport_handle_t t, const char *buff, int len, int timeout_ms)
+static int32_t ws_write(transport_handle_t t, const char *buff, uint32_t len, int timeout_ms)
 {
     transport_ws_t *ws = transport_get_context_data(t);
     char ws_header[MAX_WEBSOCKET_HEADER_SIZE];
@@ -147,12 +147,12 @@ static int ws_write(transport_handle_t t, const char *buff, int len, int timeout
     return transport_write(ws->parent, buffer, len, timeout_ms);
 }
 
-static int ws_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
+static int32_t ws_read(transport_handle_t t, char *buffer, uint32_t len, int timeout_ms)
 {
     transport_ws_t *ws = transport_get_context_data(t);
-    int payload_len;
+    int32_t payload_len;
     char *data_ptr = buffer, opcode, mask, *mask_key = NULL;
-    int rlen;
+    int32_t rlen;
     int poll_read;
     if ((poll_read = transport_poll_read(ws->parent, timeout_ms)) <= 0) {
         return poll_read;

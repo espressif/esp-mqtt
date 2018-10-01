@@ -74,7 +74,7 @@ static int tcp_connect(transport_handle_t t, const char *host, int port, int tim
     return tcp->sock;
 }
 
-static int tcp_write(transport_handle_t t, const char *buffer, int len, int timeout_ms)
+static int32_t tcp_write(transport_handle_t t, const char *buffer, uint32_t len, int timeout_ms)
 {
     int poll;
     transport_tcp_t *tcp = transport_get_context_data(t);
@@ -84,14 +84,14 @@ static int tcp_write(transport_handle_t t, const char *buffer, int len, int time
     return write(tcp->sock, buffer, len);
 }
 
-static int tcp_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
+static int32_t tcp_read(transport_handle_t t, char *buffer, uint32_t len, int timeout_ms)
 {
     transport_tcp_t *tcp = transport_get_context_data(t);
     int poll = -1;
     if ((poll = transport_poll_read(t, timeout_ms)) <= 0) {
         return poll;
     }
-    int read_len = read(tcp->sock, buffer, len);
+    int32_t read_len = read(tcp->sock, buffer, len);
     if (read_len == 0) {
         return -1;
     }
