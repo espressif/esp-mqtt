@@ -28,7 +28,6 @@
 * POSSIBILITY OF SUCH DAMAGE.
 *
 */
-#include <stdint.h>
 #include <string.h>
 #include "mqtt_msg.h"
 #include "mqtt_config.h"

@@ -1,5 +1,6 @@
 #ifndef MQTT_MSG_H
 #define MQTT_MSG_H
+#include <stdint.h>
 #include "mqtt_config.h"
 #ifdef  __cplusplus
 extern "C" {
