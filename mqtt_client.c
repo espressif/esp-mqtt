@@ -465,7 +465,7 @@ static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
         return client->config->event_handle(&client->event);
     }
     return ESP_FAIL;
-}
+} 
 
 
 
@@ -479,6 +479,7 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
     do
     {
         if (total_mqtt_len == 0) {
+
             mqtt_topic_length = length;
             mqtt_topic = mqtt_get_publish_topic(message, &mqtt_topic_length);
             mqtt_data_length = length;
@@ -510,6 +511,7 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
                                   client->mqtt_state.message_length - client->mqtt_state.message_length_read > client->mqtt_state.in_buffer_length ?
                                   client->mqtt_state.in_buffer_length : client->mqtt_state.message_length - client->mqtt_state.message_length_read,
                                   client->config->network_timeout_ms);
+
         if (len_read <= 0) {
             ESP_LOGE(TAG, "Read error or timeout: %d", errno);
             break;
