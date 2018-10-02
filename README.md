@@ -3,11 +3,12 @@
 [![Twitter Follow](https://img.shields.io/twitter/follow/tuanpmt.svg?style=social&label=Follow)](https://twitter.com/tuanpmt)
 ![GitHub contributors](https://img.shields.io/github/contributors/tuanpmt/espmqtt.svg)
 
-# ESP32 MQTT Library
+# ESP MQTT Library
 
 ## Features
 
 - Based on: https://github.com/tuanpmt/esp_mqtt 
+- Support for ESP32 and ESP8266 (using the latest esp-idf style SDK)
 - Support MQTT over TCP, SSL with mbedtls, MQTT over Websocket, MQTT over Websocket Secure
 - Easy to setup with URI 
 - Multiple instances (Multiple clients in one application)
