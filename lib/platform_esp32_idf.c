@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "platform.h"
 
 #ifdef ESP_PLATFORM

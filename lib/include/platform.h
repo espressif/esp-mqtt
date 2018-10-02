@@ -6,9 +6,15 @@
 #ifndef _PLATFORM_H__
 #define _PLATFORM_H__
 
+#include "sdkconfig.h"
+
 //Support ESP32
-#ifdef ESP_PLATFORM
+#  ifdef ESP_PLATFORM
+#    ifdef CONFIG_TARGET_PLATFORM_ESP8266
+#include "platform_esp8266_idf.h"
+#    else
 #include "platform_esp32_idf.h"
-#endif
+#    endif
+#  endif
 
 #endif

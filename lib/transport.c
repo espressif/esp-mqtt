@@ -1,9 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "rom/queue.h"
-#include "esp_log.h"
-
 #include "transport.h"
 #include "platform.h"
 
