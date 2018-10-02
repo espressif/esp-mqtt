@@ -479,7 +479,6 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
     do
     {
         if (total_mqtt_len == 0) {
-
             mqtt_topic_length = length;
             mqtt_topic = mqtt_get_publish_topic(message, &mqtt_topic_length);
             mqtt_data_length = length;
