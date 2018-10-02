@@ -202,9 +202,10 @@ static int ssl_poll_write(transport_handle_t t, int timeout_ms)
     return select(ssl->client_fd.fd + 1, NULL, &writeset, NULL, &timeout);
 }
 
-static int ssl_write(transport_handle_t t, const char *buffer, int len, int timeout_ms)
+static int32_t ssl_write(transport_handle_t t, const char *buffer, uint32_t len, int timeout_ms)
 {
-    int poll, ret;
+    int poll ;
+    int32_t ret;
     transport_ssl_t *ssl = transport_get_context_data(t);
 
     if ((poll = transport_poll_write(t, timeout_ms)) <= 0) {
@@ -218,9 +219,10 @@ static int ssl_write(transport_handle_t t, const char *buffer, int len, int time
     return ret;
 }
 
-static int ssl_read(transport_handle_t t, char *buffer, int len, int timeout_ms)
+static int32_t ssl_read(transport_handle_t t, char *buffer, uint32_t len, int timeout_ms)
 {
-    int poll = -1, ret;
+    int poll = -1;
+    int32_t ret;
     transport_ssl_t *ssl = transport_get_context_data(t);
 
     if (mbedtls_ssl_get_bytes_avail(&ssl->ctx) <= 0) {

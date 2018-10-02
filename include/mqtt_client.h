@@ -43,12 +43,12 @@ typedef struct {
     esp_mqtt_client_handle_t client;
     void *user_context;
     char *data;
-    int data_len;
-    int total_data_len;
-    int current_data_offset;
+    uint32_t data_len;
+    uint32_t total_data_len;
+    uint32_t current_data_offset;
     char *topic;
-    int topic_len;
-    int msg_id;
+    uint16_t topic_len;
+    uint16_t msg_id;
 } esp_mqtt_event_t;
 
 typedef esp_mqtt_event_t* esp_mqtt_event_handle_t;
@@ -88,7 +88,7 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client);
 esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
 esp_err_t esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic, int qos);
 esp_err_t esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *topic);
-int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain);
+int32_t esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, uint32_t len, int qos, int retain);
 esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client);
 
 #ifdef __cplusplus

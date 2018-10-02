@@ -33,7 +33,9 @@
 #include "mqtt_config.h"
 #include "platform.h"
 
-#define MQTT_MAX_FIXED_HEADER_SIZE 3
+#define MQTT_MAX_NB_BYTES_REMAINING_LENGTH 4
+#define MQTT_MAX_FIXED_HEADER_SIZE (1 + MQTT_MAX_NB_BYTES_REMAINING_LENGTH)
+#define MQTT_NB_BYTES_SIZE_STRING 2
 
 enum mqtt_connect_flag
 {
@@ -59,9 +61,20 @@ struct __attribute((__packed__)) mqtt_connect_variable_header
     uint8_t keepaliveLsb;
 };
 
-static int append_string(mqtt_connection_t* connection, const char* string, int len)
+/**
+ * \brief Append a string to the message
+ *
+ * \param connection Connection on which to add the string
+ * \param string String to add
+ * \param len Length of the string to add
+ * \return int32_t Length added, including the header
+ *
+ * A string is always prefixed by its length, on 2 bytes. Therefore, the length is expressed on 2 bytes. Since we return -1 in case of error and the size of the prefix is included in the length returned in case of success, we have to return an int32_t to handle all cases. Note that this function is also used for the will message that is not a string per se, but has the same requirements.
+ *
+ */
+static int32_t append_string(mqtt_connection_t* connection, const char* string, uint16_t len)
 {
-    if (connection->message.length + len + 2 > connection->buffer_length)
+    if (connection->message.length + len + MQTT_NB_BYTES_SIZE_STRING > connection->buffer_length)
         return -1;
 
     connection->buffer[connection->message.length++] = len >> 8;
@@ -69,7 +82,7 @@ static int append_string(mqtt_connection_t* connection, const char* string, int 
     memcpy(connection->buffer + connection->message.length, string, len);
     connection->message.length += len;
 
-    return len + 2;
+    return len + MQTT_NB_BYTES_SIZE_STRING;
 }
 
 static uint16_t append_message_id(mqtt_connection_t* connection, uint16_t message_id)
@@ -90,12 +103,67 @@ static uint16_t append_message_id(mqtt_connection_t* connection, uint16_t messag
 }
 
 /**
+ * \brief Get the remaining length information
+ *
+ * \param buffer Buffer of bytes containing the MQTT message
+ * \return uint32_t The remaining length
+ */
+static uint32_t get_remaining_length(uint8_t* buffer, uint32_t length){
+    uint32_t remaining_length = 0 ;
+
+    // Remaining length info starts at byte 2
+    for (uint8_t i_byte = 1; i_byte < length; ++i_byte) {
+        remaining_length += (buffer[i_byte] & 0x7f) << (7 * (i_byte - 1));
+        // If there's no continuation bit, we can stop
+        if ((buffer[i_byte] & 0x80) == 0){
+            break;
+        }
+    }
+
+    return remaining_length ;
+}
+
+/**
+ * \brief Get the number of bytes on which is coded the remaining length information
+ *
+ * \param remaining_length The remaining length
+ * \return uint8_t The number of bytes it takes to encode the remaining length
+ *
+ * Remaining length is coded using a variable length encoding. It cannot contain more than 4 bytes. Each byte contains as its MSB a continuation bit. If set to 1, it means the next byte also contain a part of the remaining length information. Due to this continuation bit, the length is coded in a base 128. First limit is 128-1, second limit (128*128)-1 and so on.
+ *
+ */
+static uint8_t get_nb_bytes_remaining_length(uint32_t remaining_length) {
+    if ( remaining_length <= 127) {
+        return 1 ;
+    } else if ( remaining_length <= 16383 ) {
+        return 2 ;
+    } else if ( remaining_length <= 2097151 ) {
+        return 3 ;
+    } else if ( remaining_length <= 268435455 ) {
+        return 4 ;
+    } else {
+        return 0 ;
+    }
+}
+
+
+static uint8_t get_fixed_header_size(uint8_t* buffer, uint32_t length) {
+    uint8_t nb_bytes_remaining_length = get_nb_bytes_remaining_length(get_remaining_length(buffer, length)) ;
+    if ( nb_bytes_remaining_length == 0) {
+        return 0 ;
+    } else {
+        return nb_bytes_remaining_length + 1 ;
+    }
+}
+
+
+/**
  * \brief Initialize an empty message
  *
  * \param[inout] connection Connection on which to build the message
  * \return int Length of the message created
  */
-static int init_message(mqtt_connection_t* connection)
+static uint32_t init_message(mqtt_connection_t* connection)
 {
     connection->message.length = MQTT_MAX_FIXED_HEADER_SIZE;
     return MQTT_MAX_FIXED_HEADER_SIZE;
@@ -117,26 +185,37 @@ static mqtt_message_t* fail_message(mqtt_connection_t* connection)
  * \param[in] qos Quality of service
  * \param[in] retain Retain flag
  * \return mqtt_message_t* Pointer on the message completely built
+ *
+ * Due to the variable number of bytes to encode the remaining length information, the buffer was initialized with the maximum size of the fixed header in mind. Which means the rest of the message has been put at the position MQTT_MAX_FIXED_HEADER_SIZE in the buffer. So, for example, for a remaining length of 112 bytes, the fixed header will have two bytes : one for the flags and one for remaining length. This data must be written at position MQTT_MAX_FIXED_HEADER_SIZE - 1 and MQTT_MAX_FIXED_HEADER_SIZE - 2. This offset is computed to put the fixed header at the appropriate position and indicate the "true" start position of the message data.
+ *
  */
 static mqtt_message_t* fini_message(mqtt_connection_t* connection, int type, int dup, int qos, int retain)
 {
-    int remaining_length = connection->message.length - MQTT_MAX_FIXED_HEADER_SIZE;
+    uint32_t remaining_length = connection->message.length - MQTT_MAX_FIXED_HEADER_SIZE;
+    int8_t nb_bytes_remaining_length = get_nb_bytes_remaining_length(remaining_length) ;
 
-    // If the remaining length won't fit on one byte
-    if (remaining_length > 127)
-    {
-        connection->buffer[0] = ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
-        connection->buffer[1] = 0x80 | (remaining_length % 128);
-        connection->buffer[2] = remaining_length / 128;
-        connection->message.length = remaining_length + 3;
-        connection->message.data = connection->buffer;
-    }
-    else
-    {
-        connection->buffer[1] = ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
-        connection->buffer[2] = remaining_length;
-        connection->message.length = remaining_length + 2;
-        connection->message.data = connection->buffer + 1;
+    if ( nb_bytes_remaining_length == 0 ) {
+        return fail_message(connection) ;
+    } else {
+        // Set the length taking into account the fixed header
+        connection->message.length = 1 + nb_bytes_remaining_length + remaining_length ;
+
+        // First byte contains all the flags
+        int offset_buffer = MQTT_MAX_NB_BYTES_REMAINING_LENGTH - nb_bytes_remaining_length ;
+        connection->buffer[offset_buffer] = ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
+
+        // Build the remaining length bytes
+        uint32_t divider = 1 ;
+        for ( int8_t i_byte_remaining_length = 1 ; i_byte_remaining_length <= nb_bytes_remaining_length ; i_byte_remaining_length++ ) {
+            connection->buffer[offset_buffer + i_byte_remaining_length] = (remaining_length / divider) % 128 ;
+            if ( i_byte_remaining_length != nb_bytes_remaining_length) {
+                connection->buffer[offset_buffer + i_byte_remaining_length] |= 0x80 ;
+                divider *= 128 ;
+            }
+        }
+
+        // Set the pointer for the data to the right position
+        connection->message.data = connection->buffer + offset_buffer ;
     }
 
     return &connection->message;
@@ -149,7 +228,7 @@ static mqtt_message_t* fini_message(mqtt_connection_t* connection, int type, int
  * \param[in] buffer Buffer of bytes containing the MQTT message
  * \param[in] buffer_length Length of the MQTT message
  */
-void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint16_t buffer_length)
+void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint32_t buffer_length)
 {
     memset(connection, 0, sizeof(mqtt_connection_t));
     connection->buffer = buffer;
@@ -166,26 +245,18 @@ void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint16_t buff
  * MQTT messages must contain a "remaining length" info as part of the fixed header of MQTT messages. It starts at byte 2 and is coded using a variable length encoding. Length <= 127 bytes are coded on a single byte. In other case, each byte is composed as follows : MSB continuation bit | length (7 bits) LSB. The maximum number of bytes for remaining length is 4.
  *
  */
-uint32_t mqtt_get_total_length(uint8_t* buffer, uint16_t length)
+uint32_t mqtt_get_total_length(uint8_t* buffer, uint32_t length)
 {
-    int i;
-    uint32_t totlen = 0;
+    uint32_t total_length = 1;
+    uint32_t remaining_length = get_remaining_length(buffer, length) ;
+    uint8_t nb_bytes_remaining_length = get_nb_bytes_remaining_length(remaining_length) ;
 
-    // Remaining length info starts at byte 2
-    for (i = 1; i < length; ++i)
-    {
-        totlen += (buffer[i] & 0x7f) << (7 * (i - 1));
-        // If there's no continuation bit, we can stop
-        if ((buffer[i] & 0x80) == 0)
-        {
-            ++i;
-            break;
-        }
+    if ( nb_bytes_remaining_length == 0 ){
+        return 0 ;
+    } else {
+        total_length += remaining_length + nb_bytes_remaining_length ;
+        return total_length ;
     }
-    // Add to the total length the size of the fixed header (1 byte + length of remaining length info)
-    totlen += i;
-
-    return totlen;
 }
 
 /**
@@ -200,34 +271,27 @@ uint32_t mqtt_get_total_length(uint8_t* buffer, uint16_t length)
  */
 const char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length)
 {
-    int i;
-    int totlen = 0;
-    int topiclen;
+    uint32_t i_byte;
+    uint16_t topic_length;
 
     // Go past the fixed header of the message
-    for (i = 1; i < *length; ++i)
-    {
-        totlen += (buffer[i] & 0x7f) << (7 * (i - 1));
-        if ((buffer[i] & 0x80) == 0)
-        {
-            ++i;
-            break;
-        }
+    i_byte = get_fixed_header_size(buffer, *length) ;
+    if ( i_byte == 0 ) {
+        return NULL ;
     }
-    totlen += i;
 
     // First field in variable header is the topic. As all strings, 2 bytes are used to described its length.
-    if (i + 2 >= *length)
+    if (i_byte + MQTT_NB_BYTES_SIZE_STRING >= *length)
         return NULL;
-    topiclen = buffer[i++] << 8;
-    topiclen |= buffer[i++];
+    topic_length = buffer[i_byte++] << 8;
+    topic_length |= buffer[i_byte++];
 
     // Stop if the remaining size of the buffer isn't big enough to contain the topic
-    if (i + topiclen > *length)
+    if (i_byte + topic_length > *length)
         return NULL;
 
-    *length = topiclen;
-    return (const char*)(buffer + i);
+    *length = topic_length;
+    return (const char*)(buffer + i_byte);
 }
 
 /**
@@ -239,51 +303,46 @@ const char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length)
  */
 const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
 {
-    int i;
-    int totlen = 0;
-    int topiclen;
-    int blength = *length;
+    uint32_t i_byte;
+    uint32_t totlen = 0;
+    uint16_t topiclen;
+    uint32_t buffer_length = *length;
     *length = 0;
 
     // Go past the fixed header of the message
-    for (i = 1; i < blength; ++i)
-    {
-        totlen += (buffer[i] & 0x7f) << (7 * (i - 1));
-        if ((buffer[i] & 0x80) == 0)
-        {
-            ++i;
-            break;
-        }
+    i_byte = get_fixed_header_size(buffer, buffer_length) ;
+    if ( i_byte == 0 ) {
+        return NULL ;
     }
-    totlen += i;
+    totlen = mqtt_get_total_length(buffer, buffer_length) ;
 
     // Go past the topic (first field of variable header)
-    if (i + 2 >= blength)
+    if (i_byte + MQTT_NB_BYTES_SIZE_STRING >= buffer_length)
         return NULL;
-    topiclen = buffer[i++] << 8;
-    topiclen |= buffer[i++];
+    topiclen = buffer[i_byte++] << 8;
+    topiclen |= buffer[i_byte++];
 
-    if (i + topiclen >= blength)
+    if (i_byte + topiclen >= buffer_length)
         return NULL;
 
-    i += topiclen;
+    i_byte += topiclen;
 
     // Messages with quality of service greater than 0 have two bytes for the packet identifier
     if (mqtt_get_qos(buffer) > 0)
     {
-        if (i + 2 >= blength)
+        if (i_byte + 2 >= buffer_length)
             return NULL;
-        i += 2;
+        i_byte += 2;
     }
 
-    if (totlen < i)
+    if (totlen < i_byte)
         return NULL;
 
-    if (totlen <= blength)
-        *length = totlen - i;
+    if (totlen <= buffer_length)
+        *length = totlen - i_byte;
     else
-        *length = blength - i;
-    return (const char*)(buffer + i);
+        *length = buffer_length - i_byte;
+    return (const char*)(buffer + i_byte);
 }
 
 /**
@@ -293,7 +352,7 @@ const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
  * \param length Total length of the message
  * \return uint16_t Packed identitifier of the message
  */
-uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length)
+uint16_t mqtt_get_id(uint8_t* buffer, uint32_t length)
 {
     if (length < 1)
         return 0;
@@ -303,21 +362,17 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length)
         // Fetching packet identifier in case of publish message is non trivial
         case MQTT_MSG_TYPE_PUBLISH:
             {
-                int i;
-                int topiclen;
+                uint32_t i;
+                uint16_t topiclen;
 
                 // Go past fixed header
-                for (i = 1; i < length; ++i)
-                {
-                    if ((buffer[i] & 0x80) == 0)
-                    {
-                        ++i;
-                        break;
-                    }
+                i = get_fixed_header_size(buffer, length) ;
+                if ( i == 0 ) {
+                    return 0 ;
                 }
 
                 // Go past the first field of the variable header (topic)
-                if (i + 2 >= length)
+                if (i + MQTT_NB_BYTES_SIZE_STRING >= length)
                     return 0;
                 topiclen = buffer[i++] << 8;
                 topiclen |= buffer[i++];
@@ -453,7 +508,7 @@ mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_inf
  * \param[out] message_id ID of the message generated
  * \return mqtt_message_t*
  */
-mqtt_message_t* mqtt_msg_publish(mqtt_connection_t* connection, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id)
+mqtt_message_t* mqtt_msg_publish(mqtt_connection_t* connection, const char* topic, const char* data, uint32_t data_length, int qos, int retain, uint16_t* message_id)
 {
     init_message(connection);
 
