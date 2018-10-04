@@ -15,6 +15,10 @@
 
 ## How to use
 
+From IDFv3.2 [ESP-MQTT]((https://github.com/espressif/esp-mqtt)) is integrated in [ESP-IDF](https://github.com/espressif/esp-idf) as a submodule. Please do not use separately.
+
+For [ESP-IDF](https://github.com/espressif/esp-idf) versions prior to IDFv3.2, please checkout the [ESP-MQTT_FOR_IDF_3.1](https://github.com/espressif/esp-mqtt/tree/ESP-MQTT_FOR_IDF_3.1) tag and follow the instructions below:
+
 Clone this component to [ESP-IDF](https://github.com/espressif/esp-idf) project (as submodule): 
 ```
 git submodule add https://github.com/tuanpmt/espmqtt.git components/espmqtt

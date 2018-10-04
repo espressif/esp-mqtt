@@ -30,6 +30,7 @@ install:
   - export PATH=$PATH:$HOME/esp/xtensa-esp32-elf/bin
   # Get ESP-IDF from github
   - git clone --recursive https://github.com/espressif/esp-idf.git
+  - cd esp-idf && git checkout --recurse-submodules v3.1
   # Set the path to ESP-IDF directory
   - export IDF_PATH=~/esp/esp-idf
 
