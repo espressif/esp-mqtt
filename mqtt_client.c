@@ -699,6 +699,7 @@ static void esp_mqtt_task(void *pv)
                     break;
                 }
                 client->event.event_id = MQTT_EVENT_CONNECTED;
+                client->event.session_present = mqtt_get_connect_session_present(client->mqtt_state.in_buffer);
                 client->state = MQTT_STATE_CONNECTED;
                 esp_mqtt_dispatch_event(client);
 
