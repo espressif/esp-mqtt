@@ -7,29 +7,30 @@
 #define _ESP_PLATFORM_H__
 
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/semphr.h"
-#include "freertos/queue.h"
 #include "freertos/event_groups.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
 
+#include "lwip/dns.h"
 #include "lwip/err.h"
+#include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
-#include "lwip/netdb.h"
-#include "lwip/dns.h"
 
-#include "rom/queue.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "rom/queue.h"
 
 char *platform_create_id_string();
 int platform_random(int max);
 long long platform_tick_get_ms();
 void ms_to_timeval(int timeout_ms, struct timeval *tv);
 
-#define ESP_MEM_CHECK(TAG, a, action) if (!(a)) {                                                      \
-        ESP_LOGE(TAG,"%s:%d (%s): %s", __FILE__, __LINE__, __FUNCTION__, "Memory exhausted");       \
-        action;                                                                                         \
-        }
+#define ESP_MEM_CHECK(TAG, a, action)                                                          \
+    if (!(a)) {                                                                                \
+        ESP_LOGE(TAG, "%s:%d (%s): %s", __FILE__, __LINE__, __FUNCTION__, "Memory exhausted"); \
+        action;                                                                                \
+    }
 #endif

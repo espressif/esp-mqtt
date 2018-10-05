@@ -6,16 +6,15 @@
 #ifndef _TRANSPORT_H_
 #define _TRANSPORT_H_
 
-#include <stdint.h>
 #include <esp_err.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
-typedef struct transport_list_t* transport_list_handle_t;
-typedef struct transport_item_t* transport_handle_t;
+typedef struct transport_list_t *transport_list_handle_t;
+typedef struct transport_item_t *transport_handle_t;
 
 typedef int (*connect_func)(transport_handle_t t, const char *host, int port, int timeout_ms);
 typedef int32_t (*io_func)(transport_handle_t t, const char *buffer, uint32_t len, int timeout_ms);
@@ -32,7 +31,8 @@ transport_list_handle_t transport_list_init();
 
 /**
  * @brief      Cleanup and free all transports, include itself,
- *             this function will invoke transport_destroy of every transport have added this the list
+ *             this function will invoke transport_destroy of every transport have added this the
+ * list
  *
  * @param[in]  list  The list
  *
@@ -43,7 +43,8 @@ transport_list_handle_t transport_list_init();
 esp_err_t transport_list_destroy(transport_list_handle_t list);
 
 /**
- * @brief      Add a transport to the list, and define a scheme to indentify this transport in the list
+ * @brief      Add a transport to the list, and define a scheme to indentify this transport in the
+ * list
  *
  * @param[in]  list    The list
  * @param[in]  t       The Transport
@@ -52,7 +53,8 @@ esp_err_t transport_list_destroy(transport_list_handle_t list);
  * @return
  *     - ESP_OK
  */
-esp_err_t transport_list_add(transport_list_handle_t list, transport_handle_t t, const char *scheme);
+esp_err_t transport_list_add(transport_list_handle_t list, transport_handle_t t,
+                             const char *scheme);
 
 /**
  * @brief      This function will remove all transport from the list,
@@ -67,7 +69,8 @@ esp_err_t transport_list_add(transport_list_handle_t list, transport_handle_t t,
 esp_err_t transport_list_clean(transport_list_handle_t list);
 
 /**
- * @brief      Get the transport by scheme, which has been defined when calling function `transport_list_add`
+ * @brief      Get the transport by scheme, which has been defined when calling function
+ * `transport_list_add`
  *
  * @param[in]  list  The list
  * @param[in]  tag   The tag
@@ -229,14 +232,9 @@ esp_err_t transport_set_context_data(transport_handle_t t, void *data);
  * @return
  *     - ESP_OK
  */
-esp_err_t transport_set_func(transport_handle_t t,
-                             connect_func _connect,
-                             io_read_func _read,
-                             io_func _write,
-                             trans_func _close,
-                             poll_func _poll_read,
-                             poll_func _poll_write,
-                             trans_func _destroy);
+esp_err_t transport_set_func(transport_handle_t t, connect_func _connect, io_read_func _read,
+                             io_func _write, trans_func _close, poll_func _poll_read,
+                             poll_func _poll_write, trans_func _destroy);
 #ifdef __cplusplus
 }
 #endif

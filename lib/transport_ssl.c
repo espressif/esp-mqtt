@@ -1,23 +1,22 @@
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "lwip/dns.h"
 #include "lwip/err.h"
+#include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
-#include "lwip/netdb.h"
-#include "lwip/dns.h"
 
-#include "mbedtls/platform.h"
-#include "mbedtls/net_sockets.h"
-#include "mbedtls/esp_debug.h"
-#include "mbedtls/ssl.h"
-#include "mbedtls/entropy.h"
-#include "mbedtls/ctr_drbg.h"
-#include "mbedtls/error.h"
 #include "mbedtls/certs.h"
-
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/error.h"
+#include "mbedtls/esp_debug.h"
+#include "mbedtls/net_sockets.h"
+#include "mbedtls/platform.h"
+#include "mbedtls/ssl.h"
 
 #include "esp_log.h"
 #include "esp_system.h"
@@ -31,29 +30,28 @@ static const char *TAG = "TRANS_SSL";
  *  mbedtls specific transport data
  */
 typedef struct {
-    mbedtls_entropy_context  entropy;
+    mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_ssl_context      ctx;
-    mbedtls_x509_crt         cacert;
-    mbedtls_x509_crt         client_cert;
-    mbedtls_pk_context       client_key;
-    mbedtls_ssl_config       conf;
-    mbedtls_net_context      client_fd;
-    void                     *cert_pem_data;
-    int                      cert_pem_len;
-    void                     *client_cert_pem_data;
-    int                      client_cert_pem_len;
-    void                     *client_key_pem_data;
-    int                      client_key_pem_len;
-    bool                     mutual_authentication;
-    bool                     ssl_initialized;
-    bool                     verify_server;
+    mbedtls_ssl_context ctx;
+    mbedtls_x509_crt cacert;
+    mbedtls_x509_crt client_cert;
+    mbedtls_pk_context client_key;
+    mbedtls_ssl_config conf;
+    mbedtls_net_context client_fd;
+    void *cert_pem_data;
+    int cert_pem_len;
+    void *client_cert_pem_data;
+    int client_cert_pem_len;
+    void *client_key_pem_data;
+    int client_key_pem_len;
+    bool mutual_authentication;
+    bool ssl_initialized;
+    bool verify_server;
 } transport_ssl_t;
 
 static int ssl_close(transport_handle_t t);
 
-static int ssl_connect(transport_handle_t t, const char *host, int port, int timeout_ms)
-{
+static int ssl_connect(transport_handle_t t, const char *host, int port, int timeout_ms) {
     int ret = -1, flags;
     struct timeval tv;
     transport_ssl_t *ssl = transport_get_context_data(t);
@@ -67,15 +65,15 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
     mbedtls_ssl_config_init(&ssl->conf);
     mbedtls_entropy_init(&ssl->entropy);
 
-    if ((ret = mbedtls_ssl_config_defaults(&ssl->conf,
-                                           MBEDTLS_SSL_IS_CLIENT,
+    if ((ret = mbedtls_ssl_config_defaults(&ssl->conf, MBEDTLS_SSL_IS_CLIENT,
                                            MBEDTLS_SSL_TRANSPORT_STREAM,
                                            MBEDTLS_SSL_PRESET_DEFAULT)) != 0) {
         ESP_LOGE(TAG, "mbedtls_ssl_config_defaults returned %d", ret);
         goto exit;
     }
 
-    if ((ret = mbedtls_ctr_drbg_seed(&ssl->ctr_drbg, mbedtls_entropy_func, &ssl->entropy, NULL, 0)) != 0) {
+    if ((ret = mbedtls_ctr_drbg_seed(&ssl->ctr_drbg, mbedtls_entropy_func, &ssl->entropy, NULL,
+                                     0)) != 0) {
         ESP_LOGE(TAG, "mbedtls_ctr_drbg_seed returned %d", ret);
         goto exit;
     }
@@ -83,8 +81,10 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
     if (ssl->cert_pem_data) {
         mbedtls_x509_crt_init(&ssl->cacert);
         ssl->verify_server = true;
-        if ((ret = mbedtls_x509_crt_parse(&ssl->cacert, ssl->cert_pem_data, ssl->cert_pem_len + 1)) < 0) {
-            ESP_LOGE(TAG, "mbedtls_x509_crt_parse returned -0x%x\n\nDATA=%s,len=%d", -ret, (char*)ssl->cert_pem_data, ssl->cert_pem_len);
+        if ((ret = mbedtls_x509_crt_parse(&ssl->cacert, ssl->cert_pem_data,
+                                          ssl->cert_pem_len + 1)) < 0) {
+            ESP_LOGE(TAG, "mbedtls_x509_crt_parse returned -0x%x\n\nDATA=%s,len=%d", -ret,
+                     (char *)ssl->cert_pem_data, ssl->cert_pem_len);
             goto exit;
         }
         mbedtls_ssl_conf_ca_chain(&ssl->conf, &ssl->cacert, NULL);
@@ -102,21 +102,28 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
         mbedtls_x509_crt_init(&ssl->client_cert);
         mbedtls_pk_init(&ssl->client_key);
         ssl->mutual_authentication = true;
-        if ((ret = mbedtls_x509_crt_parse(&ssl->client_cert, ssl->client_cert_pem_data, ssl->client_cert_pem_len + 1)) < 0) {
-            ESP_LOGE(TAG, "mbedtls_x509_crt_parse returned -0x%x\n\nDATA=%s,len=%d", -ret, (char*)ssl->client_cert_pem_data, ssl->client_cert_pem_len);
+        if ((ret = mbedtls_x509_crt_parse(&ssl->client_cert, ssl->client_cert_pem_data,
+                                          ssl->client_cert_pem_len + 1)) < 0) {
+            ESP_LOGE(TAG, "mbedtls_x509_crt_parse returned -0x%x\n\nDATA=%s,len=%d", -ret,
+                     (char *)ssl->client_cert_pem_data, ssl->client_cert_pem_len);
             goto exit;
         }
-        if ((ret = mbedtls_pk_parse_key(&ssl->client_key, ssl->client_key_pem_data, ssl->client_key_pem_len + 1, NULL, 0)) < 0) {
-            ESP_LOGE(TAG, "mbedtls_pk_parse_keyfile returned -0x%x\n\nDATA=%s,len=%d", -ret, (char*)ssl->client_key_pem_data, ssl->client_key_pem_len);
+        if ((ret = mbedtls_pk_parse_key(&ssl->client_key, ssl->client_key_pem_data,
+                                        ssl->client_key_pem_len + 1, NULL, 0)) < 0) {
+            ESP_LOGE(TAG, "mbedtls_pk_parse_keyfile returned -0x%x\n\nDATA=%s,len=%d", -ret,
+                     (char *)ssl->client_key_pem_data, ssl->client_key_pem_len);
             goto exit;
         }
 
-        if ((ret = mbedtls_ssl_conf_own_cert(&ssl->conf, &ssl->client_cert, &ssl->client_key)) < 0) {
+        if ((ret = mbedtls_ssl_conf_own_cert(&ssl->conf, &ssl->client_cert, &ssl->client_key)) <
+            0) {
             ESP_LOGE(TAG, "mbedtls_ssl_conf_own_cert returned -0x%x\n", -ret);
             goto exit;
         }
     } else if (ssl->client_cert_pem_data || ssl->client_key_pem_data) {
-        ESP_LOGE(TAG, "You have to provide both client_cert_pem and client_key_pem for mutual authentication");
+        ESP_LOGE(TAG,
+                 "You have to provide both client_cert_pem and client_key_pem for mutual "
+                 "authentication");
         goto exit;
     }
 
@@ -146,7 +153,7 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
 
     mbedtls_ssl_set_bio(&ssl->ctx, &ssl->client_fd, mbedtls_net_send, mbedtls_net_recv, NULL);
 
-    if((ret = mbedtls_ssl_set_hostname(&ssl->ctx, host)) != 0) {
+    if ((ret = mbedtls_ssl_set_hostname(&ssl->ctx, host)) != 0) {
         ESP_LOGE(TAG, " failed\n  ! mbedtls_ssl_set_hostname returned %d\n\n", ret);
         goto exit;
     }
@@ -179,8 +186,7 @@ exit:
     return ret;
 }
 
-static int ssl_poll_read(transport_handle_t t, int timeout_ms)
-{
+static int ssl_poll_read(transport_handle_t t, int timeout_ms) {
     transport_ssl_t *ssl = transport_get_context_data(t);
     fd_set readset;
     FD_ZERO(&readset);
@@ -191,8 +197,7 @@ static int ssl_poll_read(transport_handle_t t, int timeout_ms)
     return select(ssl->client_fd.fd + 1, &readset, NULL, NULL, &timeout);
 }
 
-static int ssl_poll_write(transport_handle_t t, int timeout_ms)
-{
+static int ssl_poll_write(transport_handle_t t, int timeout_ms) {
     transport_ssl_t *ssl = transport_get_context_data(t);
     fd_set writeset;
     FD_ZERO(&writeset);
@@ -202,25 +207,24 @@ static int ssl_poll_write(transport_handle_t t, int timeout_ms)
     return select(ssl->client_fd.fd + 1, NULL, &writeset, NULL, &timeout);
 }
 
-static int32_t ssl_write(transport_handle_t t, const char *buffer, uint32_t len, int timeout_ms)
-{
-    int poll ;
+static int32_t ssl_write(transport_handle_t t, const char *buffer, uint32_t len, int timeout_ms) {
+    int poll;
     int32_t ret;
     transport_ssl_t *ssl = transport_get_context_data(t);
 
     if ((poll = transport_poll_write(t, timeout_ms)) <= 0) {
-        ESP_LOGW(TAG, "Poll timeout or error, errno=%s, fd=%d, timeout_ms=%d", strerror(errno), ssl->client_fd.fd, timeout_ms);
+        ESP_LOGW(TAG, "Poll timeout or error, errno=%s, fd=%d, timeout_ms=%d", strerror(errno),
+                 ssl->client_fd.fd, timeout_ms);
         return poll;
     }
-    ret = mbedtls_ssl_write(&ssl->ctx, (const unsigned char *) buffer, len);
+    ret = mbedtls_ssl_write(&ssl->ctx, (const unsigned char *)buffer, len);
     if (ret <= 0) {
         ESP_LOGE(TAG, "mbedtls_ssl_write error, errno=%s", strerror(errno));
     }
     return ret;
 }
 
-static int32_t ssl_read(transport_handle_t t, char *buffer, uint32_t len, int timeout_ms)
-{
+static int32_t ssl_read(transport_handle_t t, char *buffer, uint32_t len, int timeout_ms) {
     int poll = -1;
     int32_t ret;
     transport_ssl_t *ssl = transport_get_context_data(t);
@@ -237,8 +241,7 @@ static int32_t ssl_read(transport_handle_t t, char *buffer, uint32_t len, int ti
     return ret;
 }
 
-static int ssl_close(transport_handle_t t)
-{
+static int ssl_close(transport_handle_t t) {
     int ret = -1;
     transport_ssl_t *ssl = transport_get_context_data(t);
     if (ssl->ssl_initialized) {
@@ -264,16 +267,14 @@ static int ssl_close(transport_handle_t t)
     return ret;
 }
 
-static int ssl_destroy(transport_handle_t t)
-{
+static int ssl_destroy(transport_handle_t t) {
     transport_ssl_t *ssl = transport_get_context_data(t);
     transport_close(t);
     free(ssl);
     return 0;
 }
 
-void transport_ssl_set_cert_data(transport_handle_t t, const char *data, int len)
-{
+void transport_ssl_set_cert_data(transport_handle_t t, const char *data, int len) {
     transport_ssl_t *ssl = transport_get_context_data(t);
     if (t && ssl) {
         ssl->cert_pem_data = (void *)data;
@@ -281,8 +282,7 @@ void transport_ssl_set_cert_data(transport_handle_t t, const char *data, int len
     }
 }
 
-void transport_ssl_set_client_cert_data(transport_handle_t t, const char *data, int len)
-{
+void transport_ssl_set_client_cert_data(transport_handle_t t, const char *data, int len) {
     transport_ssl_t *ssl = transport_get_context_data(t);
     if (t && ssl) {
         ssl->client_cert_pem_data = (void *)data;
@@ -290,8 +290,7 @@ void transport_ssl_set_client_cert_data(transport_handle_t t, const char *data, 
     }
 }
 
-void transport_ssl_set_client_key_data(transport_handle_t t, const char *data, int len)
-{
+void transport_ssl_set_client_key_data(transport_handle_t t, const char *data, int len) {
     transport_ssl_t *ssl = transport_get_context_data(t);
     if (t && ssl) {
         ssl->client_key_pem_data = (void *)data;
@@ -299,14 +298,13 @@ void transport_ssl_set_client_key_data(transport_handle_t t, const char *data, i
     }
 }
 
-transport_handle_t transport_ssl_init()
-{
+transport_handle_t transport_ssl_init() {
     transport_handle_t t = transport_init();
     transport_ssl_t *ssl = calloc(1, sizeof(transport_ssl_t));
     ESP_MEM_CHECK(TAG, ssl, return NULL);
     mbedtls_net_init(&ssl->client_fd);
     transport_set_context_data(t, ssl);
-    transport_set_func(t, ssl_connect, ssl_read, ssl_write, ssl_close, ssl_poll_read, ssl_poll_write, ssl_destroy);
+    transport_set_func(t, ssl_connect, ssl_read, ssl_write, ssl_close, ssl_poll_read,
+                       ssl_poll_write, ssl_destroy);
     return t;
 }
-

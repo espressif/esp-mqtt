@@ -12,9 +12,9 @@
 extern "C" {
 #endif
 
-
 /**
- * @brief       Create new SSL transport, the transport handle must be release transport_destroy callback
+ * @brief       Create new SSL transport, the transport handle must be release transport_destroy
+ * callback
  *
  * @return      the allocated transport_handle_t, or NULL if the handle can not be allocated
  */
@@ -33,9 +33,7 @@ void transport_ssl_set_cert_data(transport_handle_t t, const char *data, int len
 void transport_ssl_set_client_cert_data(transport_handle_t t, const char *data, int len);
 void transport_ssl_set_client_key_data(transport_handle_t t, const char *data, int len);
 
-
 #ifdef __cplusplus
 }
 #endif
 #endif
-

@@ -19,7 +19,6 @@ extern "C" {
  */
 transport_handle_t transport_tcp_init();
 
-
 #ifdef __cplusplus
 }
 #endif

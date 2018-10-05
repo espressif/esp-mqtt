@@ -7,20 +7,20 @@
 
 ## Features
 
-- Based on: https://github.com/tuanpmt/esp_mqtt 
+- Based on: https://github.com/tuanpmt/esp_mqtt
 - Support MQTT over TCP, SSL with mbedtls, MQTT over Websocket, MQTT over Websocket Secure
-- Easy to setup with URI 
+- Easy to setup with URI
 - Multiple instances (Multiple clients in one application)
 - Support subscribing, publishing, authentication, will messages, keep alive pings and all 3 QoS levels (it should be a fully functional client).
 
 ## How to use
 
-Clone this component to [ESP-IDF](https://github.com/espressif/esp-idf) project (as submodule): 
+Clone this component to [ESP-IDF](https://github.com/espressif/esp-idf) project (as submodule):
 ```
 git submodule add https://github.com/tuanpmt/espmqtt.git components/espmqtt
 ```
 
-Or run a sample (make sure you have installed the [toolchain](http://esp-idf.readthedocs.io/en/latest/get-started/index.html#setup-toolchain)): 
+Or run a sample (make sure you have installed the [toolchain](http://esp-idf.readthedocs.io/en/latest/get-started/index.html#setup-toolchain)):
 
 ```
 git clone https://github.com/tuanpmt/espmqtt.git
@@ -34,17 +34,17 @@ make flash monitor
 
 - Curently support `mqtt`, `mqtts`, `ws`, `wss` schemes
 - MQTT over TCP samples:
-    + `mqtt://iot.eclipse.org`: MQTT over TCP, default port 1883: 
-    + `mqtt://iot.eclipse.org:1884` MQTT over TCP, port 1884: 
+    + `mqtt://iot.eclipse.org`: MQTT over TCP, default port 1883:
+    + `mqtt://iot.eclipse.org:1884` MQTT over TCP, port 1884:
     + `mqtt://username:password@iot.eclipse.org:1884` MQTT over TCP, port 1884, with username and password
-- MQTT over SSL samples: 
+- MQTT over SSL samples:
     + `mqtts://iot.eclipse.org`: MQTT over SSL, port 8883
     + `mqtts://iot.eclipse.org:8884`: MQTT over SSL, port 8884
-- MQTT over Websocket samples: 
+- MQTT over Websocket samples:
     + `ws://iot.eclipse.org:80/ws`
-- MQTT over Websocket Secure samples: 
+- MQTT over Websocket Secure samples:
     + `wss://iot.eclipse.org:443/ws`
-- Minimal configurations: 
+- Minimal configurations:
 
 ```c
 const esp_mqtt_client_config_t mqtt_cfg = {
@@ -54,7 +54,7 @@ const esp_mqtt_client_config_t mqtt_cfg = {
 };
 ```
 
-- If there are any options related to the URI in `esp_mqtt_client_config_t`, the option defined by the URI will be overridden. Sample: 
+- If there are any options related to the URI in `esp_mqtt_client_config_t`, the option defined by the URI will be overridden. Sample:
 
 ```c
 const esp_mqtt_client_config_t mqtt_cfg = {
@@ -65,11 +65,11 @@ const esp_mqtt_client_config_t mqtt_cfg = {
 //MQTT client will connect to iot.eclipse.org using port 4567
 ```
 
-### SSL 
+### SSL
 
 - Get Certification from server, example: `iot.eclipse.org` `openssl s_client -showcerts -connect iot.eclipse.org:8883 </dev/null 2>/dev/null|openssl x509 -outform PEM >iot_eclipse_org.pem`
 - Check the sample application: `examples/mqtt_ssl`
-- Configuration: 
+- Configuration:
 
 ```cpp
 const esp_mqtt_client_config_t mqtt_cfg = {
@@ -86,7 +86,7 @@ const esp_mqtt_client_config_t mqtt_cfg = {
 -  `host`: MQTT server domain (ipv4 as string)
 -  `port`: MQTT server port
 -  `client_id`: default client id is `ESP32_%CHIPID%`
--  `username`: MQTT username 
+-  `username`: MQTT username
 -  `password`: MQTT password
 -  `lwt_topic, lwt_msg, lwt_qos, lwt_retain, lwt_msg_len`: are mqtt lwt options, default NULL
 -  `disable_clean_session`: mqtt clean session, default clean_session is true
@@ -107,8 +107,8 @@ const esp_mqtt_client_config_t mqtt_cfg = {
 ### Change settings in `menuconfig`
 
 ```
-make menuconfig 
--> Component config -> ESPMQTT Configuration 
+make menuconfig
+-> Component config -> ESPMQTT Configuration
 ```
 
 ## Example

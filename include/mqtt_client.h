@@ -7,8 +7,8 @@
 #ifndef _MQTT_CLIENT_H_
 #define _MQTT_CLIENT_H_
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include "esp_err.h"
 
@@ -18,7 +18,7 @@
 extern "C" {
 #endif
 
-typedef struct esp_mqtt_client* esp_mqtt_client_handle_t;
+typedef struct esp_mqtt_client *esp_mqtt_client_handle_t;
 
 typedef enum {
     MQTT_EVENT_ERROR = 0,
@@ -51,10 +51,9 @@ typedef struct {
     uint16_t msg_id;
 } esp_mqtt_event_t;
 
-typedef esp_mqtt_event_t* esp_mqtt_event_handle_t;
+typedef esp_mqtt_event_t *esp_mqtt_event_handle_t;
 
-typedef esp_err_t (* mqtt_event_callback_t)(esp_mqtt_event_handle_t event);
-
+typedef esp_err_t (*mqtt_event_callback_t)(esp_mqtt_event_handle_t event);
 
 typedef struct {
     mqtt_event_callback_t event_handle;
@@ -88,11 +87,12 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client);
 esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
 int32_t esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic, int qos);
 int32_t esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *topic);
-int32_t esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, uint32_t len, int qos, int retain);
+int32_t esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic,
+                                const char *data, uint32_t len, int qos, int retain);
 esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client);
 
 #ifdef __cplusplus
 }
-#endif //__cplusplus
+#endif  //__cplusplus
 
 #endif

@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include "platform.h"
 
-#ifdef  __cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -25,11 +25,12 @@ typedef struct outbox_item {
 
 STAILQ_HEAD(outbox_list_t, outbox_item);
 
-typedef struct outbox_list_t * outbox_handle_t;
+typedef struct outbox_list_t *outbox_handle_t;
 typedef outbox_item_t *outbox_item_handle_t;
 
 outbox_handle_t outbox_init();
-outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, uint8_t *data, uint32_t len, uint16_t msg_id, int msg_type, uint32_t tick);
+outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, uint8_t *data, uint32_t len,
+                                    uint16_t msg_id, int msg_type, uint32_t tick);
 outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox);
 outbox_item_handle_t outbox_get(outbox_handle_t outbox, uint16_t msg_id);
 esp_err_t outbox_delete(outbox_handle_t outbox, uint16_t msg_id, int msg_type);
@@ -42,7 +43,7 @@ uint32_t outbox_get_size(outbox_handle_t outbox);
 esp_err_t outbox_cleanup(outbox_handle_t outbox, uint32_t max_size);
 void outbox_destroy(outbox_handle_t outbox);
 
-#ifdef  __cplusplus
+#ifdef __cplusplus
 }
 #endif
 #endif

@@ -1,13 +1,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
+#include "lwip/sockets.h"
 
+#include "esp_err.h"
 #include "esp_log.h"
 #include "esp_system.h"
-#include "esp_err.h"
 
 #include "platform.h"
 #include "transport.h"
@@ -19,7 +19,6 @@ typedef struct {
 } transport_tcp_t;
 
 static int resolve_dns(const char *host, struct sockaddr_in *ip) {
-
     struct hostent *he;
     struct in_addr **addr_list;
     he = gethostbyname(host);
@@ -35,15 +34,14 @@ static int resolve_dns(const char *host, struct sockaddr_in *ip) {
     return ESP_OK;
 }
 
-static int tcp_connect(transport_handle_t t, const char *host, int port, int timeout_ms)
-{
+static int tcp_connect(transport_handle_t t, const char *host, int port, int timeout_ms) {
     struct sockaddr_in remote_ip;
     struct timeval tv;
     transport_tcp_t *tcp = transport_get_context_data(t);
 
     bzero(&remote_ip, sizeof(struct sockaddr_in));
 
-    //if stream_host is not ip address, resolve it AF_INET,servername,&serveraddr.sin_addr
+    // if stream_host is not ip address, resolve it AF_INET,servername,&serveraddr.sin_addr
     if (inet_pton(AF_INET, host, &remote_ip.sin_addr) != 1) {
         if (resolve_dns(host, &remote_ip) < 0) {
             return -1;
@@ -64,8 +62,8 @@ static int tcp_connect(transport_handle_t t, const char *host, int port, int tim
 
     setsockopt(tcp->sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
-    ESP_LOGD(TAG, "[sock=%d],connecting to server IP:%s,Port:%d...",
-             tcp->sock, ipaddr_ntoa((const ip_addr_t*)&remote_ip.sin_addr.s_addr), port);
+    ESP_LOGD(TAG, "[sock=%d],connecting to server IP:%s,Port:%d...", tcp->sock,
+             ipaddr_ntoa((const ip_addr_t *)&remote_ip.sin_addr.s_addr), port);
     if (connect(tcp->sock, (struct sockaddr *)(&remote_ip), sizeof(struct sockaddr)) != 0) {
         close(tcp->sock);
         tcp->sock = -1;
@@ -74,8 +72,7 @@ static int tcp_connect(transport_handle_t t, const char *host, int port, int tim
     return tcp->sock;
 }
 
-static int32_t tcp_write(transport_handle_t t, const char *buffer, uint32_t len, int timeout_ms)
-{
+static int32_t tcp_write(transport_handle_t t, const char *buffer, uint32_t len, int timeout_ms) {
     int poll;
     transport_tcp_t *tcp = transport_get_context_data(t);
     if ((poll = transport_poll_write(t, timeout_ms)) <= 0) {
@@ -84,8 +81,7 @@ static int32_t tcp_write(transport_handle_t t, const char *buffer, uint32_t len,
     return write(tcp->sock, buffer, len);
 }
 
-static int32_t tcp_read(transport_handle_t t, char *buffer, uint32_t len, int timeout_ms)
-{
+static int32_t tcp_read(transport_handle_t t, char *buffer, uint32_t len, int timeout_ms) {
     transport_tcp_t *tcp = transport_get_context_data(t);
     int poll = -1;
     if ((poll = transport_poll_read(t, timeout_ms)) <= 0) {
@@ -98,8 +94,7 @@ static int32_t tcp_read(transport_handle_t t, char *buffer, uint32_t len, int ti
     return read_len;
 }
 
-static int tcp_poll_read(transport_handle_t t, int timeout_ms)
-{
+static int tcp_poll_read(transport_handle_t t, int timeout_ms) {
     transport_tcp_t *tcp = transport_get_context_data(t);
     fd_set readset;
     FD_ZERO(&readset);
@@ -109,8 +104,7 @@ static int tcp_poll_read(transport_handle_t t, int timeout_ms)
     return select(tcp->sock + 1, &readset, NULL, NULL, &timeout);
 }
 
-static int tcp_poll_write(transport_handle_t t, int timeout_ms)
-{
+static int tcp_poll_write(transport_handle_t t, int timeout_ms) {
     transport_tcp_t *tcp = transport_get_context_data(t);
     fd_set writeset;
     FD_ZERO(&writeset);
@@ -120,8 +114,7 @@ static int tcp_poll_write(transport_handle_t t, int timeout_ms)
     return select(tcp->sock + 1, NULL, &writeset, NULL, &timeout);
 }
 
-static int tcp_close(transport_handle_t t)
-{
+static int tcp_close(transport_handle_t t) {
     transport_tcp_t *tcp = transport_get_context_data(t);
     int ret = -1;
     if (tcp->sock >= 0) {
@@ -131,21 +124,20 @@ static int tcp_close(transport_handle_t t)
     return ret;
 }
 
-static esp_err_t tcp_destroy(transport_handle_t t)
-{
+static esp_err_t tcp_destroy(transport_handle_t t) {
     transport_tcp_t *tcp = transport_get_context_data(t);
     transport_close(t);
     free(tcp);
     return 0;
 }
 
-transport_handle_t transport_tcp_init()
-{
+transport_handle_t transport_tcp_init() {
     transport_handle_t t = transport_init();
     transport_tcp_t *tcp = calloc(1, sizeof(transport_tcp_t));
     ESP_MEM_CHECK(TAG, tcp, return NULL);
     tcp->sock = -1;
-    transport_set_func(t, tcp_connect, tcp_read, tcp_write, tcp_close, tcp_poll_read, tcp_poll_write, tcp_destroy);
+    transport_set_func(t, tcp_connect, tcp_read, tcp_write, tcp_close, tcp_poll_read,
+                       tcp_poll_write, tcp_destroy);
     transport_set_context_data(t, tcp);
 
     return t;

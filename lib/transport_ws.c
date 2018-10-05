@@ -1,13 +1,13 @@
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
+#include "mbedtls/base64.h"
+#include "mbedtls/sha1.h"
 #include "platform.h"
 #include "transport.h"
 #include "transport_tcp.h"
 #include "transport_ws.h"
-#include "mbedtls/base64.h"
-#include "mbedtls/sha1.h"
 
 static const char *TAG = "TRANSPORT_WS";
 
@@ -19,8 +19,7 @@ typedef struct {
     transport_handle_t parent;
 } transport_ws_t;
 
-static char *trimwhitespace(const char *str)
-{
+static char *trimwhitespace(const char *str) {
     char *end;
 
     // Trim leading space
@@ -40,15 +39,13 @@ static char *trimwhitespace(const char *str)
     return (char *)str;
 }
 
-
-static char *get_http_header(const char *buffer, const char *key)
-{
+static char *get_http_header(const char *buffer, const char *key) {
     char *found = strstr(buffer, key);
     if (found) {
         found += strlen(key);
         char *found_end = strstr(found, "\r\n");
         if (found_end) {
-            found_end[0] = 0;//terminal string
+            found_end[0] = 0;  // terminal string
 
             return trimwhitespace(found);
         }
@@ -56,31 +53,28 @@ static char *get_http_header(const char *buffer, const char *key)
     return NULL;
 }
 
-static int ws_connect(transport_handle_t t, const char *host, int port, int timeout_ms)
-{
+static int ws_connect(transport_handle_t t, const char *host, int port, int timeout_ms) {
     transport_ws_t *ws = transport_get_context_data(t);
     if (transport_connect(ws->parent, host, port, timeout_ms) < 0) {
         ESP_LOGE(TAG, "Error connect to ther server");
     }
-    unsigned char random_key[16] = { 0 }, client_key[32] = {0};
+    unsigned char random_key[16] = {0}, client_key[32] = {0};
     int i;
     for (i = 0; i < sizeof(random_key); i++) {
         random_key[i] = rand() & 0xFF;
     }
     size_t outlen = 0;
-    mbedtls_base64_encode(client_key, 32,  &outlen, random_key, 16);
-    int len =   snprintf(ws->buffer, DEFAULT_WS_BUFFER,
-                         "GET %s HTTP/1.1\r\n"
-                         "Connection: Upgrade\r\n"
-                         "Host: %s:%d\r\n"
-                         "Upgrade: websocket\r\n"
-                         "Sec-WebSocket-Version: 13\r\n"
-                         "Sec-WebSocket-Protocol: mqtt\r\n"
-                         "Sec-WebSocket-Key: %s\r\n"
-                         "User-Agent: ESP32 MQTT Client\r\n\r\n",
-                         ws->path,
-                         host, port,
-                         client_key);
+    mbedtls_base64_encode(client_key, 32, &outlen, random_key, 16);
+    int len = snprintf(ws->buffer, DEFAULT_WS_BUFFER,
+                       "GET %s HTTP/1.1\r\n"
+                       "Connection: Upgrade\r\n"
+                       "Host: %s:%d\r\n"
+                       "Upgrade: websocket\r\n"
+                       "Sec-WebSocket-Version: 13\r\n"
+                       "Sec-WebSocket-Protocol: mqtt\r\n"
+                       "Sec-WebSocket-Key: %s\r\n"
+                       "User-Agent: ESP32 MQTT Client\r\n\r\n",
+                       ws->path, host, port, client_key);
     ESP_LOGD(TAG, "Write upgrate request\r\n%s", ws->buffer);
     if (transport_write(ws->parent, ws->buffer, len, timeout_ms) <= 0) {
         ESP_LOGE(TAG, "Error write Upgrade header %s", ws->buffer);
@@ -97,20 +91,21 @@ static int ws_connect(transport_handle_t t, const char *host, int port, int time
     }
 
     unsigned char client_key_b64[64], valid_client_key[20], accept_key[32] = {0};
-    int key_len = sprintf((char*)client_key_b64, "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", (char*)client_key);
+    int key_len = sprintf((char *)client_key_b64, "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
+                          (char *)client_key);
     mbedtls_sha1(client_key_b64, (size_t)key_len, valid_client_key);
-    mbedtls_base64_encode(accept_key, 32,  &outlen, valid_client_key, 20);
+    mbedtls_base64_encode(accept_key, 32, &outlen, valid_client_key, 20);
     accept_key[outlen] = 0;
-    ESP_LOGD(TAG, "server key=%s, send_key=%s, accept_key=%s", (char *)server_key, (char*)client_key, accept_key);
-    if (strcmp((char*)accept_key, (char*)server_key) != 0) {
+    ESP_LOGD(TAG, "server key=%s, send_key=%s, accept_key=%s", (char *)server_key,
+             (char *)client_key, accept_key);
+    if (strcmp((char *)accept_key, (char *)server_key) != 0) {
         ESP_LOGE(TAG, "Invalid websocket key");
         return -1;
     }
     return 0;
 }
 
-static int32_t ws_write(transport_handle_t t, const char *buff, uint32_t len, int timeout_ms)
-{
+static int32_t ws_write(transport_handle_t t, const char *buff, uint32_t len, int timeout_ms) {
     transport_ws_t *ws = transport_get_context_data(t);
     char ws_header[MAX_WEBSOCKET_HEADER_SIZE];
     char *mask;
@@ -147,8 +142,7 @@ static int32_t ws_write(transport_handle_t t, const char *buff, uint32_t len, in
     return transport_write(ws->parent, buffer, len, timeout_ms);
 }
 
-static int32_t ws_read(transport_handle_t t, char *buffer, uint32_t len, int timeout_ms)
-{
+static int32_t ws_read(transport_handle_t t, char *buffer, uint32_t len, int timeout_ms) {
     transport_ws_t *ws = transport_get_context_data(t);
     int32_t payload_len;
     char *data_ptr = buffer, opcode, mask, *mask_key = NULL;
@@ -163,7 +157,7 @@ static int32_t ws_read(transport_handle_t t, char *buffer, uint32_t len, int tim
     }
 
     opcode = (*data_ptr & 0x0F);
-    data_ptr ++;
+    data_ptr++;
     mask = ((*data_ptr >> 7) & 0x01);
     payload_len = (*data_ptr & 0x7F);
     data_ptr++;
@@ -196,40 +190,35 @@ static int32_t ws_read(transport_handle_t t, char *buffer, uint32_t len, int tim
     return payload_len;
 }
 
-static int ws_poll_read(transport_handle_t t, int timeout_ms)
-{
+static int ws_poll_read(transport_handle_t t, int timeout_ms) {
     transport_ws_t *ws = transport_get_context_data(t);
     return transport_poll_read(ws->parent, timeout_ms);
 }
 
-static int ws_poll_write(transport_handle_t t, int timeout_ms)
-{
+static int ws_poll_write(transport_handle_t t, int timeout_ms) {
     transport_ws_t *ws = transport_get_context_data(t);
-    return transport_poll_write(ws->parent, timeout_ms);;
+    return transport_poll_write(ws->parent, timeout_ms);
+    ;
 }
 
-static int ws_close(transport_handle_t t)
-{
+static int ws_close(transport_handle_t t) {
     transport_ws_t *ws = transport_get_context_data(t);
     return transport_close(ws->parent);
 }
 
-static esp_err_t ws_destroy(transport_handle_t t)
-{
+static esp_err_t ws_destroy(transport_handle_t t) {
     transport_ws_t *ws = transport_get_context_data(t);
     free(ws->buffer);
     free(ws->path);
     free(ws);
     return 0;
 }
-void transport_ws_set_path(transport_handle_t t, const char *path)
-{
+void transport_ws_set_path(transport_handle_t t, const char *path) {
     transport_ws_t *ws = transport_get_context_data(t);
     ws->path = realloc(ws->path, strlen(path) + 1);
     strcpy(ws->path, path);
 }
-transport_handle_t transport_ws_init(transport_handle_t parent_handle)
-{
+transport_handle_t transport_ws_init(transport_handle_t parent_handle) {
     transport_handle_t t = transport_init();
     transport_ws_t *ws = calloc(1, sizeof(transport_ws_t));
     ESP_MEM_CHECK(TAG, ws, return NULL);
@@ -244,8 +233,8 @@ transport_handle_t transport_ws_init(transport_handle_t parent_handle)
         return NULL;
     });
 
-    transport_set_func(t, ws_connect, ws_read, ws_write, ws_close, ws_poll_read, ws_poll_write, ws_destroy);
+    transport_set_func(t, ws_connect, ws_read, ws_write, ws_close, ws_poll_read, ws_poll_write,
+                       ws_destroy);
     transport_set_context_data(t, ws);
     return t;
 }
-
