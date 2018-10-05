@@ -839,7 +839,18 @@ static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client)
     return ESP_OK;
 }
 
-int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic, int qos)
+/**
+ * \brief Subscribe to a topic with a specified quality of service
+ *
+ * \param client
+ * \param topic Topic to subscribe to
+ * \param qos Quality of service for this subscription
+ * \return int32_t Message id of the subscription message or -1 in case of error
+ *
+ * Returns an int32 because the message id fits on an uint16 but -1 is returned in case of error.
+ *
+ */
+int32_t esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic, int qos)
 {
     if (client->state != MQTT_STATE_CONNECTED) {
         ESP_LOGE(TAG, "Client has not connected");
@@ -862,7 +873,17 @@ int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic
     return client->mqtt_state.pending_msg_id;
 }
 
-int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *topic)
+/**
+ * \brief Unsubscribe to a topic
+ *
+ * \param client
+ * \param topic Topic to unsubscribe from
+ * \return int32_t Message id of the unsubscription message or -1 in case of error
+ *
+ * Returns an int32 because the message id fits on an uint16 but -1 is returned in case of error.
+ *
+ */
+int32_t esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *topic)
 {
     if (client->state != MQTT_STATE_CONNECTED) {
         ESP_LOGE(TAG, "Client has not connected");
