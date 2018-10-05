@@ -4,6 +4,7 @@
 
 #include "mbedtls/base64.h"
 #include "mbedtls/sha1.h"
+#include "mqtt_config.h"
 #include "platform.h"
 #include "transport.h"
 #include "transport_tcp.h"
@@ -56,7 +57,7 @@ static char *get_http_header(const char *buffer, const char *key) {
 static int ws_connect(transport_handle_t t, const char *host, int port, int timeout_ms) {
     transport_ws_t *ws = transport_get_context_data(t);
     if (transport_connect(ws->parent, host, port, timeout_ms) < 0) {
-        ESP_LOGE(TAG, "Error connect to ther server");
+        ESPMQTT_LOGE(TAG, "Error connect to ther server");
     }
     unsigned char random_key[16] = {0}, client_key[32] = {0};
     int i;
@@ -75,18 +76,18 @@ static int ws_connect(transport_handle_t t, const char *host, int port, int time
                        "Sec-WebSocket-Key: %s\r\n"
                        "User-Agent: ESP32 MQTT Client\r\n\r\n",
                        ws->path, host, port, client_key);
-    ESP_LOGD(TAG, "Write upgrate request\r\n%s", ws->buffer);
+    ESPMQTT_LOGD(TAG, "Write upgrate request\r\n%s", ws->buffer);
     if (transport_write(ws->parent, ws->buffer, len, timeout_ms) <= 0) {
-        ESP_LOGE(TAG, "Error write Upgrade header %s", ws->buffer);
+        ESPMQTT_LOGE(TAG, "Error write Upgrade header %s", ws->buffer);
         return -1;
     }
     if ((len = transport_read(ws->parent, ws->buffer, DEFAULT_WS_BUFFER, timeout_ms)) <= 0) {
-        ESP_LOGE(TAG, "Error read response for Upgrade header %s", ws->buffer);
+        ESPMQTT_LOGE(TAG, "Error read response for Upgrade header %s", ws->buffer);
         return -1;
     }
     char *server_key = get_http_header(ws->buffer, "Sec-WebSocket-Accept:");
     if (server_key == NULL) {
-        ESP_LOGE(TAG, "Sec-WebSocket-Accept not found");
+        ESPMQTT_LOGE(TAG, "Sec-WebSocket-Accept not found");
         return -1;
     }
 
@@ -96,10 +97,10 @@ static int ws_connect(transport_handle_t t, const char *host, int port, int time
     mbedtls_sha1(client_key_b64, (size_t)key_len, valid_client_key);
     mbedtls_base64_encode(accept_key, 32, &outlen, valid_client_key, 20);
     accept_key[outlen] = 0;
-    ESP_LOGD(TAG, "server key=%s, send_key=%s, accept_key=%s", (char *)server_key,
-             (char *)client_key, accept_key);
+    ESPMQTT_LOGD(TAG, "server key=%s, send_key=%s, accept_key=%s", (char *)server_key,
+                 (char *)client_key, accept_key);
     if (strcmp((char *)accept_key, (char *)server_key) != 0) {
-        ESP_LOGE(TAG, "Invalid websocket key");
+        ESPMQTT_LOGE(TAG, "Invalid websocket key");
         return -1;
     }
     return 0;
@@ -136,7 +137,7 @@ static int32_t ws_write(transport_handle_t t, const char *buff, uint32_t len, in
         buffer[i] = (buffer[i] ^ mask[i % 4]);
     }
     if (transport_write(ws->parent, ws_header, header_len, timeout_ms) != header_len) {
-        ESP_LOGE(TAG, "Error write header");
+        ESPMQTT_LOGE(TAG, "Error write header");
         return -1;
     }
     return transport_write(ws->parent, buffer, len, timeout_ms);
@@ -152,7 +153,7 @@ static int32_t ws_read(transport_handle_t t, char *buffer, uint32_t len, int tim
         return poll_read;
     }
     if ((rlen = transport_read(ws->parent, buffer, len, timeout_ms)) <= 0) {
-        ESP_LOGE(TAG, "Error read data");
+        ESPMQTT_LOGE(TAG, "Error read data");
         return rlen;
     }
 
@@ -161,7 +162,7 @@ static int32_t ws_read(transport_handle_t t, char *buffer, uint32_t len, int tim
     mask = ((*data_ptr >> 7) & 0x01);
     payload_len = (*data_ptr & 0x7F);
     data_ptr++;
-    ESP_LOGD(TAG, "Opcode: %d, mask: %d, len: %d\r\n", opcode, mask, payload_len);
+    ESPMQTT_LOGD(TAG, "Opcode: %d, mask: %d, len: %d\r\n", opcode, mask, payload_len);
     if (payload_len == 126) {
         // headerLen += 2;
         payload_len = data_ptr[0] << 8 | data_ptr[1];

@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "rom/queue.h"
 
+#include "mqtt_config.h"
 #include "platform.h"
 #include "transport.h"
 

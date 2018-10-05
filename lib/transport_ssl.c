@@ -22,6 +22,7 @@
 #include "esp_system.h"
 #include "platform.h"
 
+#include "mqtt_config.h"
 #include "transport.h"
 #include "transport_ssl.h"
 
@@ -68,13 +69,13 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
     if ((ret = mbedtls_ssl_config_defaults(&ssl->conf, MBEDTLS_SSL_IS_CLIENT,
                                            MBEDTLS_SSL_TRANSPORT_STREAM,
                                            MBEDTLS_SSL_PRESET_DEFAULT)) != 0) {
-        ESP_LOGE(TAG, "mbedtls_ssl_config_defaults returned %d", ret);
+        ESPMQTT_LOGE(TAG, "mbedtls_ssl_config_defaults returned %d", ret);
         goto exit;
     }
 
     if ((ret = mbedtls_ctr_drbg_seed(&ssl->ctr_drbg, mbedtls_entropy_func, &ssl->entropy, NULL,
                                      0)) != 0) {
-        ESP_LOGE(TAG, "mbedtls_ctr_drbg_seed returned %d", ret);
+        ESPMQTT_LOGE(TAG, "mbedtls_ctr_drbg_seed returned %d", ret);
         goto exit;
     }
 
@@ -83,15 +84,15 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
         ssl->verify_server = true;
         if ((ret = mbedtls_x509_crt_parse(&ssl->cacert, ssl->cert_pem_data,
                                           ssl->cert_pem_len + 1)) < 0) {
-            ESP_LOGE(TAG, "mbedtls_x509_crt_parse returned -0x%x\n\nDATA=%s,len=%d", -ret,
-                     (char *)ssl->cert_pem_data, ssl->cert_pem_len);
+            ESPMQTT_LOGE(TAG, "mbedtls_x509_crt_parse returned -0x%x\n\nDATA=%s,len=%d", -ret,
+                         (char *)ssl->cert_pem_data, ssl->cert_pem_len);
             goto exit;
         }
         mbedtls_ssl_conf_ca_chain(&ssl->conf, &ssl->cacert, NULL);
         mbedtls_ssl_conf_authmode(&ssl->conf, MBEDTLS_SSL_VERIFY_REQUIRED);
 
         if ((ret = mbedtls_ssl_set_hostname(&ssl->ctx, host)) != 0) {
-            ESP_LOGE(TAG, "mbedtls_ssl_set_hostname returned -0x%x", -ret);
+            ESPMQTT_LOGE(TAG, "mbedtls_ssl_set_hostname returned -0x%x", -ret);
             goto exit;
         }
     } else {
@@ -104,26 +105,26 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
         ssl->mutual_authentication = true;
         if ((ret = mbedtls_x509_crt_parse(&ssl->client_cert, ssl->client_cert_pem_data,
                                           ssl->client_cert_pem_len + 1)) < 0) {
-            ESP_LOGE(TAG, "mbedtls_x509_crt_parse returned -0x%x\n\nDATA=%s,len=%d", -ret,
-                     (char *)ssl->client_cert_pem_data, ssl->client_cert_pem_len);
+            ESPMQTT_LOGE(TAG, "mbedtls_x509_crt_parse returned -0x%x\n\nDATA=%s,len=%d", -ret,
+                         (char *)ssl->client_cert_pem_data, ssl->client_cert_pem_len);
             goto exit;
         }
         if ((ret = mbedtls_pk_parse_key(&ssl->client_key, ssl->client_key_pem_data,
                                         ssl->client_key_pem_len + 1, NULL, 0)) < 0) {
-            ESP_LOGE(TAG, "mbedtls_pk_parse_keyfile returned -0x%x\n\nDATA=%s,len=%d", -ret,
-                     (char *)ssl->client_key_pem_data, ssl->client_key_pem_len);
+            ESPMQTT_LOGE(TAG, "mbedtls_pk_parse_keyfile returned -0x%x\n\nDATA=%s,len=%d", -ret,
+                         (char *)ssl->client_key_pem_data, ssl->client_key_pem_len);
             goto exit;
         }
 
         if ((ret = mbedtls_ssl_conf_own_cert(&ssl->conf, &ssl->client_cert, &ssl->client_key)) <
             0) {
-            ESP_LOGE(TAG, "mbedtls_ssl_conf_own_cert returned -0x%x\n", -ret);
+            ESPMQTT_LOGE(TAG, "mbedtls_ssl_conf_own_cert returned -0x%x\n", -ret);
             goto exit;
         }
     } else if (ssl->client_cert_pem_data || ssl->client_key_pem_data) {
-        ESP_LOGE(TAG,
-                 "You have to provide both client_cert_pem and client_key_pem for mutual "
-                 "authentication");
+        ESPMQTT_LOGE(TAG,
+                     "You have to provide both client_cert_pem and client_key_pem for mutual "
+                     "authentication");
         goto exit;
     }
 
@@ -134,7 +135,7 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
 #endif
 
     if ((ret = mbedtls_ssl_setup(&ssl->ctx, &ssl->conf)) != 0) {
-        ESP_LOGE(TAG, "mbedtls_ssl_setup returned -0x%x\n\n", -ret);
+        ESPMQTT_LOGE(TAG, "mbedtls_ssl_setup returned -0x%x\n\n", -ret);
         goto exit;
     }
 
@@ -143,43 +144,43 @@ static int ssl_connect(transport_handle_t t, const char *host, int port, int tim
     ms_to_timeval(timeout_ms, &tv);
 
     setsockopt(ssl->client_fd.fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    ESP_LOGD(TAG, "Connect to %s:%d", host, port);
+    ESPMQTT_LOGD(TAG, "Connect to %s:%d", host, port);
     char port_str[8] = {0};
     sprintf(port_str, "%d", port);
     if ((ret = mbedtls_net_connect(&ssl->client_fd, host, port_str, MBEDTLS_NET_PROTO_TCP)) != 0) {
-        ESP_LOGE(TAG, "mbedtls_net_connect returned -%x", -ret);
+        ESPMQTT_LOGE(TAG, "mbedtls_net_connect returned -%x", -ret);
         goto exit;
     }
 
     mbedtls_ssl_set_bio(&ssl->ctx, &ssl->client_fd, mbedtls_net_send, mbedtls_net_recv, NULL);
 
     if ((ret = mbedtls_ssl_set_hostname(&ssl->ctx, host)) != 0) {
-        ESP_LOGE(TAG, " failed\n  ! mbedtls_ssl_set_hostname returned %d\n\n", ret);
+        ESPMQTT_LOGE(TAG, " failed\n  ! mbedtls_ssl_set_hostname returned %d\n\n", ret);
         goto exit;
     }
 
-    ESP_LOGD(TAG, "Performing the SSL/TLS handshake...");
+    ESPMQTT_LOGD(TAG, "Performing the SSL/TLS handshake...");
 
     while ((ret = mbedtls_ssl_handshake(&ssl->ctx)) != 0) {
         if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) {
-            ESP_LOGE(TAG, "mbedtls_ssl_handshake returned -0x%x", -ret);
+            ESPMQTT_LOGE(TAG, "mbedtls_ssl_handshake returned -0x%x", -ret);
             goto exit;
         }
     }
 
-    ESP_LOGD(TAG, "Verifying peer X.509 certificate...");
+    ESPMQTT_LOGD(TAG, "Verifying peer X.509 certificate...");
 
     if ((flags = mbedtls_ssl_get_verify_result(&ssl->ctx)) != 0) {
         /* In real life, we probably want to close connection if ret != 0 */
-        ESP_LOGW(TAG, "Failed to verify peer certificate!");
+        ESPMQTT_LOGW(TAG, "Failed to verify peer certificate!");
         if (ssl->cert_pem_data) {
             goto exit;
         }
     } else {
-        ESP_LOGD(TAG, "Certificate verified.");
+        ESPMQTT_LOGD(TAG, "Certificate verified.");
     }
 
-    ESP_LOGD(TAG, "Cipher suite is %s", mbedtls_ssl_get_ciphersuite(&ssl->ctx));
+    ESPMQTT_LOGD(TAG, "Cipher suite is %s", mbedtls_ssl_get_ciphersuite(&ssl->ctx));
     return ret;
 exit:
     ssl_close(t);
@@ -213,13 +214,13 @@ static int32_t ssl_write(transport_handle_t t, const char *buffer, uint32_t len,
     transport_ssl_t *ssl = transport_get_context_data(t);
 
     if ((poll = transport_poll_write(t, timeout_ms)) <= 0) {
-        ESP_LOGW(TAG, "Poll timeout or error, errno=%s, fd=%d, timeout_ms=%d", strerror(errno),
-                 ssl->client_fd.fd, timeout_ms);
+        ESPMQTT_LOGW(TAG, "Poll timeout or error, errno=%s, fd=%d, timeout_ms=%d", strerror(errno),
+                     ssl->client_fd.fd, timeout_ms);
         return poll;
     }
     ret = mbedtls_ssl_write(&ssl->ctx, (const unsigned char *)buffer, len);
     if (ret <= 0) {
-        ESP_LOGE(TAG, "mbedtls_ssl_write error, errno=%s", strerror(errno));
+        ESPMQTT_LOGE(TAG, "mbedtls_ssl_write error, errno=%s", strerror(errno));
     }
     return ret;
 }
@@ -245,7 +246,7 @@ static int ssl_close(transport_handle_t t) {
     int ret = -1;
     transport_ssl_t *ssl = transport_get_context_data(t);
     if (ssl->ssl_initialized) {
-        ESP_LOGD(TAG, "Cleanup mbedtls");
+        ESPMQTT_LOGD(TAG, "Cleanup mbedtls");
         mbedtls_ssl_close_notify(&ssl->ctx);
         mbedtls_ssl_session_reset(&ssl->ctx);
         mbedtls_net_free(&ssl->client_fd);

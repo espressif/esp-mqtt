@@ -51,7 +51,7 @@ static int tcp_connect(transport_handle_t t, const char *host, int port, int tim
     tcp->sock = socket(PF_INET, SOCK_STREAM, 0);
 
     if (tcp->sock < 0) {
-        ESP_LOGE(TAG, "Error create socket");
+        ESPMQTT_LOGE(TAG, "Error create socket");
         return -1;
     }
 
@@ -62,8 +62,8 @@ static int tcp_connect(transport_handle_t t, const char *host, int port, int tim
 
     setsockopt(tcp->sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
-    ESP_LOGD(TAG, "[sock=%d],connecting to server IP:%s,Port:%d...", tcp->sock,
-             ipaddr_ntoa((const ip_addr_t *)&remote_ip.sin_addr.s_addr), port);
+    ESPMQTT_LOGD(TAG, "[sock=%d],connecting to server IP:%s,Port:%d...", tcp->sock,
+                 ipaddr_ntoa((const ip_addr_t *)&remote_ip.sin_addr.s_addr), port);
     if (connect(tcp->sock, (struct sockaddr *)(&remote_ip), sizeof(struct sockaddr)) != 0) {
         close(tcp->sock);
         tcp->sock = -1;

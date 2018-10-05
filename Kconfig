@@ -1,5 +1,11 @@
 menu "ESPMQTT Configurations"
 
+config MQTT_SILENCE_LIBRARY
+    bool "Silence all message output from this library"
+    default y
+    help
+        If activated, the library won't try to output anything, else it will use ESP_LOGX (X=I,D,V,E) macros for output.
+
 config MQTT_PROTOCOL_311
     bool "Enable MQTT protocol 3.1.1"
     default y
@@ -46,7 +52,7 @@ config MQTT_SSL_DEFAULT_PORT
     depends on MQTT_TRANSPORT_SSL
     help
         Default MQTT over SSL port
-        
+
 config MQTT_WS_DEFAULT_PORT
     int "Default MQTT over Websocket port"
     default 80
@@ -83,7 +89,7 @@ config MQTT_TASK_CORE_SELECTION_ENABLED
 	default false
 	help
 		This will enable core selection
-		
+
 choice
     depends on MQTT_TASK_CORE_SELECTION_ENABLED
     prompt "Core to use ?"
@@ -92,5 +98,5 @@ choice
     config MQTT_USE_CORE_1
           bool "Core 1"
  endchoice
-		
+
 endmenu

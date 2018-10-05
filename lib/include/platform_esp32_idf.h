@@ -21,6 +21,7 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "mqtt_config.h"
 #include "rom/queue.h"
 
 char *platform_create_id_string();
@@ -28,9 +29,9 @@ int platform_random(int max);
 long long platform_tick_get_ms();
 void ms_to_timeval(int timeout_ms, struct timeval *tv);
 
-#define ESP_MEM_CHECK(TAG, a, action)                                                          \
-    if (!(a)) {                                                                                \
-        ESP_LOGE(TAG, "%s:%d (%s): %s", __FILE__, __LINE__, __FUNCTION__, "Memory exhausted"); \
-        action;                                                                                \
+#define ESP_MEM_CHECK(TAG, a, action)                                                              \
+    if (!(a)) {                                                                                    \
+        ESPMQTT_LOGE(TAG, "%s:%d (%s): %s", __FILE__, __LINE__, __FUNCTION__, "Memory exhausted"); \
+        action;                                                                                    \
     }
 #endif

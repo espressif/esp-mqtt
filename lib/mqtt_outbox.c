@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "esp_log.h"
+#include "mqtt_config.h"
 #include "rom/queue.h"
 
 static const char *TAG = "OUTBOX";
@@ -28,8 +29,8 @@ outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, uint8_t *data, uint3
     });
     memcpy(item->buffer, data, len);
     STAILQ_INSERT_TAIL(outbox, item, next);
-    ESP_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%d, size=%d", msg_id, msg_type, len,
-             outbox_get_size(outbox));
+    ESPMQTT_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%d, size=%d", msg_id, msg_type, len,
+                 outbox_get_size(outbox));
     return item;
 }
 
@@ -59,8 +60,8 @@ esp_err_t outbox_delete(outbox_handle_t outbox, uint16_t msg_id, int msg_type) {
             STAILQ_REMOVE(outbox, item, outbox_item, next);
             free(item->buffer);
             free(item);
-            ESP_LOGD(TAG, "DELETED msgid=%d, msg_type=%d, remain size=%d", msg_id, msg_type,
-                     outbox_get_size(outbox));
+            ESPMQTT_LOGD(TAG, "DELETED msgid=%d, msg_type=%d, remain size=%d", msg_id, msg_type,
+                         outbox_get_size(outbox));
             return ESP_OK;
         }
     }
