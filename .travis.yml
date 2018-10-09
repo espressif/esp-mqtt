@@ -13,6 +13,7 @@ addons:
 before_install:
   # Save path to the git respository
   - PROJECT_PATH=$(pwd)
+  - CI_COMMIT_SHA=$(git rev-parse HEAD)
 
 install:
   # Install ESP32 toochain following steps as desribed
@@ -24,31 +25,35 @@ install:
   - mkdir -p ~/esp
   - cd ~/esp
   # Download binary toolchain for the ESP32
-  - wget https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-61-gab8375a-5.2.0.tar.gz
-  - tar -xzf xtensa-esp32-elf-linux64-1.22.0-61-gab8375a-5.2.0.tar.gz
-  # Make xtensa-esp32-elf available for all terminal sessions
-  - export PATH=$PATH:$HOME/esp/xtensa-esp32-elf/bin
+  - wget https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-80-g6c4433a-5.2.0.tar.gz
+  - tar -xzf xtensa-esp32-elf-linux64-1.22.0-80-g6c4433a-5.2.0.tar.gz
   # Get ESP-IDF from github
   - git clone --recursive https://github.com/espressif/esp-idf.git
   # Set the path to ESP-IDF directory
   - export IDF_PATH=~/esp/esp-idf
+  - python -m pip install --user -r $IDF_PATH/requirements.txt
+  # Setup build tool: xtensa-esp32-elf and idf.py
+  - export PATH=$PATH:$HOME/esp/xtensa-esp32-elf/bin:$IDF_PATH/tools
 
 script:
-  # Go back to the git repository
-  - cd $PROJECT_PATH/examples/mqtt_tcp
-  # Update configuration so that kconfig doesn't start interactive mode
-  - make defconfig
-  # Build project from the git repository
-  - make -j4
-  - cd $PROJECT_PATH/examples/mqtt_ssl
+  # Legacy build with IDF < 3.2
+  - cd $IDF_PATH && git checkout --recurse-submodules v3.1
+  - cd $PROJECT_PATH
+  - ./modify_for_legacy_idf.sh || true
+  - cd $PROJECT_PATH/examples/tcp
   - make defconfig
   - make -j4
-  - cd $PROJECT_PATH/examples/mqtt_ws
-  - make defconfig
-  - make -j4
-  - cd $PROJECT_PATH/examples/mqtt_wss
-  - make defconfig
-  - make -j4
-  - cd $PROJECT_PATH/examples/emitter-client
-  - make defconfig
-  - make -j4
+  # Master build with latest IDF
+  - cd $IDF_PATH && git checkout --recurse-submodules master
+  - cd $IDF_PATH/components/mqtt/esp-mqtt
+  - git remote add local $PROJECT_PATH/.git
+  - git fetch local
+  - git checkout $CI_COMMIT_SHA
+  - cd $IDF_PATH/examples/protocols/mqtt/tcp
+  - idf.py build
+  - cd $IDF_PATH/examples/protocols/mqtt/ssl
+  - idf.py build
+  - cd $IDF_PATH/examples/protocols/mqtt/ws
+  - idf.py build
+  - cd $IDF_PATH/examples/protocols/mqtt/wss
+  - idf.py build

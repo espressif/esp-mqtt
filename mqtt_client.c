@@ -761,28 +761,32 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
         return ESP_FAIL;
     }
 #if MQTT_CORE_SELECTION_ENABLED
-    	ESP_LOGD(TAG, "Core selection enabled on %u", MQTT_TASK_CORE);
-		if (xTaskCreatePinnedToCore(esp_mqtt_task, "mqtt_task", client->config->task_stack, client, client->config->task_prio, NULL, MQTT_TASK_CORE) != pdTRUE) {
-			ESP_LOGE(TAG, "Error create mqtt task");
-			return ESP_FAIL;
-		}
+        ESP_LOGD(TAG, "Core selection enabled on %u", MQTT_TASK_CORE);
+        if (xTaskCreatePinnedToCore(esp_mqtt_task, "mqtt_task", client->config->task_stack, client, client->config->task_prio, NULL, MQTT_TASK_CORE) != pdTRUE) {
+            ESP_LOGE(TAG, "Error create mqtt task");
+            return ESP_FAIL;
+        }
 #else
-    	ESP_LOGD(TAG, "Core selection disabled");
-		if (xTaskCreate(esp_mqtt_task, "mqtt_task", client->config->task_stack, client, client->config->task_prio, NULL) != pdTRUE) {
-			ESP_LOGE(TAG, "Error create mqtt task")	;
-			return ESP_FAIL;
-		}
+        ESP_LOGD(TAG, "Core selection disabled");
+        if (xTaskCreate(esp_mqtt_task, "mqtt_task", client->config->task_stack, client, client->config->task_prio, NULL) != pdTRUE) {
+            ESP_LOGE(TAG, "Error create mqtt task");
+            return ESP_FAIL;
+        }
 #endif
     return ESP_OK;
 }
 
-
 esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 {
-    client->run = false;
-    xEventGroupWaitBits(client->status_bits, STOPPED_BIT, false, true, portMAX_DELAY);
-    client->state = MQTT_STATE_UNKNOWN;
-    return ESP_OK;
+    if (client->run) {
+        client->run = false;
+        xEventGroupWaitBits(client->status_bits, STOPPED_BIT, false, true, portMAX_DELAY);
+        client->state = MQTT_STATE_UNKNOWN;
+        return ESP_OK;
+    } else {
+        ESP_LOGW(TAG, "Client asked to stop, but was not started");
+        return ESP_FAIL;
+    }
 }
 
 static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client)
