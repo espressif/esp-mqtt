@@ -859,16 +859,20 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         len = strlen(data);
     }
 
-    client->mqtt_state.outbound_message = mqtt_msg_publish(&client->mqtt_state.mqtt_connection,
-                                          topic, data, len,
-                                          qos, retain,
-                                          &pending_msg_id);
+    mqtt_message_t *publish_msg = mqtt_msg_publish(&client->mqtt_state.mqtt_connection,
+                                  topic, data, len,
+                                  qos, retain,
+                                  &pending_msg_id);
+
+    /* We have to set as pending all the qos>0 messages) */
     if (qos > 0) {
+        mqtt_enqueue(client);
+        client->mqtt_state.outbound_message = publish_msg;
         client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
         client->mqtt_state.pending_msg_id = pending_msg_id;
         client->mqtt_state.pending_msg_count ++;
-        /* Have to enqueue all the qos>0 messages) */
-        mqtt_enqueue(client);
+    } else {
+        client->mqtt_state.outbound_message = publish_msg;
     }
 
     if (mqtt_write_data(client) != ESP_OK) {
