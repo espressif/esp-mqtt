@@ -214,7 +214,7 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
     }
     read_len = esp_transport_read(client->transport,
                               (char *)client->mqtt_state.in_buffer,
-                              client->mqtt_state.outbound_message->length,
+                              client->mqtt_state.in_buffer_length,
                               client->config->network_timeout_ms);
     if (read_len < 0) {
         ESP_LOGE(TAG, "Error network response");
