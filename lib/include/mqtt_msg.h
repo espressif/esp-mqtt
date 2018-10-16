@@ -102,6 +102,7 @@ typedef struct mqtt_connect_info
 
 
 static inline int mqtt_get_type(uint8_t* buffer) { return (buffer[0] & 0xf0) >> 4; }
+static inline int mqtt_get_connect_session_present(uint8_t* buffer) { return buffer[2] & 0x01; }
 static inline int mqtt_get_connect_return_code(uint8_t* buffer) { return buffer[3]; }
 static inline int mqtt_get_dup(uint8_t* buffer) { return (buffer[0] & 0x08) >> 3; }
 static inline int mqtt_get_qos(uint8_t* buffer) { return (buffer[0] & 0x06) >> 1; }
