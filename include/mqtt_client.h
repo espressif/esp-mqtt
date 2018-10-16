@@ -20,14 +20,31 @@ extern "C" {
 
 typedef struct esp_mqtt_client* esp_mqtt_client_handle_t;
 
+/**
+ * @brief MQTT event types.
+ *
+ * User event handler receives context data in `esp_mqtt_event_t` structure with
+ *  - `user_context` - user data from `esp_mqtt_client_config_t`
+ *  - `client` - mqtt client handle
+ *  - various other data depending on event type
+ *
+ */
 typedef enum {
     MQTT_EVENT_ERROR = 0,
-    MQTT_EVENT_CONNECTED,
-    MQTT_EVENT_DISCONNECTED,
-    MQTT_EVENT_SUBSCRIBED,
-    MQTT_EVENT_UNSUBSCRIBED,
-    MQTT_EVENT_PUBLISHED,
-    MQTT_EVENT_DATA,
+    MQTT_EVENT_CONNECTED,          /*!< connected event, additional context: session_present flag */
+    MQTT_EVENT_DISCONNECTED,       /*!< disconnected event */
+    MQTT_EVENT_SUBSCRIBED,         /*!< subscribed event, additional context: msg_id */
+    MQTT_EVENT_UNSUBSCRIBED,       /*!< unsubscribed event */
+    MQTT_EVENT_PUBLISHED,          /*!< published event, additional context:  msg_id */
+    MQTT_EVENT_DATA,               /*!< data event, additional context:
+                                        - msg_id               message id
+                                        - topic                pointer to the received topic
+                                        - topic_len            length of the topic
+                                        - data                 pointer to the received data
+                                        - data_len             length of the data for this event
+                                        - current_data_offset  offset of the current data for this event
+                                        - total_data_len       total length of the data received
+                                         */
 } esp_mqtt_event_id_t;
 
 typedef enum {
@@ -82,9 +99,9 @@ typedef struct {
     int task_prio;                          /*!< MQTT task priority, default is 5, can be changed in ``make menuconfig`` */
     int task_stack;                         /*!< MQTT task stack size, default is 6144 bytes, can be changed in ``make menuconfig`` */
     int buffer_size;                        /*!< size of MQTT send/receive buffer, default is 1024 */
-    const char *cert_pem;                   /*!< pointer to CERT file for server verify (with SSL), default is NULL, not required to verify the server */
-    const char *client_cert_pem;            /*!< pointer to CERT file for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_key_pem` has to be provided. */
-    const char *client_key_pem;             /*!< pointer to PEM private key file for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_cert_pem` has to be provided. */
+    const char *cert_pem;                   /*!< Pointer to certificate data in PEM format for server verify (with SSL), default is NULL, not required to verify the server */
+    const char *client_cert_pem;            /*!< Pointer to certificate data in PEM format for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_key_pem` has to be provided. */
+    const char *client_key_pem;             /*!< Pointer to private key data in PEM format for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_cert_pem` has to be provided. */
     esp_mqtt_transport_t transport;         /*!< overrides URI transport */
 } esp_mqtt_client_config_t;
 
