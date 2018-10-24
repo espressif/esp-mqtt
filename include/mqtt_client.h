@@ -110,6 +110,7 @@ typedef struct {
 esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *config);
 esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *uri);
 esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client);
+esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client);
 esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
 esp_err_t esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic, int qos);
 esp_err_t esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *topic);

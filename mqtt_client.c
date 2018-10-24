@@ -75,6 +75,7 @@ struct esp_mqtt_client {
 };
 
 const static int STOPPED_BIT = BIT0;
+const static int RECONNECT_BIT = BIT1;
 
 static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_dispatch_event_with_msgid(esp_mqtt_client_handle_t client);
@@ -769,6 +770,7 @@ static void esp_mqtt_task(void *pv)
 
         switch ((int)client->state) {
             case MQTT_STATE_INIT:
+                xEventGroupClearBits(client->status_bits, RECONNECT_BIT);
                 client->event.event_id = MQTT_EVENT_BEFORE_CONNECT;
                 esp_mqtt_dispatch_event_with_msgid(client);
 
@@ -847,7 +849,8 @@ static void esp_mqtt_task(void *pv)
                     ESP_LOGD(TAG, "Reconnecting...");
                     break;
                 }
-                vTaskDelay(client->wait_timeout_ms / 2 / portTICK_RATE_MS);
+                xEventGroupWaitBits(client->status_bits, RECONNECT_BIT, false, true,
+                                    client->wait_timeout_ms / 2 / portTICK_RATE_MS);
                 break;
         }
     }
@@ -876,6 +879,18 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
             return ESP_FAIL;
         }
 #endif
+    return ESP_OK;
+}
+
+esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client)
+{
+    ESP_LOGI(TAG, "Client force reconnect requested");
+    if (client->state != MQTT_STATE_WAIT_TIMEOUT) {
+        ESP_LOGD(TAG, "The client is not waiting for reconnection. Ignore the request");
+        return ESP_FAIL;
+    }
+    client->wait_timeout_ms = 0;
+    xEventGroupSetBits(client->status_bits, RECONNECT_BIT);
     return ESP_OK;
 }
 
