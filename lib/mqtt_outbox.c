@@ -31,22 +31,25 @@ outbox_handle_t outbox_init()
     return outbox;
 }
 
-outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, uint8_t *data, int len, int msg_id, int msg_type, int tick)
+outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, outbox_message_handle_t message, int tick)
 {
     outbox_item_handle_t item = calloc(1, sizeof(outbox_item_t));
     ESP_MEM_CHECK(TAG, item, return NULL);
-    item->msg_id = msg_id;
-    item->msg_type = msg_type;
+    item->msg_id = message->msg_id;
+    item->msg_type = message->msg_type;
     item->tick = tick;
-    item->len = len;
-    item->buffer = malloc(len);
+    item->len =  message->len;
+    item->buffer = malloc(message->len + message->remaining_len);
     ESP_MEM_CHECK(TAG, item->buffer, {
         free(item);
         return NULL;
     });
-    memcpy(item->buffer, data, len);
+    memcpy(item->buffer, message->data, message->len);
+    if (message->remaining_data) {
+        memcpy(item->buffer+message->len, message->remaining_data, message->remaining_len);
+    }
     STAILQ_INSERT_TAIL(outbox, item, next);
-    ESP_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%d, size=%d", msg_id, msg_type, len, outbox_get_size(outbox));
+    ESP_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%d, size=%d", message->msg_id, message->msg_type, message->len + message->remaining_len, outbox_get_size(outbox));
     return item;
 }
 

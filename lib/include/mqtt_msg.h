@@ -72,7 +72,8 @@ typedef struct mqtt_message
 {
     uint8_t* data;
     uint32_t length;
-
+    uint32_t fragmented_msg_total_length;       /*!< total len of fragmented messages (zero for all other messages) */
+    uint32_t fragmented_msg_data_offset;        /*!< data offset of fragmented messages (zero for all other messages) */
 } mqtt_message_t;
 
 typedef struct mqtt_connection

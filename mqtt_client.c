@@ -596,19 +596,40 @@ static bool is_valid_mqtt_msg(esp_mqtt_client_handle_t client, int msg_type, int
     return false;
 }
 
+static void mqtt_enqueue_oversized(esp_mqtt_client_handle_t client, uint8_t *remaining_data, int remaining_len)
+{
+    ESP_LOGD(TAG, "mqtt_enqueue_oversized id: %d, type=%d successful",
+             client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
+    //lock mutex
+    outbox_message_t msg = { 0 };
+    if (client->mqtt_state.pending_msg_count > 0) {
+        client->mqtt_state.pending_msg_count --;
+    }
+    msg.data = client->mqtt_state.outbound_message->data;
+    msg.len =  client->mqtt_state.outbound_message->length;
+    msg.msg_id = client->mqtt_state.pending_msg_id;
+    msg.msg_type = client->mqtt_state.pending_msg_type;
+    msg.remaining_data = remaining_data;
+    msg.remaining_len = remaining_len;
+    //Copy to queue buffer
+    outbox_enqueue(client->outbox, &msg, platform_tick_get_ms());
+
+    //unlock
+}
+
 static void mqtt_enqueue(esp_mqtt_client_handle_t client)
 {
     ESP_LOGD(TAG, "mqtt_enqueue id: %d, type=%d successful",
              client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
     //lock mutex
     if (client->mqtt_state.pending_msg_count > 0) {
+        outbox_message_t msg = { 0 };
+        msg.data = client->mqtt_state.outbound_message->data;
+        msg.len =  client->mqtt_state.outbound_message->length;
+        msg.msg_id = client->mqtt_state.pending_msg_id;
+        msg.msg_type = client->mqtt_state.pending_msg_type;
         //Copy to queue buffer
-        outbox_enqueue(client->outbox,
-                       client->mqtt_state.outbound_message->data,
-                       client->mqtt_state.outbound_message->length,
-                       client->mqtt_state.pending_msg_id,
-                       client->mqtt_state.pending_msg_type,
-                       platform_tick_get_ms());
+        outbox_enqueue(client->outbox, &msg, platform_tick_get_ms());
     }
     //unlock
 }
@@ -951,9 +972,51 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         client->mqtt_state.outbound_message = publish_msg;
     }
 
-    if (mqtt_write_data(client) != ESP_OK) {
-        ESP_LOGE(TAG, "Error to public data to topic=%s, qos=%d", topic, qos);
-        return -1;
+    /* Provide support for sending fragmented message if it doesn't fit buffer */
+    int remaining_len = len;
+    const char *current_data = data;
+    bool sending = true;
+
+    while (sending)  {
+
+        if (mqtt_write_data(client) != ESP_OK) {
+            ESP_LOGE(TAG, "Error to public data to topic=%s, qos=%d", topic, qos);
+            return -1;
+        }
+
+        int data_sent = client->mqtt_state.outbound_message->length - client->mqtt_state.outbound_message->fragmented_msg_data_offset;
+        remaining_len -= data_sent;
+        current_data +=  data_sent;
+
+        if (remaining_len > 0) {
+            mqtt_connection_t* connection = &client->mqtt_state.mqtt_connection;
+            ESP_LOGD(TAG, "Sending fragmented message, remains to send %d bytes of %d", remaining_len, len);
+            if (connection->message.fragmented_msg_data_offset) {
+                // asked to enqueue oversized message (first time only)
+                connection->message.fragmented_msg_data_offset = 0;
+                connection->message.fragmented_msg_total_length = 0;
+                if (qos > 0) {
+                    // internally enqueue all big messages, as they dont fit 'pending msg' structure
+                    mqtt_enqueue_oversized(client, (uint8_t*)current_data, remaining_len);
+                }
+            }
+
+            if (remaining_len > connection->buffer_length) {
+                // Continue with sending
+                memcpy(connection->buffer, current_data, connection->buffer_length);
+                connection->message.length = connection->buffer_length;
+                sending = true;
+            } else {
+                memcpy(connection->buffer, current_data, remaining_len);
+                connection->message.length = remaining_len;
+                sending = true;
+            }
+            connection->message.data = connection->buffer;
+            client->mqtt_state.outbound_message = &connection->message;
+        } else {
+            // Message was sent correctly
+            sending = false;
+        }
     }
     return pending_msg_id;
 }
