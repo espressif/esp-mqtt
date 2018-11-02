@@ -1,0 +1,32 @@
+limits:
+  "google-readability-braces-around-statements" : 30
+  "readability-braces-around-statements" : 30
+  "clang-diagnostic-error" : 10
+  "readability-non-const-parameter" : 10
+  "misc-misplaced-const" : 10
+  "clang-diagnostic-typedef-redefinition" : 10
+  "hicpp-braces-around-statements" : 10
+  "clang-diagnostic-int-to-pointer-cast" : 10
+  "hicpp-no-assembler" : 10
+  "readability-else-after-return" : 10
+  "readability-redundant-declaration" : 10
+  "clang-diagnostic-unknown-attributes" : 10
+  "misc-unused-parameters" : 10
+  "readability-inconsistent-declaration-parameter-name" : 10
+  "google-readability-todo" : 10
+  "clang-diagnostic-macro-redefined" : 10
+  "google-readability-casting" : 10
+  "readability-inconsistent-declaration-parameter-name": 10
+  "readability-named-parameter": 10
+  "readability-container-size-empty": 10
+  "modernize-use-using": 10
+  "modernize-use-override": 10
+  "readability-implicit-bool-cast": 10
+  "modernize-use-default-member-init": 10
+  "performance-unnecessary-value-param": 10
+  "modernize-use-equals-default": 10
+  "modernize-use-nullptr": 10
+
+ignore:
+
+
