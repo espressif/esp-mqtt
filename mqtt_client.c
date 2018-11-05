@@ -285,18 +285,18 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
 #endif
 
 #if MQTT_ENABLE_SSL
-    transport_handle_t ssl = transport_ssl_init();
+    transport_handle_t ssl = esp_mqtt_transport_ssl_init();
     ESP_MEM_CHECK(TAG, ssl, goto _mqtt_init_failed);
     transport_set_default_port(ssl, MQTT_SSL_DEFAULT_PORT);
     if (config->cert_pem) {
-        transport_ssl_set_cert_data(ssl, config->cert_pem, strlen(config->cert_pem));
+        esp_mqtt_transport_ssl_set_cert_data(ssl, config->cert_pem, strlen(config->cert_pem));
     }
     if (config->client_cert_pem) {
-        transport_ssl_set_client_cert_data(ssl, config->client_cert_pem,
+        esp_mqtt_transport_ssl_set_client_cert_data(ssl, config->client_cert_pem,
                                            strlen(config->client_cert_pem));
     }
     if (config->client_key_pem) {
-        transport_ssl_set_client_key_data(ssl, config->client_key_pem,
+        esp_mqtt_transport_ssl_set_client_key_data(ssl, config->client_key_pem,
                                           strlen(config->client_key_pem));
     }
     transport_list_add(client->transport_list, ssl, "mqtts");

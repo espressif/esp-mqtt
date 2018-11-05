@@ -275,7 +275,7 @@ static int ssl_destroy(transport_handle_t t) {
     return 0;
 }
 
-void transport_ssl_set_cert_data(transport_handle_t t, const char *data, int len) {
+void esp_mqtt_transport_ssl_set_cert_data(transport_handle_t t, const char *data, int len) {
     transport_ssl_t *ssl = transport_get_context_data(t);
     if (t && ssl) {
         ssl->cert_pem_data = (void *)data;
@@ -283,7 +283,7 @@ void transport_ssl_set_cert_data(transport_handle_t t, const char *data, int len
     }
 }
 
-void transport_ssl_set_client_cert_data(transport_handle_t t, const char *data, int len) {
+void esp_mqtt_transport_ssl_set_client_cert_data(transport_handle_t t, const char *data, int len) {
     transport_ssl_t *ssl = transport_get_context_data(t);
     if (t && ssl) {
         ssl->client_cert_pem_data = (void *)data;
@@ -291,7 +291,7 @@ void transport_ssl_set_client_cert_data(transport_handle_t t, const char *data, 
     }
 }
 
-void transport_ssl_set_client_key_data(transport_handle_t t, const char *data, int len) {
+void esp_mqtt_transport_ssl_set_client_key_data(transport_handle_t t, const char *data, int len) {
     transport_ssl_t *ssl = transport_get_context_data(t);
     if (t && ssl) {
         ssl->client_key_pem_data = (void *)data;
@@ -299,7 +299,7 @@ void transport_ssl_set_client_key_data(transport_handle_t t, const char *data, i
     }
 }
 
-transport_handle_t transport_ssl_init() {
+transport_handle_t esp_mqtt_transport_ssl_init() {
     transport_handle_t t = transport_init();
     transport_ssl_t *ssl = calloc(1, sizeof(transport_ssl_t));
     ESP_MEM_CHECK(TAG, ssl, return NULL);

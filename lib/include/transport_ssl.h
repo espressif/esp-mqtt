@@ -18,7 +18,7 @@ extern "C" {
  *
  * @return      the allocated transport_handle_t, or NULL if the handle can not be allocated
  */
-transport_handle_t transport_ssl_init();
+transport_handle_t esp_mqtt_transport_ssl_init();
 
 /**
  * @brief      Set SSL certificate data (as PEM format).
@@ -29,9 +29,9 @@ transport_handle_t transport_ssl_init();
  * @param[in]  data  The pem data
  * @param[in]  len   The length
  */
-void transport_ssl_set_cert_data(transport_handle_t t, const char *data, int len);
-void transport_ssl_set_client_cert_data(transport_handle_t t, const char *data, int len);
-void transport_ssl_set_client_key_data(transport_handle_t t, const char *data, int len);
+void esp_mqtt_transport_ssl_set_cert_data(transport_handle_t t, const char *data, int len);
+void esp_mqtt_transport_ssl_set_client_cert_data(transport_handle_t t, const char *data, int len);
+void esp_mqtt_transport_ssl_set_client_key_data(transport_handle_t t, const char *data, int len);
 
 #ifdef __cplusplus
 }
