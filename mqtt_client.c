@@ -85,7 +85,6 @@ static char *create_string(const char *ptr, int len);
 static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_client_config_t *config)
 {
     //Copy user configurations to client context
-    esp_err_t err = ESP_OK;
     mqtt_config_storage_t *cfg = calloc(1, sizeof(mqtt_config_storage_t));
     ESP_MEM_CHECK(TAG, cfg, return ESP_ERR_NO_MEM);
 
@@ -100,7 +99,6 @@ static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_
     if (cfg->task_stack == 0) {
         cfg->task_stack = MQTT_TASK_STACK;
     }
-    err = ESP_ERR_NO_MEM;
     if (config->host) {
         cfg->host = strdup(config->host);
         ESP_MEM_CHECK(TAG, cfg->host, goto _mqtt_set_config_failed);
@@ -165,11 +163,10 @@ static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_
         cfg->auto_reconnect = false;
     }
 
-
-    return err;
+    return ESP_OK;
 _mqtt_set_config_failed:
     esp_mqtt_destroy_config(client);
-    return err;
+    return ESP_ERR_NO_MEM;
 }
 
 static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
