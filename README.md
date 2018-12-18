@@ -19,9 +19,21 @@
 Please refer to instructions in [ESP-IDF](https://github.com/espressif/esp-idf)
 
 ## Documentation
-Please refer to the standard [ESP-IDF](https://github.com/espressif/esp-idf) documentation here https://github.com/espressif/esp-idf/blob/master/docs/en/api-reference/protocols/mqtt.rst
+
+* Please refer to the standard [ESP-IDF](https://github.com/espressif/esp-idf), documentation for the latest version: https://docs.espressif.com/projects/esp-idf/
+
+* Documentation of ESP-MQTT API: https://docs.espressif.com/projects/esp-idf/en/latest/api-reference/protocols/mqtt.html
 
 ## License
+
 - MQTT Package - [Stephen Robinson - contiki-mqtt](https://github.com/esar/contiki-mqtt)
 - Others [@tuanpmt](https://twitter.com/tuanpmt)
 Apache License
+
+## Older IDF verisons
+
+For [ESP-IDF](https://github.com/espressif/esp-idf) versions prior to IDFv3.2, please  clone as a component of [ESP-IDF](https://github.com/espressif/esp-idf):
+```
+git submodule add https://github.com/espressif/esp-mqtt.git components/espmqtt
+```
+and checkout the [ESP-MQTT_FOR_IDF_3.1](https://github.com/espressif/esp-mqtt/tree/ESP-MQTT_FOR_IDF_3.1) tag
