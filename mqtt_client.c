@@ -508,13 +508,6 @@ static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
     return ESP_FAIL;
 }
 
-
-typedef struct {
-    char *path;
-    char *buffer;
-    esp_transport_handle_t parent;
-} transport_ws_t;
-
 static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, int length)
 {
     const char *mqtt_topic = NULL, *mqtt_data = NULL;
@@ -582,7 +575,7 @@ static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, i
         buffer_offset = 0;
         max_to_read = client->mqtt_state.in_buffer_length;
         if (len_read <= 0) {
-            ESP_LOGE(TAG, "Read error or timeout: %d", errno);
+            ESP_LOGE(TAG, "Read error or timeout: len_read=%d, errno=%d", len_read, errno);
             break;
         }
         client->mqtt_state.message_length_read += len_read;
@@ -711,7 +704,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             // Deliver the publish message
             client->mqtt_state.message_length_read = read_len - transport_message_offset;
             client->mqtt_state.message_length = mqtt_get_total_length(&client->mqtt_state.in_buffer[transport_message_offset], client->mqtt_state.message_length_read);
-            ESP_LOGI(TAG, "deliver_publish, message_length_read=%d, message_length=%d", read_len, client->mqtt_state.message_length);
+            ESP_LOGD(TAG, "deliver_publish, message_length_read=%d, message_length=%d", read_len, client->mqtt_state.message_length);
             deliver_publish(client, &client->mqtt_state.in_buffer[transport_message_offset], client->mqtt_state.message_length_read);
             break;
         case MQTT_MSG_TYPE_PUBACK:
