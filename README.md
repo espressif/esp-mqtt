@@ -13,6 +13,10 @@
 - Multiple instances (Multiple clients in one application)
 - Support subscribing, publishing, authentication, will messages, keep alive pings and all 3 QoS levels (it should be a fully functional client).
 
+## Caveats
+- Resending qos1/qos2 messages after reconnection
+- Thread safe library
+
 ## How to use
 
 [ESP-MQTT](https://github.com/espressif/esp-mqtt) is a standard [ESP-IDF](https://github.com/espressif/esp-idf) component.
