@@ -365,11 +365,6 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
         }
     }
 
-    if (client->config->scheme == NULL) {
-        client->config->scheme = create_string("mqtt", 4);
-        ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_init_failed);
-    }
-
     client->keepalive_tick = platform_tick_get_ms();
     client->reconnect_tick = platform_tick_get_ms();
     client->refresh_connection_tick = platform_tick_get_ms();
@@ -432,17 +427,15 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
         return ESP_FAIL;
     }
 
-    if (client->config->scheme == NULL) {
-        client->config->scheme = create_string(uri + puri.field_data[UF_SCHEMA].off, puri.field_data[UF_SCHEMA].len);
-    }
+    // set uri overrides actual scheme, host, path if configured previously
+    free(client->config->scheme);
+    free(client->config->host);
+    free(client->config->path);
 
-    if (client->config->host == NULL) {
-        client->config->host = create_string(uri + puri.field_data[UF_HOST].off, puri.field_data[UF_HOST].len);
-    }
+    client->config->scheme = create_string(uri + puri.field_data[UF_SCHEMA].off, puri.field_data[UF_SCHEMA].len);
+    client->config->host = create_string(uri + puri.field_data[UF_HOST].off, puri.field_data[UF_HOST].len);
+    client->config->path = create_string(uri + puri.field_data[UF_PATH].off, puri.field_data[UF_PATH].len);
 
-    if (client->config->path == NULL) {
-        client->config->path = create_string(uri + puri.field_data[UF_PATH].off, puri.field_data[UF_PATH].len);
-    }
     if (client->config->path) {
         esp_transport_handle_t trans = esp_transport_list_get_transport(client->transport_list, "ws");
         if (trans) {
