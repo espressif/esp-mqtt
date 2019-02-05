@@ -35,7 +35,7 @@ typedef enum pending_state {
 
 outbox_handle_t outbox_init();
 outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, outbox_message_handle_t message, int tick);
-outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox, pending_state_t pending);
+outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox, pending_state_t pending, int *tick);
 outbox_item_handle_t outbox_get(outbox_handle_t outbox, int msg_id);
 uint8_t* outbox_item_get_data(outbox_item_handle_t item,  size_t *len, uint16_t *msg_id, int *msg_type, int *qos);
 esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type);

@@ -501,7 +501,7 @@ static esp_err_t mqtt_write_data(esp_mqtt_client_handle_t client)
                                     client->config->network_timeout_ms);
     // client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
     if (write_len <= 0) {
-        ESP_LOGE(TAG, "Error write data or timeout, written len = %d", write_len);
+        ESP_LOGE(TAG, "Error write data or timeout, written len = %d, errno=%d", write_len, errno);
         return ESP_FAIL;
     }
     /* we've just sent a mqtt control packet, update keepalive counter
@@ -624,9 +624,6 @@ static void mqtt_enqueue_oversized(esp_mqtt_client_handle_t client, uint8_t *rem
              client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
     //lock mutex
     outbox_message_t msg = { 0 };
-    if (client->mqtt_state.pending_msg_count > 0) {
-        client->mqtt_state.pending_msg_count --;
-    }
     msg.data = client->mqtt_state.outbound_message->data;
     msg.len =  client->mqtt_state.outbound_message->length;
     msg.msg_id = client->mqtt_state.pending_msg_id;
@@ -669,7 +666,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
     read_len = esp_transport_read(client->transport, (char *)client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_length, 0);
 
     if (read_len < 0) {
-        ESP_LOGE(TAG, "Read error or end of stream");
+        ESP_LOGE(TAG, "Read error or end of stream, errno:%d", errno);
         return ESP_FAIL;
     }
 
@@ -787,6 +784,7 @@ static void esp_mqtt_task(void *pv)
 {
     esp_mqtt_client_handle_t client = (esp_mqtt_client_handle_t) pv;
     uint32_t last_retransmit = 0;
+    int32_t msg_tick = 0;
     client->run = true;
 
     //get transport by scheme
@@ -845,7 +843,7 @@ static void esp_mqtt_task(void *pv)
                 }
 
                 // resend all non-transmitted messages first
-                outbox_item_handle_t item = outbox_dequeue(client->outbox, QUEUED);
+                outbox_item_handle_t item = outbox_dequeue(client->outbox, QUEUED, NULL);
                 if (item) {
                     if (mqtt_resend_queued(client, item) == ESP_OK) {
                         outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED);
@@ -853,8 +851,8 @@ static void esp_mqtt_task(void *pv)
                 // resend other "transmitted" messages after 1s
                 } else if (platform_tick_get_ms() - last_retransmit > 1000) {
                     last_retransmit = platform_tick_get_ms();
-                    item = outbox_dequeue(client->outbox, TRANSMITTED);
-                    if (item) {
+                    item = outbox_dequeue(client->outbox, TRANSMITTED, &msg_tick);
+                    if (item && (last_retransmit - msg_tick > 1000))  {
                         mqtt_resend_queued(client, item);
                     }
                 }
@@ -1048,15 +1046,17 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
                                   qos, retain,
                                   &pending_msg_id);
 
-    /* We have to set as pending all the qos>0 messages) */
+    /* We have to set as pending all the qos>0 messages */
     if (qos > 0) {
         client->mqtt_state.outbound_message = publish_msg;
         client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
         client->mqtt_state.pending_msg_id = pending_msg_id;
         client->mqtt_state.pending_publish_qos = qos;
         client->mqtt_state.pending_msg_count ++;
-        // by default store as QUEUED (not transmitted yet)
-        mqtt_enqueue(client);
+        // by default store as QUEUED (not transmitted yet) only for messages which would fit outbound buffer
+        if (client->mqtt_state.mqtt_connection.message.fragmented_msg_total_length == 0) {
+            mqtt_enqueue(client);
+        }
     } else {
         client->mqtt_state.outbound_message = publish_msg;
     }

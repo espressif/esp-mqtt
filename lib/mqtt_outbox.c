@@ -40,7 +40,7 @@ outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, outbox_message_handl
     item->msg_type = message->msg_type;
     item->msg_qos = message->msg_qos;
     item->tick = tick;
-    item->len =  message->len;
+    item->len =  message->len + message->remaining_len;
     item->pending = QUEUED;
     item->buffer = malloc(message->len + message->remaining_len);
     ESP_MEM_CHECK(TAG, item->buffer, {
@@ -67,11 +67,14 @@ outbox_item_handle_t outbox_get(outbox_handle_t outbox, int msg_id)
     return NULL;
 }
 
-outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox, pending_state_t pending)
+outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox, pending_state_t pending, int *tick)
 {
     outbox_item_handle_t item;
     STAILQ_FOREACH(item, outbox, next) {
         if (item->pending == pending) {
+            if (tick) {
+                *tick = item->tick;
+            }
             return item;
         }
     }
@@ -169,7 +172,7 @@ int outbox_get_size(outbox_handle_t outbox)
 esp_err_t outbox_cleanup(outbox_handle_t outbox, int max_size)
 {
     while(outbox_get_size(outbox) > max_size) {
-        outbox_item_handle_t item = outbox_dequeue(outbox, CONFIRMED);
+        outbox_item_handle_t item = outbox_dequeue(outbox, CONFIRMED, NULL);
         if (item == NULL) {
             return ESP_FAIL;
         }
