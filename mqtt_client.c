@@ -859,20 +859,20 @@ static void esp_mqtt_task(void *pv)
 
                 if (platform_tick_get_ms() - client->keepalive_tick > client->connect_info.keepalive * 1000 / 2) {
                     //No ping resp from last ping => Disconnected
-                	if(client->wait_for_ping_resp){
-                    	ESP_LOGE(TAG, "No PING_RESP, disconnected");
-                    	esp_mqtt_abort_connection(client);
-                    	client->wait_for_ping_resp = false;
-                    	break;
+                    if(client->wait_for_ping_resp){
+                        ESP_LOGE(TAG, "No PING_RESP, disconnected");
+                        esp_mqtt_abort_connection(client);
+                        client->wait_for_ping_resp = false;
+                        break;
                     }
-                	if (esp_mqtt_client_ping(client) == ESP_FAIL) {
+                    if (esp_mqtt_client_ping(client) == ESP_FAIL) {
                         ESP_LOGE(TAG, "Can't send ping, disconnected");
                         esp_mqtt_abort_connection(client);
                         break;
                     } else {
-                    	client->wait_for_ping_resp = true;
+                        client->wait_for_ping_resp = true;
                     }
-                	ESP_LOGD(TAG, "PING sent");
+                    ESP_LOGD(TAG, "PING sent");
                 }
 
                 if (client->config->refresh_connection_after_ms &&
