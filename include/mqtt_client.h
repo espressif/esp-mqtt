@@ -48,6 +48,16 @@ typedef enum {
     MQTT_EVENT_BEFORE_CONNECT,     /*!< The event occurs before connecting */
 } esp_mqtt_event_id_t;
 
+enum mqtt_connect_return_code
+{
+    CONNECTION_ACCEPTED = 0,
+    CONNECTION_REFUSE_PROTOCOL,
+    CONNECTION_REFUSE_ID_REJECTED,
+    CONNECTION_REFUSE_SERVER_UNAVAILABLE,
+    CONNECTION_REFUSE_BAD_USERNAME,
+    CONNECTION_REFUSE_NOT_AUTHORIZED
+};
+
 typedef enum {
     MQTT_TRANSPORT_UNKNOWN = 0x0,
     MQTT_TRANSPORT_OVER_TCP,      /*!< MQTT over TCP, using scheme: ``mqtt`` */
@@ -71,6 +81,7 @@ typedef struct {
     int topic_len;                      /*!< Length of the topic for this event asociated with this event */
     int msg_id;                         /*!< MQTT messaged id of message */
     int session_present;                /*!< MQTT session_present flag for connection event */
+    uint8_t connect_return_code;		/*!< MQTT connection return code. Only written on a connection */
 } esp_mqtt_event_t;
 
 typedef esp_mqtt_event_t* esp_mqtt_event_handle_t;

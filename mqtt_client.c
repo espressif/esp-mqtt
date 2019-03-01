@@ -282,31 +282,42 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
         return ESP_FAIL;
     }
     connect_rsp_code = mqtt_get_connect_return_code(client->mqtt_state.in_buffer);
-    switch (connect_rsp_code) {
-        case CONNECTION_ACCEPTED:
-            ESP_LOGD(TAG, "Connected");
-            return ESP_OK;
-        case CONNECTION_REFUSE_PROTOCOL:
-            ESP_LOGW(TAG, "Connection refused, bad protocol");
-            return ESP_FAIL;
-        case CONNECTION_REFUSE_SERVER_UNAVAILABLE:
-            ESP_LOGW(TAG, "Connection refused, server unavailable");
-            return ESP_FAIL;
-        case CONNECTION_REFUSE_BAD_USERNAME:
-            ESP_LOGW(TAG, "Connection refused, bad username or password");
-            return ESP_FAIL;
-        case CONNECTION_REFUSE_NOT_AUTHORIZED:
-            ESP_LOGW(TAG, "Connection refused, not authorized");
-            return ESP_FAIL;
-        default:
-            ESP_LOGW(TAG, "Connection refused, Unknow reason");
-            return ESP_FAIL;
+    if(connect_rsp_code == CONNECTION_ACCEPTED)
+    {
+    	ESP_LOGD(TAG, "Connected");
+    	return ESP_OK;
     }
-    return ESP_OK;
+    return ESP_FAIL;
 }
 
 static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
 {
+	if(client->state == MQTT_STATE_INIT)
+	{
+		esp_err_t connect_rsp_code = mqtt_get_connect_return_code(client->mqtt_state.in_buffer);
+		switch (connect_rsp_code) {
+			case CONNECTION_ACCEPTED:
+				ESP_LOGD(TAG, "Connected");
+				break;
+			case CONNECTION_REFUSE_PROTOCOL:
+				ESP_LOGW(TAG, "Connection refused, bad protocol");
+				break;
+			case CONNECTION_REFUSE_SERVER_UNAVAILABLE:
+				ESP_LOGW(TAG, "Connection refused, server unavailable");
+				break;
+			case CONNECTION_REFUSE_BAD_USERNAME:
+				ESP_LOGW(TAG, "Connection refused, bad username or password");
+				break;
+			case CONNECTION_REFUSE_NOT_AUTHORIZED:
+				ESP_LOGW(TAG, "Connection refused, not authorized");
+				break;
+			default:
+				ESP_LOGW(TAG, "Connection refused, Unknow reason");
+				break;
+		}
+		client->event.connect_return_code = connect_rsp_code;
+	}
+
     esp_transport_close(client->transport);
     client->wait_timeout_ms = MQTT_RECONNECT_TIMEOUT_MS;
     client->reconnect_tick = platform_tick_get_ms();
