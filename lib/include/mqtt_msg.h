@@ -57,15 +57,6 @@ enum mqtt_message_type {
     MQTT_MSG_TYPE_DISCONNECT = 14
 };
 
-enum mqtt_connect_return_code {
-    CONNECTION_ACCEPTED = 0,
-    CONNECTION_REFUSE_PROTOCOL,
-    CONNECTION_REFUSE_ID_REJECTED,
-    CONNECTION_REFUSE_SERVER_UNAVAILABLE,
-    CONNECTION_REFUSE_BAD_USERNAME,
-    CONNECTION_REFUSE_NOT_AUTHORIZED
-};
-
 typedef struct mqtt_message {
     uint8_t *data;
     uint32_t length;

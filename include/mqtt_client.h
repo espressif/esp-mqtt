@@ -37,7 +37,7 @@ typedef struct esp_mqtt_client *esp_mqtt_client_handle_t;
  *
  */
 typedef enum {
-    MQTT_EVENT_ERROR = 0,
+    MQTT_EVENT_ERROR = 0,          /*!< on error event, additional context: error handle from esp_tls (if supported) */
     MQTT_EVENT_CONNECTED,          /*!< connected event, additional context: session_present flag */
     MQTT_EVENT_DISCONNECTED,       /*!< disconnected event */
     MQTT_EVENT_SUBSCRIBED,         /*!< subscribed event, additional context: msg_id */
@@ -57,7 +57,20 @@ typedef enum {
                                         and current data offset updating.
                                          */
     MQTT_EVENT_BEFORE_CONNECT,     /*!< The event occurs before connecting */
+    MQTT_EVENT_CONNECTION_REFUSED, /*!< The event occurs if connection is refused by the broker, additional context: connect_return_code */
 } esp_mqtt_event_id_t;
+
+/**
+ * MQTT connection error codes propagated via ERROR event
+ */
+typedef enum {
+    MQTT_CONNECTION_ACCEPTED = 0,                   /*!< Connection accepted  */
+    MQTT_CONNECTION_REFUSE_PROTOCOL,                /*!< MQTT connection refused reason: Wrong protocol */
+    MQTT_CONNECTION_REFUSE_ID_REJECTED,             /*!< MQTT connection refused reason: ID rejected */
+    MQTT_CONNECTION_REFUSE_SERVER_UNAVAILABLE,      /*!< MQTT connection refused reason: Server unavailable */
+    MQTT_CONNECTION_REFUSE_BAD_USERNAME,            /*!< MQTT connection refused reason: Wrong user */
+    MQTT_CONNECTION_REFUSE_NOT_AUTHORIZED           /*!< MQTT connection refused reason: Wrong username or password */
+} esp_mqtt_connect_return_code_t;
 
 typedef enum {
     MQTT_TRANSPORT_UNKNOWN = 0x0,
@@ -83,6 +96,7 @@ typedef struct {
     int msg_id;                         /*!< MQTT messaged id of message */
     int session_present;                /*!< MQTT session_present flag for connection event */
     void* error_handle;                 /*!< esp-tls error handle referencing last error/flags captured in transports */
+    esp_mqtt_connect_return_code_t connect_return_code;     /*!< MQTT connection return code. Only written on a connection */
 } esp_mqtt_event_t;
 
 typedef esp_mqtt_event_t *esp_mqtt_event_handle_t;
