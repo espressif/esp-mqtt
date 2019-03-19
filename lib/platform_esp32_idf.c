@@ -9,7 +9,7 @@ static const char *TAG = "PLATFORM";
 
 #define MAX_ID_STRING (32)
 
-char *platform_create_id_string()
+char *platform_create_id_string(void)
 {
     uint8_t mac[6];
     char *id_string = calloc(1, MAX_ID_STRING);
@@ -24,7 +24,7 @@ int platform_random(int max)
     return esp_random() % max;
 }
 
-long long platform_tick_get_ms()
+long long platform_tick_get_ms(void)
 {
     struct timeval te;
     gettimeofday(&te, NULL); // get current time

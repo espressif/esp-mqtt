@@ -24,7 +24,7 @@ typedef struct outbox_item {
 STAILQ_HEAD(outbox_list_t, outbox_item);
 
 
-outbox_handle_t outbox_init()
+outbox_handle_t outbox_init(void)
 {
     outbox_handle_t outbox = calloc(1, sizeof(struct outbox_list_t));
     ESP_MEM_CHECK(TAG, outbox, return NULL);
