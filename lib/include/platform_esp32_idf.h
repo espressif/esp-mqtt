@@ -18,7 +18,7 @@
 #include "lwip/netdb.h"
 #include "lwip/dns.h"
 
-#include "rom/queue.h"
+#include "sys/queue.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_system.h"
