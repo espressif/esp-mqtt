@@ -958,6 +958,12 @@ esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client)
 esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 {
     if (client->run) {
+        // Notify the broker we are disconnecting
+        client->mqtt_state.outbound_message = mqtt_msg_disconnect(&client->mqtt_state.mqtt_connection);
+        if (mqtt_write_data(client) != ESP_OK) {
+            ESP_LOGE(TAG, "Error sending disconnect message");
+        }
+        
         client->run = false;
         xEventGroupWaitBits(client->status_bits, STOPPED_BIT, false, true, portMAX_DELAY);
         client->state = MQTT_STATE_UNKNOWN;
