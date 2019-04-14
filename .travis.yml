@@ -29,8 +29,8 @@ install:
   # Download binary toolchain for the ESP32
   - wget https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-80-g6c4433a-5.2.0.tar.gz
   - tar -xzf xtensa-esp32-elf-linux64-1.22.0-80-g6c4433a-5.2.0.tar.gz
-  # Get ESP-IDF from github
-  - git clone --recursive https://github.com/espressif/esp-idf.git
+  # Get ESP-IDF from github (non-recursive to save time, later we update submodules for different versions)
+  - git clone https://github.com/espressif/esp-idf.git
   # Set the path to ESP-IDF directory
   - export IDF_PATH=~/esp/esp-idf
   - python -m pip install --user -r $IDF_PATH/requirements.txt
@@ -39,18 +39,20 @@ install:
 
 script:
   # Legacy build with IDF < 3.2
-  - cd $IDF_PATH && git checkout --recurse-submodules v3.1
+  - cd $IDF_PATH
+  - git checkout v3.1 && git submodule update --init --recursive
   - cd $PROJECT_PATH
   - ./modify_for_legacy_idf.sh || true
   - cd $PROJECT_PATH/examples/tcp
   - make defconfig
   - make -j4
   # Master build with latest IDF
-  - cd $IDF_PATH && git checkout --recurse-submodules master
+  - cd $IDF_PATH
+  - git checkout master && git submodule update --init --recursive
   - cd $IDF_PATH/components/mqtt/esp-mqtt
   - git remote add local $PROJECT_PATH/.git
   - git fetch local
-  - git checkout $CI_COMMIT_SHA
+  - git reset --hard $CI_COMMIT_SHA
   - cd $IDF_PATH/examples/protocols/mqtt/tcp
   - idf.py build
   - cd $IDF_PATH/examples/protocols/mqtt/ssl

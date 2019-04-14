@@ -39,7 +39,7 @@ build_with_idf:
     - cd $IDF_PATH/components/mqtt/esp-mqtt
     - rm -rf .git
     - cp -r $CI_PROJECT_DIR/.git .
-    - git checkout $CI_COMMIT_SHA
+    - git reset --hard $CI_COMMIT_SHA
     # build one example and capture compile commands/flags for static analysis
     - cd $IDF_PATH/examples/protocols/mqtt/tcp
     - export PEDANTIC_CFLAGS="-Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
