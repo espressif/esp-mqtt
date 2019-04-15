@@ -82,6 +82,7 @@ typedef struct {
     int topic_len;                      /*!< Length of the topic for this event asociated with this event */
     int msg_id;                         /*!< MQTT messaged id of message */
     int session_present;                /*!< MQTT session_present flag for connection event */
+    esp_err_t last_err;                 /*!< MQTT last error captured in transports */
 } esp_mqtt_event_t;
 
 typedef esp_mqtt_event_t *esp_mqtt_event_handle_t;
