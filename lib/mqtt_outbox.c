@@ -1,7 +1,7 @@
 #include "mqtt_outbox.h"
 #include <stdlib.h>
 #include <string.h>
-#include "rom/queue.h"
+#include "sys/queue.h"
 #include "esp_log.h"
 
 #ifndef CONFIG_MQTT_CUSTOM_OUTBOX
