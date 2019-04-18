@@ -273,13 +273,13 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length)
                 topiclen = buffer[i++] << 8;
                 topiclen |= buffer[i++];
 
-                if (i + topiclen >= length)
+                if (i + topiclen > length)
                     return 0;
                 i += topiclen;
 
                 if (mqtt_get_qos(buffer) > 0)
                 {
-                    if (i + 2 >= length)
+                    if (i + 2 > length)
                         return 0;
                     //i += 2;
                 } else {
