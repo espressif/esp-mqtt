@@ -67,6 +67,16 @@ typedef enum {
     MQTT_STATE_WAIT_TIMEOUT,
 } mqtt_client_state_t;
 
+/* State values for reading MQTT message header */
+typedef enum {
+	MQTT_MSG_STATE_ANALYSE 				= -4,	//!< MQTT MSG will be analysed
+    MQTT_MSG_STATE_HEADER_INCOMPLETE 	= -3,   //!< MQTT MSG HEADER is incomplete
+    MQTT_MSG_STATE_HEADER_COMPLETE 		= -2,   //!< MQTT MSG HEADER is complete
+	MQTT_MSG_STATE_PAYLOAD_INCOMPLETE 	= -1,   //!< MQTT MSG PAYLOAD is incomplete
+	MQTT_MSG_STATE_COMPLETE 			=  0    //!< MQTT MSG is completed.
+} mqtt_msg_state_t;
+
+
 struct esp_mqtt_client {
     esp_transport_list_handle_t transport_list;
     esp_transport_handle_t transport;
@@ -530,73 +540,125 @@ static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
 
 static void deliver_publish(esp_mqtt_client_handle_t client, uint8_t *message, int length)
 {
+	mqtt_msg_state_t mqtt_msg_state = MQTT_MSG_STATE_ANALYSE;
     const char *mqtt_topic = NULL, *mqtt_data = NULL;
     uint32_t mqtt_topic_length, mqtt_data_length;
-    uint32_t mqtt_len = 0, mqtt_offset = 0, total_mqtt_len = 0;
+    uint32_t mqtt_len = 0, mqtt_offset = 0;
     int len_read= length;
     int max_to_read = client->mqtt_state.in_buffer_length;
     int buffer_offset = 0;
+    uint8_t mqtt_fixed_header_length, mqtt_variable_header_length = 0;
     esp_transport_handle_t transport = client->transport;
 
     do
     {
-        if (total_mqtt_len == 0) {
-            /* any further reading only the underlying payload */
-            transport = esp_transport_get_payload_transport_handle(transport);
-            mqtt_data_length = mqtt_topic_length = length;
-            if (NULL == (mqtt_topic = mqtt_get_publish_topic(message, &mqtt_topic_length)) ||
-                NULL == (mqtt_data = mqtt_get_publish_data(message, &mqtt_data_length)) ) {
-                // mqtt header is not complete, continue reading
-                memmove(client->mqtt_state.in_buffer, message, length);
-                buffer_offset = length;
-                message = client->mqtt_state.in_buffer;
-                max_to_read = client->mqtt_state.in_buffer_length - length;
-                mqtt_len = 0;
-            } else {
-                total_mqtt_len = client->mqtt_state.message_length - client->mqtt_state.message_length_read + mqtt_data_length;
-                mqtt_len = mqtt_data_length;
-                mqtt_data_length = client->mqtt_state.message_length - ((uint8_t*)mqtt_data- message);
-                /* read msg id only once */
-                client->event.msg_id = mqtt_get_id(message, length);
-            }
-        } else {
-            mqtt_len = len_read;
-            mqtt_data = (const char*)client->mqtt_state.in_buffer;
-            mqtt_topic = NULL;
-            mqtt_topic_length = 0;
-        }
+    	ESP_LOGD(TAG, "MQTT_MSG_STATE: %d", mqtt_msg_state);
 
-        if (total_mqtt_len != 0) {
-            ESP_LOGD(TAG, "Get data len= %d, topic len=%d", mqtt_len, mqtt_topic_length);
-            client->event.event_id = MQTT_EVENT_DATA;
-            client->event.data = (char *)mqtt_data;
-            client->event.data_len = mqtt_len;
-            client->event.total_data_len = mqtt_data_length;
-            client->event.current_data_offset = mqtt_offset;
-            client->event.topic = (char *)mqtt_topic;
-            client->event.topic_len = mqtt_topic_length;
-            esp_mqtt_dispatch_event(client);
-        }
+    	switch(mqtt_msg_state)
+    	{
+    	case MQTT_MSG_STATE_ANALYSE:
+    	{
+    		mqtt_msg_state = MQTT_MSG_STATE_HEADER_INCOMPLETE;
 
-        mqtt_offset += mqtt_len;
-        if (client->mqtt_state.message_length_read >= client->mqtt_state.message_length) {
-            break;
-        }
+    		transport = esp_transport_get_payload_transport_handle(transport);
+    		mqtt_topic_length = length;
+    		mqtt_topic = mqtt_get_publish_topic(message, &mqtt_topic_length);
+    		if(mqtt_topic == NULL) // not enough data to get the topic
+    		{
+    			break;	// exit the switch and get more data.
+    		}
 
-        len_read = esp_transport_read(transport,
-                                  (char *)client->mqtt_state.in_buffer + buffer_offset,
-                                  client->mqtt_state.message_length - client->mqtt_state.message_length_read > max_to_read ?
-                                  max_to_read : client->mqtt_state.message_length - client->mqtt_state.message_length_read,
-                                  client->config->network_timeout_ms);
-        length = len_read + buffer_offset;
-        buffer_offset = 0;
-        max_to_read = client->mqtt_state.in_buffer_length;
-        if (len_read <= 0) {
-            ESP_LOGE(TAG, "Read error or timeout: len_read=%d, errno=%d", len_read, errno);
-            break;
-        }
-        client->mqtt_state.message_length_read += len_read;
-    } while (1);
+    		int i;
+
+    		for (i = 1; i < length; ++i)		// Count the number of bytes for the message length ( Starting after the FLAGS)
+    		{
+    			if ((message[i] & 0x80) == 0)	// Check for continuation bit
+    			{
+    				++i;
+    				break;
+    			}
+    		}
+    		mqtt_fixed_header_length = i; 		// Fixed Header = FLAGS [1 Byte] + msg length ( 1-4 Bytes [i])
+
+    		mqtt_variable_header_length = 2 + mqtt_topic_length;	// Topic length (2 Bytes) + actual topic data
+    		if(mqtt_get_qos(message)> 0 ) 							// QOS1 and QOS2 include the Packet Identifier
+    		{
+    			mqtt_variable_header_length+=2;						//  Packet Identifier (2 Bytes)
+    		}
+
+    		if(client->mqtt_state.message_length_read > mqtt_fixed_header_length + mqtt_variable_header_length)
+    		{
+    			mqtt_msg_state = MQTT_MSG_STATE_HEADER_COMPLETE;	// HEADER is OK, but the msg contains a payload. (Total mqtt msg len > headers len)
+    		}
+    		if(client->mqtt_state.message_length_read == mqtt_fixed_header_length + mqtt_variable_header_length)
+    		{
+    			mqtt_msg_state = MQTT_MSG_STATE_COMPLETE;	// Message was only the HEADER. So it's complete!	(Total mqtt msg len == headers len)
+    		}
+    		break;
+    	}
+    	case MQTT_MSG_STATE_HEADER_COMPLETE:
+    	{
+    		mqtt_msg_state = MQTT_MSG_STATE_PAYLOAD_INCOMPLETE;
+    		mqtt_data_length = length;
+    		mqtt_data = mqtt_get_publish_data(message, &mqtt_data_length);
+    		if(mqtt_data == NULL)
+    		{
+    			break;
+    		}
+    		if(client->mqtt_state.message_length_read == mqtt_fixed_header_length + mqtt_variable_header_length + mqtt_data_length)
+    		{
+    			mqtt_msg_state = MQTT_MSG_STATE_COMPLETE;	// Message  it's complete!	(Total mqtt msg len == headers len + payload len)
+    		}
+    		break;
+    	}
+    	default:
+    		break;
+    	}	// switch
+
+    	if(	mqtt_msg_state == MQTT_MSG_STATE_HEADER_INCOMPLETE ||
+    		mqtt_msg_state == MQTT_MSG_STATE_PAYLOAD_INCOMPLETE	)
+    	{
+    		memmove(client->mqtt_state.in_buffer, message, length);
+    		buffer_offset = length;
+    		message = client->mqtt_state.in_buffer;
+    		max_to_read = client->mqtt_state.in_buffer_length - length;
+    		mqtt_len = 0;
+
+    		mqtt_offset += mqtt_len;
+
+    		len_read = esp_transport_read(transport,
+    				(char *)client->mqtt_state.in_buffer + buffer_offset,
+					client->mqtt_state.message_length - client->mqtt_state.message_length_read > max_to_read ?
+							max_to_read : client->mqtt_state.message_length - client->mqtt_state.message_length_read,
+							client->config->network_timeout_ms);
+    		length = len_read + buffer_offset;
+    		ESP_LOGD(TAG, "MQTT read %d", len_read);
+    		max_to_read = client->mqtt_state.in_buffer_length;
+
+    		if (len_read <= 0) {
+    			ESP_LOGE(TAG, "Read error or timeout: len_read=%d, errno=%d", len_read, errno);
+    			break;
+    		}
+    		client->mqtt_state.message_length_read += len_read;
+    	}
+
+    	if( mqtt_msg_state == MQTT_MSG_STATE_COMPLETE)
+    	{
+    		ESP_LOGD(TAG, "MQTT_MSG_STATE_HEADER_COMPLETE - send evt");
+    		ESP_LOGD(TAG, "Get data len= %d, topic len=%d", mqtt_len, mqtt_topic_length);
+    		client->event.event_id = MQTT_EVENT_DATA;
+    		client->event.data = (char *)mqtt_data;
+    		client->event.data_len = mqtt_len;
+    		client->event.total_data_len = mqtt_data_length;
+    		client->event.current_data_offset = mqtt_offset;
+    		client->event.topic = (char *)mqtt_topic;
+    		client->event.topic_len = mqtt_topic_length;
+    		esp_mqtt_dispatch_event(client);
+
+    		return;
+    	}
+
+    }while(1);
 
 }
 
