@@ -1189,7 +1189,12 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
 {
     uint16_t pending_msg_id = 0;
 
-    if (len <= 0) {
+    /* Acceptable publish messages:
+        data == NULL, len == 0: publish null message
+        data valid,   len == 0: publish all data, payload len is determined from string length
+        data valid,   len >  0: publish data with defined length
+     */
+    if (len <= 0 && data != NULL) {
         len = strlen(data);
     }
 
