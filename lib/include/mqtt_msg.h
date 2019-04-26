@@ -112,10 +112,11 @@ static inline int mqtt_get_retain(uint8_t* buffer) { return (buffer[0] & 0x01); 
 
 void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint16_t buffer_length);
 bool mqtt_header_complete(uint8_t* buffer, uint16_t buffer_length);
-uint32_t mqtt_get_total_length(uint8_t* buffer, uint16_t length);
+uint32_t mqtt_get_total_length(uint8_t* buffer, uint16_t length, int* fixed_size_len);
 const char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length);
 const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length);
 uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length);
+int mqtt_has_valid_msg_hdr(uint8_t* buffer, uint16_t length);
 
 mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_info_t* info);
 mqtt_message_t* mqtt_msg_publish(mqtt_connection_t* connection, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id);
