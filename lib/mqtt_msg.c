@@ -29,6 +29,7 @@
 *
 */
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include "mqtt_msg.h"
 #include "mqtt_config.h"
@@ -170,6 +171,38 @@ uint32_t mqtt_get_total_length(uint8_t* buffer, uint16_t length)
     totlen += i;
     
     return totlen;
+}
+
+bool mqtt_header_complete(uint8_t* buffer, uint16_t buffer_length)
+{
+    uint16_t i;
+    uint16_t topiclen;
+
+    for (i = 1; i < MQTT_MAX_FIXED_HEADER_SIZE; ++i)
+    {
+        if(i >= buffer_length)
+            return false;
+        if ((buffer[i] & 0x80) == 0)
+        {
+            ++i;
+            break;
+        }
+    }
+    // i is now the length of the fixed header
+
+    if (i + 2 >= buffer_length)
+        return false;
+    topiclen = buffer[i++] << 8;
+    topiclen |= buffer[i++];
+
+    i += topiclen;
+
+    if (mqtt_get_qos(buffer) > 0)
+    {
+        i += 2;
+    }
+    // i is now the length of the fixed + variable header
+    return buffer_length >= i;
 }
 
 const char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length)
