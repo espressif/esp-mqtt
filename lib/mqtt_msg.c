@@ -430,6 +430,10 @@ mqtt_message_t *mqtt_msg_publish(mqtt_connection_t *connection, const char *topi
         return fail_message(connection);
     }
 
+    if (data == NULL && data_length > 0) {
+       return fail_message(connection);
+    }
+
     if (qos > 0) {
         if ((*message_id = append_message_id(connection, 0)) == 0) {
             return fail_message(connection);
