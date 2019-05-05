@@ -145,18 +145,21 @@ esp_err_t outbox_delete_msgtype(outbox_handle_t outbox, int msg_type)
     return ESP_OK;
 }
 
-esp_err_t outbox_delete_expired(outbox_handle_t outbox, int current_tick, int timeout)
+int outbox_delete_expired(outbox_handle_t outbox, int current_tick, int timeout)
 {
+    int deleted_items = 0;
     outbox_item_handle_t item, tmp;
     STAILQ_FOREACH_SAFE(item, outbox, next, tmp) {
         if (current_tick - item->tick > timeout) {
             STAILQ_REMOVE(outbox, item, outbox_item, next);
+            printf("free message\n");
             free(item->buffer);
             free(item);
+            deleted_items ++;
         }
 
     }
-    return ESP_OK;
+    return deleted_items;
 }
 
 int outbox_get_size(outbox_handle_t outbox)

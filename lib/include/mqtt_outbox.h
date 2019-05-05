@@ -41,7 +41,7 @@ uint8_t* outbox_item_get_data(outbox_item_handle_t item,  size_t *len, uint16_t 
 esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type);
 esp_err_t outbox_delete_msgid(outbox_handle_t outbox, int msg_id);
 esp_err_t outbox_delete_msgtype(outbox_handle_t outbox, int msg_type);
-esp_err_t outbox_delete_expired(outbox_handle_t outbox, int current_tick, int timeout);
+int outbox_delete_expired(outbox_handle_t outbox, int current_tick, int timeout);
 
 esp_err_t outbox_set_pending(outbox_handle_t outbox, int msg_id, pending_state_t pending);
 int outbox_get_size(outbox_handle_t outbox);

@@ -1011,7 +1011,11 @@ static void esp_mqtt_task(void *pv)
                 }
 
                 //Delete mesaage after 30 senconds
-                outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
+                int deleted = outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
+                client->mqtt_state.pending_msg_count -= deleted;
+                if (client->mqtt_state.pending_msg_count < 0) {
+                    client->mqtt_state.pending_msg_count = 0;
+                }
                 //
                 outbox_cleanup(client->outbox, OUTBOX_MAX_SIZE);
                 break;
