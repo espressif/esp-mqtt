@@ -552,7 +552,7 @@ static esp_err_t deliver_publish(esp_mqtt_client_handle_t client)
     size_t msg_total_len = client->mqtt_state.message_length;
     size_t msg_topic_len = msg_read_len, msg_data_len = msg_read_len;
     size_t msg_data_offset = 0;
-    const char *msg_topic = NULL, *msg_data = NULL;
+    char *msg_topic = NULL, *msg_data = NULL;
 
     // get topic
     msg_topic = mqtt_get_publish_topic(msg_buf, &msg_topic_len);
@@ -577,10 +577,10 @@ post_data_event:
     ESP_LOGD(TAG, "Get data len= %d, topic len=%d, total_data: %d offset: %d", msg_data_len, msg_topic_len,
                                                                 client->event.total_data_len, msg_data_offset);
     client->event.event_id = MQTT_EVENT_DATA;
-    client->event.data = msg_data_len > 0 ? (char *)msg_data : NULL;
+    client->event.data = msg_data_len > 0 ? msg_data : NULL;
     client->event.data_len = msg_data_len;
     client->event.current_data_offset = msg_data_offset;
-    client->event.topic = (char *)msg_topic;
+    client->event.topic = msg_topic;
     client->event.topic_len = msg_topic_len;
     esp_mqtt_dispatch_event(client);
 
@@ -589,7 +589,7 @@ post_data_event:
         size_t buf_len = client->mqtt_state.in_buffer_length;
         esp_transport_handle_t transport = esp_transport_get_payload_transport_handle(client->transport);
 
-        msg_data = (const char*)client->mqtt_state.in_buffer;
+        msg_data = (char*)client->mqtt_state.in_buffer;
         msg_topic = NULL;
         msg_topic_len = 0;
         msg_data_offset += msg_data_len;

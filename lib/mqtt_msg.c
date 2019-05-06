@@ -206,7 +206,7 @@ bool mqtt_header_complete(uint8_t* buffer, uint16_t buffer_length)
     return buffer_length >= i;
 }
 
-const char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length)
+char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length)
 {
     int i;
     int totlen = 0;
@@ -232,10 +232,10 @@ const char* mqtt_get_publish_topic(uint8_t* buffer, uint32_t* length)
         return NULL;
 
     *length = topiclen;
-    return (const char*)(buffer + i);
+    return (char*)(buffer + i);
 } 
 
-const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
+char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
 {
     int i;
     int totlen = 0;
@@ -278,7 +278,7 @@ const char* mqtt_get_publish_data(uint8_t* buffer, uint32_t* length)
         *length = totlen - i;
     else
         *length = blength - i;
-    return (const char*)(buffer + i);
+    return (char*)(buffer + i);
 }
 
 uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length)
