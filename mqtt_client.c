@@ -422,17 +422,25 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     return client;
 _mqtt_init_failed:
     esp_mqtt_client_destroy(client);
-    MQTT_API_UNLOCK(client);
     return NULL;
 }
 
 esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client)
 {
+    if (client == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
     esp_mqtt_client_stop(client);
     esp_mqtt_destroy_config(client);
-    esp_transport_list_destroy(client->transport_list);
-    outbox_destroy(client->outbox);
-    vEventGroupDelete(client->status_bits);
+    if (client->transport_list) {
+        esp_transport_list_destroy(client->transport_list);
+    }
+    if (client->outbox) {
+        outbox_destroy(client->outbox);
+    }
+    if (client->status_bits) {
+        vEventGroupDelete(client->status_bits);
+    }
     free(client->mqtt_state.in_buffer);
     free(client->mqtt_state.out_buffer);
     vSemaphoreDelete(client->api_lock);
@@ -1055,6 +1063,10 @@ static void esp_mqtt_task(void *pv)
 
 esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
 {
+    if (!client) {
+        ESP_LOGE(TAG, "Client was not initialized");
+        return ESP_ERR_INVALID_ARG;
+    }
     if (client->state >= MQTT_STATE_INIT) {
         ESP_LOGE(TAG, "Client has started");
         return ESP_FAIL;
@@ -1187,6 +1199,11 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
                                   qos, retain,
                                   &pending_msg_id);
 
+    if (publish_msg == NULL) {
+        ESP_LOGE(TAG, "Publish message cannot be created");
+        MQTT_API_UNLOCK_FROM_OTHER_TASK(client);
+        return 0;
+    }
     /* We have to set as pending all the qos>0 messages */
     if (qos > 0) {
         client->mqtt_state.outbound_message = publish_msg;
