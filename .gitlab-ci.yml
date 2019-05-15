@@ -79,7 +79,7 @@ clang_tidy_check:
     - cd $IDF_PATH/components/mqtt/esp-mqtt
     - rm -rf .git
     - cp -r $CI_PROJECT_DIR/.git .
-    - git checkout $CI_COMMIT_SHA
+    - git reset --hard $CI_COMMIT_SHA
     - mv $CI_PROJECT_DIR/tidybuild $IDF_PATH/examples/protocols/mqtt/tcp/tidybuild
     - cd $IDF_PATH/examples/protocols/mqtt/tcp/tidybuild
     - git clone "${CI_REPORT_TOOLS}"

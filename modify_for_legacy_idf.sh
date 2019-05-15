@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+if [[ -z $1 ]]; then
+    LATEST_IDF=master
+else
+    LATEST_IDF=$1
+fi
+
 # This snipped prepares environment for using esp-mqtt repository separately from idf -- legacy use before IDFv3.2
 #
 esp_mqtt_path=`pwd`
@@ -7,7 +13,7 @@ mkdir -p ${esp_mqtt_path}/examples
 pushd
 cd $IDF_PATH
 former_commit_id=`git rev-parse HEAD`
-git checkout master
+git checkout ${LATEST_IDF}
 
 for example in tcp; do
     cp -r $IDF_PATH/examples/protocols/mqtt/${example} ${esp_mqtt_path}/examples

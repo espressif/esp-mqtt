@@ -49,7 +49,7 @@ outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, outbox_message_handl
     });
     memcpy(item->buffer, message->data, message->len);
     if (message->remaining_data) {
-        memcpy(item->buffer+message->len, message->remaining_data, message->remaining_len);
+        memcpy(item->buffer + message->len, message->remaining_data, message->remaining_len);
     }
     STAILQ_INSERT_TAIL(outbox, item, next);
     ESP_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%d, size=%d", message->msg_id, message->msg_type, message->len + message->remaining_len, outbox_get_size(outbox));
@@ -81,14 +81,14 @@ outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox, pending_state_t pend
     return NULL;
 }
 
-uint8_t* outbox_item_get_data(outbox_item_handle_t item,  size_t *len, uint16_t *msg_id, int *msg_type, int *qos)
+uint8_t *outbox_item_get_data(outbox_item_handle_t item,  size_t *len, uint16_t *msg_id, int *msg_type, int *qos)
 {
     if (item) {
         *len = item->len;
         *msg_id = item->msg_id;
         *msg_type = item->msg_type;
         *qos = item->msg_qos;
-        return (uint8_t*)item->buffer;
+        return (uint8_t *)item->buffer;
     }
     return NULL;
 }
@@ -97,7 +97,7 @@ esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type)
 {
     outbox_item_handle_t item, tmp;
     STAILQ_FOREACH_SAFE(item, outbox, next, tmp) {
-        if (item->msg_id == msg_id && (0xFF&(item->msg_type)) == msg_type) {
+        if (item->msg_id == msg_id && (0xFF & (item->msg_type)) == msg_type) {
             STAILQ_REMOVE(outbox, item, outbox_item, next);
             free(item->buffer);
             free(item);
@@ -145,18 +145,21 @@ esp_err_t outbox_delete_msgtype(outbox_handle_t outbox, int msg_type)
     return ESP_OK;
 }
 
-esp_err_t outbox_delete_expired(outbox_handle_t outbox, int current_tick, int timeout)
+int outbox_delete_expired(outbox_handle_t outbox, int current_tick, int timeout)
 {
+    int deleted_items = 0;
     outbox_item_handle_t item, tmp;
     STAILQ_FOREACH_SAFE(item, outbox, next, tmp) {
         if (current_tick - item->tick > timeout) {
             STAILQ_REMOVE(outbox, item, outbox_item, next);
+            printf("free message\n");
             free(item->buffer);
             free(item);
+            deleted_items ++;
         }
 
     }
-    return ESP_OK;
+    return deleted_items;
 }
 
 int outbox_get_size(outbox_handle_t outbox)
@@ -171,7 +174,7 @@ int outbox_get_size(outbox_handle_t outbox)
 
 esp_err_t outbox_cleanup(outbox_handle_t outbox, int max_size)
 {
-    while(outbox_get_size(outbox) > max_size) {
+    while (outbox_get_size(outbox) > max_size) {
         outbox_item_handle_t item = outbox_dequeue(outbox, CONFIRMED, NULL);
         if (item == NULL) {
             return ESP_FAIL;

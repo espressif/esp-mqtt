@@ -67,13 +67,13 @@
 #endif
 
 #ifdef CONFIG_MQTT_USE_CORE_0
-    #define MQTT_TASK_CORE    0
+#define MQTT_TASK_CORE    0
 #else
-    #ifdef CONFIG_MQTT_USE_CORE_1
-        #define MQTT_TASK_CORE 1
-    #else
-        #define MQTT_TASK_CORE 0
-    #endif
+#ifdef CONFIG_MQTT_USE_CORE_1
+#define MQTT_TASK_CORE 1
+#else
+#define MQTT_TASK_CORE 0
+#endif
 #endif
 
 

@@ -16,6 +16,8 @@ before_install:
   # Have to checkout a temp branch for later in tree reference
   - git checkout -b temporary_ref_branch
   - CI_COMMIT_SHA=$(git rev-parse HEAD)
+  # Test building with latest (stable == v3.3 for now) IDF
+  - LATEST_IDF=release/v3.3
 
 install:
   # Install ESP32 toochain following steps as desribed
@@ -42,13 +44,13 @@ script:
   - cd $IDF_PATH
   - git checkout v3.1 && git submodule update --init --recursive
   - cd $PROJECT_PATH
-  - ./modify_for_legacy_idf.sh || true
+  - ./modify_for_legacy_idf.sh ${LATEST_IDF} || true
   - cd $PROJECT_PATH/examples/tcp
   - make defconfig
   - make -j4
-  # Master build with latest IDF
+  # Build with latest IDF
   - cd $IDF_PATH
-  - git checkout master && git submodule update --init --recursive
+  - git checkout ${LATEST_IDF} && git submodule update --init --recursive
   - cd $IDF_PATH/components/mqtt/esp-mqtt
   - git remote add local $PROJECT_PATH/.git
   - git fetch local
