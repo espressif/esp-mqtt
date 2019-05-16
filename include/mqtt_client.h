@@ -13,6 +13,7 @@
 #include "esp_err.h"
 
 #include "mqtt_config.h"
+#include "esp_event.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -85,7 +86,8 @@ typedef esp_err_t (* mqtt_event_callback_t)(esp_mqtt_event_handle_t event);
  * MQTT client configuration structure
  */
 typedef struct {
-    mqtt_event_callback_t event_handle;     /*!< handle for MQTT events */
+    mqtt_event_callback_t event_handle;     /*!< handle for MQTT events as a callback in legacy mode */
+    esp_event_loop_handle_t event_loop_handle; /*!< handle for MQTT event loop library */
     const char *host;                       /*!< MQTT server domain (ipv4 as string) */
     const char *uri;                        /*!< Complete MQTT broker URI */
     uint32_t port;                          /*!< MQTT server port */
@@ -236,6 +238,19 @@ esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client);
  *         ESP_OK on success
  */
 esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_client_config_t *config);
+
+/**
+ * @brief Registers mqtt event
+ *
+ * @param client            mqtt client handle
+ * @param event             event type
+ * @param event_handler     hanlder callback
+ * @param event_handler_arg handlers context
+ *
+ * @return ESP_ERR_NO_MEM if failed to allocate
+ *         ESP_OK on success
+ */
+esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mqtt_event_id_t event, esp_event_handler_t event_handler, void* event_handler_arg);
 
 #ifdef __cplusplus
 }
