@@ -403,6 +403,14 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     if (config->client_key_pem) {
         esp_transport_ssl_set_client_key_data(ssl, config->client_key_pem, strlen(config->client_key_pem));
     }
+    if (config->psk_hint_key) {
+#ifdef MQTT_SUPPORTED_FEATURE_PSK_AUTHENTICATION
+        esp_transport_ssl_set_psk_key_hint(ssl, config->psk_hint_key);
+#else
+        ESP_LOGE(TAG, "PSK authentication is not available in IDF version %s", IDF_VER);
+        goto _mqtt_init_failed;
+#endif
+    }
     esp_transport_list_add(client->transport_list, ssl, "mqtts");
     if (config->transport == MQTT_TRANSPORT_OVER_SSL) {
         client->config->scheme = create_string("mqtts", 5);
