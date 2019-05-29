@@ -59,17 +59,16 @@ build_with_idf:
     - rm -rf .git
     - cp -r $CI_PROJECT_DIR/.git .
     - git reset --hard $CI_COMMIT_SHA
-    # build one example and capture compile commands/flags for static analysis
+    # capture compile commands/flags for static analysis
     - cd $IDF_PATH/examples/protocols/mqtt/tcp
+    - mkdir -p tidybuild && cd tidybuild
+    - cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+    - mv $IDF_PATH/examples/protocols/mqtt/tcp/tidybuild $CI_PROJECT_DIR/tidybuild
+    # enable pedantic flags for compilation
     - export PEDANTIC_CFLAGS="-Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
     - export EXTRA_CFLAGS=${PEDANTIC_CFLAGS} && export EXTRA_CXXFLAGS=${EXTRA_CFLAGS}
-    - idf.py build
-    - mkdir -p tidybuild
-    - cd tidybuild
-    - cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
-    - cd $CI_PROJECT_DIR
-    - mv $IDF_PATH/examples/protocols/mqtt/tcp/tidybuild $CI_PROJECT_DIR/tidybuild
     # build other examples
+    - cd $IDF_PATH/examples/protocols/mqtt/tcp && idf.py build
     - cd $IDF_PATH/examples/protocols/mqtt/ssl && idf.py build
     - cd $IDF_PATH/examples/protocols/mqtt/ssl_mutual_auth && idf.py build
     - cd $IDF_PATH/examples/protocols/mqtt/ws && idf.py build
@@ -101,9 +100,8 @@ clang_tidy_check:
     - git reset --hard $CI_COMMIT_SHA
     - mv $CI_PROJECT_DIR/tidybuild $IDF_PATH/examples/protocols/mqtt/tcp/tidybuild
     - cd $IDF_PATH/examples/protocols/mqtt/tcp/tidybuild
-    - git clone "${CI_REPORT_TOOLS}"
-    - cd static-analysis-utils
-    - ./generate_report.sh $CI_PROJECT_DIR/.clang-tidy-limits.yml $IDF_PATH/examples/protocols/mqtt/tcp/tidybuild/report $IDF_PATH/examples/protocols/mqtt/tcp/tidybuild/output.xml
+    - git clone $IDF_ANALYSIS_UTILS static_analysis_utils && cd static_analysis_utils
+    - ./generate_report.sh $CI_PROJECT_DIR/static-analysis-rules.yml $IDF_PATH/examples/protocols/mqtt/tcp/tidybuild/report $IDF_PATH/examples/protocols/mqtt/tcp/tidybuild/output.xml
 
 deploy_report:
   stage: deploy_report
@@ -124,6 +122,7 @@ deploy_report:
     - ssh $DOCS_SERVER -x "cd $DOCS_PATH/clang-tidy && tar xzvf $GIT_VER.tar.gz && rm -f latest && ln -s $GIT_VER latest"
     # add link to view the report
     - echo "[static analysis][clang tidy] $CI_DOCKER_REGISTRY/static_analysis/esp-idf/clang-tidy/${GIT_VER}/index.html"
+    - test ! -e ${GIT_VER}/FAILED_RULES || { echo 'Failed static analysis rules!'; cat ${GIT_VER}/FAILED_RULES; exit 1; }
 
 push_master_to_github:
   stage: deploy
