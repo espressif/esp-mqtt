@@ -7,6 +7,8 @@ stages:
 
 variables:
   IDF_REPO: ${GITLAB_SSH_SERVER}/idf/esp-idf.git
+  OLDER_IDF: release/v3.1
+  RECENT_IDF: release/v3.3
 
 .add_gh_key_remote: &add_gh_key_remote |
   cit_add_ssh_key "${GH_PUSH_KEY}"
@@ -18,6 +20,23 @@ before_script:
   - curl -sSL ${CIT_LOADER_URL} | sh
   - source citools/import_functions
   - PATH=$CI_PROJECT_DIR/esp-idf/tools:$PATH
+
+build_with_older_idf:
+  stage: build
+  image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
+  tags:
+    - build
+  dependencies: []
+  script:
+    - cit_add_ssh_key "${GITLAB_KEY}"
+    - git clone "${IDF_REPO}" && cd esp-idf && git checkout ${OLDER_IDF}
+    - ./tools/ci/mirror-submodule-update.sh
+    - export IDF_PATH=$(pwd)
+    - cd $CI_PROJECT_DIR
+    - ./modify_for_legacy_idf.sh ${RECENT_IDF} || true
+    - cd $CI_PROJECT_DIR/examples/tcp
+    - make defconfig
+    - make
 
 build_with_idf:
   stage: build
