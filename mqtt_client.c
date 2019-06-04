@@ -9,6 +9,7 @@
 #include "esp_transport_ws.h"
 #include "platform.h"
 #include "mqtt_outbox.h"
+#include "mqtt_supported_features.h"
 
 /* using uri parser */
 #include "http_parser.h"
@@ -25,6 +26,7 @@
 # define MQTT_API_LOCK_FROM_OTHER_TASK(c)    { if (c->task_handle != xTaskGetCurrentTaskHandle()) { xSemaphoreTake(c->api_lock, portMAX_DELAY); } }
 # define MQTT_API_UNLOCK_FROM_OTHER_TASK(c)  { if (c->task_handle != xTaskGetCurrentTaskHandle()) { xSemaphoreGive(c->api_lock); } }
 #endif /* MQTT_USE_API_LOCKS */
+
 
 static const char *TAG = "MQTT_CLIENT";
 
@@ -368,6 +370,9 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     esp_transport_handle_t ws = esp_transport_ws_init(tcp);
     ESP_MEM_CHECK(TAG, ws, goto _mqtt_init_failed);
     esp_transport_set_default_port(ws, MQTT_WS_DEFAULT_PORT);
+#ifdef MQTT_SUPPORTED_FEATURE_WS_SUBPROTOCOL
+    esp_transport_ws_set_subprotocol(ws, "mqtt");
+#endif
     esp_transport_list_add(client->transport_list, ws, "ws");
     if (config->transport == MQTT_TRANSPORT_OVER_WS) {
         client->config->scheme = create_string("ws", 2);
@@ -398,6 +403,9 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
 #if MQTT_ENABLE_WSS
     esp_transport_handle_t wss = esp_transport_ws_init(ssl);
     ESP_MEM_CHECK(TAG, wss, goto _mqtt_init_failed);
+#ifdef MQTT_SUPPORTED_FEATURE_WS_SUBPROTOCOL
+    esp_transport_ws_set_subprotocol(wss, "mqtt");
+#endif
     esp_transport_set_default_port(wss, MQTT_WSS_DEFAULT_PORT);
     esp_transport_list_add(client->transport_list, wss, "wss");
     if (config->transport == MQTT_TRANSPORT_OVER_WSS) {
