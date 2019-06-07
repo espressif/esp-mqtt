@@ -30,11 +30,13 @@
 
 static const char *TAG = "MQTT_CLIENT";
 
+#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
 /**
  * @brief Define of MQTT Event base
  *
  */
 ESP_EVENT_DEFINE_BASE(MQTT_EVENTS);
+#endif
 
 typedef struct mqtt_state
 {
@@ -55,7 +57,9 @@ typedef struct mqtt_state
 
 typedef struct {
     mqtt_event_callback_t event_handle;
+#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
     esp_event_loop_handle_t event_loop_handle;
+#endif
     int task_stack;
     int task_prio;
     char *uri;
@@ -226,11 +230,13 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     if (config->event_handle) {
         cfg->event_handle = config->event_handle;
     } else {
+#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
         esp_event_loop_args_t no_task_loop = {
             .queue_size = 1,
             .task_name = NULL,
         };
         esp_event_loop_create(&no_task_loop, &cfg->event_loop_handle);
+#endif
     }
 
     if (config->refresh_connection_after_ms) {
@@ -564,8 +570,12 @@ static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
     if (client->config->event_handle) {
         return client->config->event_handle(&client->event);
     } else {
+#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
         esp_event_post_to(client->config->event_loop_handle, MQTT_EVENTS, client->event.event_id, &client->event, sizeof(client->event), portMAX_DELAY);
         return esp_event_loop_run(client->config->event_loop_handle, 0);
+#else
+        return ESP_FAIL;
+#endif
     }
 }
 
@@ -1319,10 +1329,15 @@ esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mq
     if (client == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
+#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
     if (client->config->event_handle) {
         ESP_LOGW(TAG, "Registering event loop while event callback is not null, clearing callback");
         client->config->event_handle = NULL;
     }
 
     return esp_event_handler_register_with(client->config->event_loop_handle, MQTT_EVENTS, event, event_handler, event_handler_arg);
+#else
+    ESP_LOGE(TAG, "Registering event handler while event loop not available in IDF version %s", IDF_VER);
+    return ESP_FAIL;
+#endif
 }

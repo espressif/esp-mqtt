@@ -19,6 +19,12 @@
 extern "C" {
 #endif
 
+#ifndef ESP_EVENT_DECLARE_BASE
+// Define event loop types if macros not available
+typedef void * esp_event_loop_handle_t;
+typedef void * esp_event_handler_t;
+#endif
+
 typedef struct esp_mqtt_client *esp_mqtt_client_handle_t;
 
 /**

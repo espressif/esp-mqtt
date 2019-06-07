@@ -27,10 +27,15 @@
  */
 
 #ifdef ESP_IDF_VERSION
+
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(3, 3, 0)
+// Features supported from 3.3
+#define MQTT_SUPPORTED_FEATURE_EVENT_LOOP
+#endif
+
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 0, 0)
-
+// Features supported in 4.0
 #define MQTT_SUPPORTED_FEATURE_WS_SUBPROTOCOL
-
 #endif
 #endif
 

@@ -152,7 +152,6 @@ int outbox_delete_expired(outbox_handle_t outbox, int current_tick, int timeout)
     STAILQ_FOREACH_SAFE(item, outbox, next, tmp) {
         if (current_tick - item->tick > timeout) {
             STAILQ_REMOVE(outbox, item, outbox_item, next);
-            printf("free message\n");
             free(item->buffer);
             free(item);
             deleted_items ++;
@@ -167,7 +166,9 @@ int outbox_get_size(outbox_handle_t outbox)
     int siz = 0;
     outbox_item_handle_t item;
     STAILQ_FOREACH(item, outbox, next) {
-        siz += item->len;
+        // Suppressing "use after free" warning as this could happen only if queue is in inconsistent state
+        // which never happens if STAILQ interface used
+        siz += item->len; // NOLINT(clang-analyzer-unix.Malloc)
     }
     return siz;
 }
