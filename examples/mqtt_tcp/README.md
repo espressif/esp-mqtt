@@ -1,1 +1,0 @@
-# ESPMQTT Sample application

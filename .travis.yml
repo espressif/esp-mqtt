@@ -13,6 +13,11 @@ addons:
 before_install:
   # Save path to the git respository
   - PROJECT_PATH=$(pwd)
+  # Have to checkout a temp branch for later in tree reference
+  - git checkout -b temporary_ref_branch
+  - CI_COMMIT_SHA=$(git rev-parse HEAD)
+  # Test building with latest (stable == v3.3 for now) IDF
+  - LATEST_IDF=release/v3.3
 
 install:
   # Install ESP32 toochain following steps as desribed
@@ -24,32 +29,37 @@ install:
   - mkdir -p ~/esp
   - cd ~/esp
   # Download binary toolchain for the ESP32
-  - wget https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-61-gab8375a-5.2.0.tar.gz
-  - tar -xzf xtensa-esp32-elf-linux64-1.22.0-61-gab8375a-5.2.0.tar.gz
-  # Make xtensa-esp32-elf available for all terminal sessions
-  - export PATH=$PATH:$HOME/esp/xtensa-esp32-elf/bin
-  # Get ESP-IDF from github
-  - git clone --recursive https://github.com/espressif/esp-idf.git
-  - cd esp-idf && git checkout --recurse-submodules v3.1
+  - wget https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-80-g6c4433a-5.2.0.tar.gz
+  - tar -xzf xtensa-esp32-elf-linux64-1.22.0-80-g6c4433a-5.2.0.tar.gz
+  # Get ESP-IDF from github (non-recursive to save time, later we update submodules for different versions)
+  - git clone https://github.com/espressif/esp-idf.git
   # Set the path to ESP-IDF directory
   - export IDF_PATH=~/esp/esp-idf
+  - python -m pip install --user -r $IDF_PATH/requirements.txt
+  # Setup build tool: xtensa-esp32-elf and idf.py
+  - export PATH=$PATH:$HOME/esp/xtensa-esp32-elf/bin:$IDF_PATH/tools
 
 script:
-  # Go back to the git repository
-  - cd $PROJECT_PATH/examples/mqtt_tcp
-  # Update configuration so that kconfig doesn't start interactive mode
-  - make defconfig
-  # Build project from the git repository
-  - make -j4
-  - cd $PROJECT_PATH/examples/mqtt_ssl
-  - make defconfig
-  - make -j4
-  - cd $PROJECT_PATH/examples/mqtt_ws
+  # Legacy build with IDF < 3.2
+  - cd $IDF_PATH
+  - git checkout v3.1 && git submodule update --init --recursive
+  - cd $PROJECT_PATH
+  - ./modify_for_legacy_idf.sh ${LATEST_IDF} || true
+  - cd $PROJECT_PATH/examples/tcp
   - make defconfig
   - make -j4
-  - cd $PROJECT_PATH/examples/mqtt_wss
-  - make defconfig
-  - make -j4
-  - cd $PROJECT_PATH/examples/emitter-client
-  - make defconfig
-  - make -j4
+  # Build with latest IDF
+  - cd $IDF_PATH
+  - git checkout ${LATEST_IDF} && git submodule update --init --recursive
+  - cd $IDF_PATH/components/mqtt/esp-mqtt
+  - git remote add local $PROJECT_PATH/.git
+  - git fetch local
+  - git reset --hard $CI_COMMIT_SHA
+  - cd $IDF_PATH/examples/protocols/mqtt/tcp
+  - idf.py build
+  - cd $IDF_PATH/examples/protocols/mqtt/ssl
+  - idf.py build
+  - cd $IDF_PATH/examples/protocols/mqtt/ws
+  - idf.py build
+  - cd $IDF_PATH/examples/protocols/mqtt/wss
+  - idf.py build
