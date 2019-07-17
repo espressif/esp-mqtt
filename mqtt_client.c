@@ -993,6 +993,11 @@ static void esp_mqtt_task(void *pv)
                                       client->config->port,
                                       client->config->network_timeout_ms) < 0) {
                 ESP_LOGE(TAG, "Error transport connect");
+                client->event.event_id = MQTT_EVENT_ERROR;
+#ifdef MQTT_SUPPORTED_FEATURE_TRANSPORT_ERR_REPORTING
+                client->event.error_handle = esp_transport_get_error_handle(client->transport);
+#endif
+                esp_mqtt_dispatch_event_with_msgid(client);
                 esp_mqtt_abort_connection(client);
                 break;
             }
