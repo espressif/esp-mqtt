@@ -118,6 +118,7 @@ typedef struct {
     const char *client_key_pem;             /*!< Pointer to private key data in PEM format for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_cert_pem` has to be provided. */
     esp_mqtt_transport_t transport;         /*!< overrides URI transport */
     int refresh_connection_after_ms;        /*!< Refresh connection after this value (in milliseconds) */
+    const struct psk_key_hint* psk_hint_key;     /*!< Pointer to PSK struct defined in esp_tls.h to enable PSK authentication (as alternative to certificate verification). If not NULL and server/client certificates are NULL, PSK is enabled */
 } esp_mqtt_client_config_t;
 
 /**
