@@ -1168,7 +1168,9 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
         }
 
         client->run = false;
+		MQTT_API_UNLOCK_FROM_OTHER_TASK(client);
         xEventGroupWaitBits(client->status_bits, STOPPED_BIT, false, true, portMAX_DELAY);
+		MQTT_API_LOCK_FROM_OTHER_TASK(client);
         client->state = MQTT_STATE_UNKNOWN;
         MQTT_API_UNLOCK_FROM_OTHER_TASK(client);
         return ESP_OK;
