@@ -13,7 +13,6 @@
 
 /* using uri parser */
 #include "http_parser.h"
-#include "esp_event_loop.h"
 
 #ifdef MQTT_DISABLE_API_LOCKS
 # define MQTT_API_LOCK(c)
