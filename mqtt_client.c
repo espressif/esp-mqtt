@@ -31,7 +31,7 @@
     { if (key) { if (len) { setfn##_der(ssl, key, len); } else { setfn(ssl, key, strlen(key)); } } }
 #else
 # define MQTT_TRANSPORT_SET_CERT_OR_KEY(setfn, key, len) \
-	{ if (key) { setfn(ssl, key, strlen(key)); } }
+    { if (key) { setfn(ssl, key, strlen(key)); } }
 #endif
 
 static const char *TAG = "MQTT_CLIENT";
@@ -403,12 +403,16 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
 
 #ifndef MQTT_SUPPORTED_FEATURE_DER_CERTIFICATES
     if (config->cert_len || config->client_cert_len || config->client_key_len) {
-	    ESP_LOGE(TAG, "Explicit cert-/key-len is not available in IDF version %s", IDF_VER);
-	    goto _mqtt_init_failed;
+        ESP_LOGE(TAG, "Explicit cert-/key-len is not available in IDF version %s", IDF_VER);
+        goto _mqtt_init_failed;
     }
 #endif
 
-    MQTT_TRANSPORT_SET_CERT_OR_KEY(esp_transport_ssl_set_cert_data, config->cert_pem, config->cert_len);
+    if (config->use_global_ca_store == true) {
+        esp_transport_ssl_enable_global_ca_store(ssl);
+    } else if (config->cert_pem) {
+        MQTT_TRANSPORT_SET_CERT_OR_KEY(esp_transport_ssl_set_cert_data, config->cert_pem, config->cert_len);
+    }
     MQTT_TRANSPORT_SET_CERT_OR_KEY(esp_transport_ssl_set_client_cert_data, config->client_cert_pem, config->client_cert_len);
     MQTT_TRANSPORT_SET_CERT_OR_KEY(esp_transport_ssl_set_client_key_data, config->client_key_pem, config->client_key_len);
 

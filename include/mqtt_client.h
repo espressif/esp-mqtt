@@ -122,6 +122,7 @@ typedef struct {
     esp_mqtt_transport_t transport;         /*!< overrides URI transport */
     int refresh_connection_after_ms;        /*!< Refresh connection after this value (in milliseconds) */
     const struct psk_key_hint* psk_hint_key;     /*!< Pointer to PSK struct defined in esp_tls.h to enable PSK authentication (as alternative to certificate verification). If not NULL and server/client certificates are NULL, PSK is enabled */
+    bool          use_global_ca_store;      /*!< Use a global ca_store for all the connections in which this bool is set. */
 } esp_mqtt_client_config_t;
 
 /**
