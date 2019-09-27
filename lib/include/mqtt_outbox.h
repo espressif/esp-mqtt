@@ -30,6 +30,7 @@ typedef struct outbox_message {
 typedef enum pending_state {
     QUEUED,
     TRANSMITTED,
+    ACKNOWLEDGED,
     CONFIRMED
 } pending_state_t;
 
