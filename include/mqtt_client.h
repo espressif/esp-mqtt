@@ -225,8 +225,8 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
  * @param qos       qos of publish message
  * @param retain    ratain flag
  *
- * @return message_id of the subscribe message on success
- *         0 if cannot publish
+ * @return message_id of the publish message (for QoS 0 message_id will always be zero) on success.
+ *         -1 on failure.
  */
 int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain);
 
