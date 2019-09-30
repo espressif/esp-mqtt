@@ -131,6 +131,16 @@ esp_err_t outbox_set_pending(outbox_handle_t outbox, int msg_id, pending_state_t
     return ESP_FAIL;
 }
 
+esp_err_t outbox_set_tick(outbox_handle_t outbox, int msg_id, int tick)
+{
+    outbox_item_handle_t item = outbox_get(outbox, msg_id);
+    if (item) {
+        item->tick = tick;
+        return ESP_OK;
+    }
+    return ESP_FAIL; 
+}
+
 esp_err_t outbox_delete_msgtype(outbox_handle_t outbox, int msg_type)
 {
     outbox_item_handle_t item, tmp;

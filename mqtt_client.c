@@ -1355,7 +1355,9 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         }
     }
 
-    if (qos > 0) {
+    if (qos > 0) {        
+        //Tick is set after transmit to avoid retransmitting too early due slow network speed / big messages
+        outbox_set_tick(client->outbox, pending_msg_id, platform_tick_get_ms());
         outbox_set_pending(client->outbox, pending_msg_id, TRANSMITTED);
     }
     MQTT_API_UNLOCK_FROM_OTHER_TASK(client);
