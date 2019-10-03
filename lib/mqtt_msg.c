@@ -430,6 +430,10 @@ mqtt_message_t *mqtt_msg_publish(mqtt_connection_t *connection, const char *topi
         return fail_message(connection);
     }
 
+    if (data == NULL && data_length > 0) {
+       return fail_message(connection);
+    }
+
     if (qos > 0) {
         if ((*message_id = append_message_id(connection, 0)) == 0) {
             return fail_message(connection);
@@ -445,8 +449,11 @@ mqtt_message_t *mqtt_msg_publish(mqtt_connection_t *connection, const char *topi
         connection->message.length = connection->buffer_length;
         connection->message.fragmented_msg_total_length = data_length + connection->message.fragmented_msg_data_offset;
     } else {
-        memcpy(connection->buffer + connection->message.length, data, data_length);
-        connection->message.length += data_length;
+        if (data != NULL)
+        {
+            memcpy(connection->buffer + connection->message.length, data, data_length);
+            connection->message.length += data_length;
+        }
         connection->message.fragmented_msg_total_length = 0;
     }
     return fini_message(connection, MQTT_MSG_TYPE_PUBLISH, 0, qos, retain);
