@@ -45,6 +45,7 @@ esp_err_t outbox_delete_msgtype(outbox_handle_t outbox, int msg_type);
 int outbox_delete_expired(outbox_handle_t outbox, int current_tick, int timeout);
 
 esp_err_t outbox_set_pending(outbox_handle_t outbox, int msg_id, pending_state_t pending);
+esp_err_t outbox_set_tick(outbox_handle_t outbox, int msg_id, int tick);
 int outbox_get_size(outbox_handle_t outbox);
 esp_err_t outbox_cleanup(outbox_handle_t outbox, int max_size);
 void outbox_destroy(outbox_handle_t outbox);
