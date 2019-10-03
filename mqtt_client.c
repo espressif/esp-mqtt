@@ -573,6 +573,11 @@ static esp_err_t mqtt_write_data(esp_mqtt_client_handle_t client)
                                         client->config->network_timeout_ms);
     // client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
     if (write_len <= 0) {
+        client->event.event_id = MQTT_EVENT_ERROR;
+#ifdef MQTT_SUPPORTED_FEATURE_TRANSPORT_ERR_REPORTING
+        client->event.error_handle = esp_transport_get_error_handle(client->transport);
+#endif
+        esp_mqtt_dispatch_event_with_msgid(client);
         ESP_LOGE(TAG, "Error write data or timeout, written len = %d, errno=%d", write_len, errno);
         return ESP_FAIL;
     }
