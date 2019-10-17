@@ -37,7 +37,7 @@ typedef struct esp_mqtt_client *esp_mqtt_client_handle_t;
  *
  */
 typedef enum {
-    MQTT_EVENT_ERROR = 0,
+    MQTT_EVENT_ERROR = 0,          /*!< on error event, additional context: connection return code, error handle from esp_tls (if supported) */
     MQTT_EVENT_CONNECTED,          /*!< connected event, additional context: session_present flag */
     MQTT_EVENT_DISCONNECTED,       /*!< disconnected event */
     MQTT_EVENT_SUBSCRIBED,         /*!< subscribed event, additional context: msg_id */
@@ -59,6 +59,27 @@ typedef enum {
     MQTT_EVENT_BEFORE_CONNECT,     /*!< The event occurs before connecting */
 } esp_mqtt_event_id_t;
 
+/**
+ * MQTT connection error codes propagated via ERROR event
+ */
+typedef enum {
+    MQTT_CONNECTION_ACCEPTED = 0,                   /*!< Connection accepted  */
+    MQTT_CONNECTION_REFUSE_PROTOCOL,                /*!< MQTT connection refused reason: Wrong protocol */
+    MQTT_CONNECTION_REFUSE_ID_REJECTED,             /*!< MQTT connection refused reason: ID rejected */
+    MQTT_CONNECTION_REFUSE_SERVER_UNAVAILABLE,      /*!< MQTT connection refused reason: Server unavailable */
+    MQTT_CONNECTION_REFUSE_BAD_USERNAME,            /*!< MQTT connection refused reason: Wrong user */
+    MQTT_CONNECTION_REFUSE_NOT_AUTHORIZED           /*!< MQTT connection refused reason: Wrong username or password */
+} esp_mqtt_connect_return_code_t;
+
+/**
+ * MQTT connection error codes propagated via ERROR event
+ */
+typedef enum {
+    MQTT_ERROR_TYPE_NONE = 0,
+    MQTT_ERROR_TYPE_ESP_TLS,
+    MQTT_ERROR_TYPE_CONNECTION_REFUSED,
+} esp_mqtt_error_type_t;
+
 typedef enum {
     MQTT_TRANSPORT_UNKNOWN = 0x0,
     MQTT_TRANSPORT_OVER_TCP,      /*!< MQTT over TCP, using scheme: ``mqtt`` */
@@ -68,21 +89,43 @@ typedef enum {
 } esp_mqtt_transport_t;
 
 /**
+ * @brief MQTT error code structure to be passed as a contextual information into ERROR event
+ *
+ * Important: This structure extends `esp_tls_last_error` error structure and is backward compatible with it
+ * (so might be down-casted and treated as `esp_tls_last_error` error, but recommended to update applications if used this way previously)
+ *
+ * Use this structure directly checking error_type first and then appropriate error code depending on the source of the error:
+ *
+ * | error_type | related member variables | note |
+ * | MQTT_ERROR_TYPE_ESP_TLS | esp_tls_last_esp_err, esp_tls_stack_err, esp_tls_cert_verify_flags | Error reported from esp-tls |
+ * | MQTT_ERROR_TYPE_CONNECTION_REFUSED | connect_return_code | Internal error reported from MQTT broker on connection |
+ */
+typedef struct esp_mqtt_error_codes {
+    /* compatible portion of the struct corresponding to struct esp_tls_last_error */
+    esp_err_t esp_tls_last_esp_err;              /*!< last esp_err code reported from esp-tls component */
+    int       esp_tls_stack_err;                 /*!< tls specific error code reported from underlying tls stack */
+    int       esp_tls_cert_verify_flags;         /*!< tls flags reported from underlying tls stack during certificate verification */
+    /* esp-mqtt specific structure extension */
+    esp_mqtt_error_type_t error_type;            /*!< error type referring to the source of the error */
+    esp_mqtt_connect_return_code_t connect_return_code; /*!< connection refused error code reported from MQTT broker on connection */
+} esp_mqtt_error_codes_t;
+
+/**
  * MQTT event configuration structure
  */
 typedef struct {
     esp_mqtt_event_id_t event_id;       /*!< MQTT event type */
     esp_mqtt_client_handle_t client;    /*!< MQTT client handle for this event */
     void *user_context;                 /*!< User context passed from MQTT client config */
-    char *data;                         /*!< Data asociated with this event */
-    int data_len;                       /*!< Lenght of the data for this event */
+    char *data;                         /*!< Data associated with this event */
+    int data_len;                       /*!< Length of the data for this event */
     int total_data_len;                 /*!< Total length of the data (longer data are supplied with multiple events) */
-    int current_data_offset;            /*!< Actual offset for the data asociated with this event */
-    char *topic;                        /*!< Topic asociated with this event */
-    int topic_len;                      /*!< Length of the topic for this event asociated with this event */
+    int current_data_offset;            /*!< Actual offset for the data associated with this event */
+    char *topic;                        /*!< Topic associated with this event */
+    int topic_len;                      /*!< Length of the topic for this event associated with this event */
     int msg_id;                         /*!< MQTT messaged id of message */
     int session_present;                /*!< MQTT session_present flag for connection event */
-    void* error_handle;                 /*!< esp-tls error handle referencing last error/flags captured in transports */
+    esp_mqtt_error_codes_t *error_handle; /*!< esp-mqtt error handle including esp-tls errors as well as internal mqtt errors */
 } esp_mqtt_event_t;
 
 typedef esp_mqtt_event_t *esp_mqtt_event_handle_t;
@@ -138,7 +181,7 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
  * @brief Sets mqtt connection URI. This API is usually used to overrides the URI
  * configured in esp_mqtt_client_init
  *
- * @param client    mqtt client hanlde
+ * @param client    mqtt client handle
  * @param uri
  *
  * @return ESP_FAIL if URI parse error, ESP_OK on success
@@ -223,7 +266,7 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
  * @param data      payload string (set to NULL, sending empty payload message)
  * @param len       data length, if set to 0, length is calculated from payload string
  * @param qos       qos of publish message
- * @param retain    ratain flag
+ * @param retain    retain flag
  *
  * @return message_id of the publish message (for QoS 0 message_id will always be zero) on success.
  *         -1 on failure.
@@ -256,7 +299,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
  *
  * @param client            mqtt client handle
  * @param event             event type
- * @param event_handler     hanlder callback
+ * @param event_handler     handler callback
  * @param event_handler_arg handlers context
  *
  * @return ESP_ERR_NO_MEM if failed to allocate

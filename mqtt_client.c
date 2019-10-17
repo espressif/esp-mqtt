@@ -317,27 +317,37 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
     }
     client->mqtt_state.in_buffer_read_len = 0;
     connect_rsp_code = mqtt_get_connect_return_code(client->mqtt_state.in_buffer);
-    switch (connect_rsp_code) {
-    case CONNECTION_ACCEPTED:
+    if (connect_rsp_code == MQTT_CONNECTION_ACCEPTED) {
         ESP_LOGD(TAG, "Connected");
         return ESP_OK;
-    case CONNECTION_REFUSE_PROTOCOL:
+    }
+    switch (connect_rsp_code) {
+    case MQTT_CONNECTION_REFUSE_PROTOCOL:
         ESP_LOGW(TAG, "Connection refused, bad protocol");
-        return ESP_FAIL;
-    case CONNECTION_REFUSE_SERVER_UNAVAILABLE:
+        break;
+    case MQTT_CONNECTION_REFUSE_SERVER_UNAVAILABLE:
         ESP_LOGW(TAG, "Connection refused, server unavailable");
-        return ESP_FAIL;
-    case CONNECTION_REFUSE_BAD_USERNAME:
+        break;
+    case MQTT_CONNECTION_REFUSE_BAD_USERNAME:
         ESP_LOGW(TAG, "Connection refused, bad username or password");
-        return ESP_FAIL;
-    case CONNECTION_REFUSE_NOT_AUTHORIZED:
+        break;
+    case MQTT_CONNECTION_REFUSE_NOT_AUTHORIZED:
         ESP_LOGW(TAG, "Connection refused, not authorized");
-        return ESP_FAIL;
+        break;
     default:
         ESP_LOGW(TAG, "Connection refused, Unknow reason");
-        return ESP_FAIL;
+        break;
     }
-    return ESP_OK;
+    /* propagate event with connection refused error */
+    client->event.event_id = MQTT_EVENT_ERROR;
+    client->event.error_handle->error_type = MQTT_ERROR_TYPE_CONNECTION_REFUSED;
+    client->event.error_handle->connect_return_code = connect_rsp_code;
+    client->event.error_handle->esp_tls_stack_err = 0;
+    client->event.error_handle->esp_tls_last_esp_err = 0;
+    client->event.error_handle->esp_tls_cert_verify_flags = 0;
+    esp_mqtt_dispatch_event_with_msgid(client);
+
+    return ESP_FAIL;
 }
 
 static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
@@ -357,6 +367,11 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
 {
     esp_mqtt_client_handle_t client = calloc(1, sizeof(struct esp_mqtt_client));
     ESP_MEM_CHECK(TAG, client, return NULL);
+    client->event.error_handle = calloc(1, sizeof(esp_mqtt_error_codes_t));
+    if (!client->event.error_handle) {
+        free(client);
+        return NULL;
+    }
     client->api_lock = xSemaphoreCreateMutex();
     if (!client->api_lock) {
         free(client);
@@ -496,6 +511,7 @@ esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client)
     free(client->mqtt_state.in_buffer);
     free(client->mqtt_state.out_buffer);
     vSemaphoreDelete(client->api_lock);
+    free(client->event.error_handle);
     free(client);
     return ESP_OK;
 }
@@ -574,8 +590,12 @@ static esp_err_t mqtt_write_data(esp_mqtt_client_handle_t client)
     // client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
     if (write_len <= 0) {
         client->event.event_id = MQTT_EVENT_ERROR;
+        client->event.error_handle->error_type = MQTT_ERROR_TYPE_ESP_TLS;
+        client->event.error_handle->connect_return_code = 0;
 #ifdef MQTT_SUPPORTED_FEATURE_TRANSPORT_ERR_REPORTING
-        client->event.error_handle = esp_transport_get_error_handle(client->transport);
+        client->event.error_handle->esp_tls_last_esp_err = esp_tls_get_and_clear_last_error(esp_transport_get_error_handle(client->transport),
+                                                                                            &client->event.error_handle->esp_tls_stack_err,
+                                                                                            &client->event.error_handle->esp_tls_cert_verify_flags);
 #endif
         esp_mqtt_dispatch_event_with_msgid(client);
         ESP_LOGE(TAG, "Error write data or timeout, written len = %d, errno=%d", write_len, errno);
@@ -970,7 +990,7 @@ static esp_err_t mqtt_resend_queued(esp_mqtt_client_handle_t client, outbox_item
 
     // try to resend the data
     if (mqtt_write_data(client) != ESP_OK) {
-        ESP_LOGE(TAG, "Error to public data ");
+        ESP_LOGE(TAG, "Error to resend data ");
         esp_mqtt_abort_connection(client);
         return ESP_FAIL;
     }
@@ -1007,7 +1027,7 @@ static void esp_mqtt_task(void *pv)
             esp_mqtt_dispatch_event_with_msgid(client);
 
             if (client->transport == NULL) {
-                ESP_LOGE(TAG, "There are no transport");
+                ESP_LOGE(TAG, "There is no transport");
                 client->run = false;
             }
 
@@ -1017,8 +1037,12 @@ static void esp_mqtt_task(void *pv)
                                       client->config->network_timeout_ms) < 0) {
                 ESP_LOGE(TAG, "Error transport connect");
                 client->event.event_id = MQTT_EVENT_ERROR;
+                client->event.error_handle->error_type = MQTT_ERROR_TYPE_ESP_TLS;
+                client->event.error_handle->connect_return_code = 0;
 #ifdef MQTT_SUPPORTED_FEATURE_TRANSPORT_ERR_REPORTING
-                client->event.error_handle = esp_transport_get_error_handle(client->transport);
+                client->event.error_handle->esp_tls_last_esp_err = esp_tls_get_and_clear_last_error(esp_transport_get_error_handle(client->transport),
+                                                                                                    &client->event.error_handle->esp_tls_stack_err,
+                                                                                                    &client->event.error_handle->esp_tls_cert_verify_flags);
 #endif
                 esp_mqtt_dispatch_event_with_msgid(client);
                 esp_mqtt_abort_connection(client);
@@ -1084,7 +1108,7 @@ static void esp_mqtt_task(void *pv)
                 client->state = MQTT_STATE_INIT;
             }
 
-            //Delete mesaage after 30 senconds
+            //Delete message after 30 seconds
             int deleted = outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
             client->mqtt_state.pending_msg_count -= deleted;
             if (client->mqtt_state.pending_msg_count < 0) {
@@ -1109,7 +1133,7 @@ static void esp_mqtt_task(void *pv)
             MQTT_API_UNLOCK(client);
             xEventGroupWaitBits(client->status_bits, RECONNECT_BIT, false, true,
                                 client->wait_timeout_ms / 2 / portTICK_RATE_MS);
-            // continue the while loop insted of break, as the mutex is unlocked
+            // continue the while loop instead of break, as the mutex is unlocked
             continue;
         }
         MQTT_API_UNLOCK(client);
@@ -1365,7 +1389,7 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
 
 cannot_publish:
     if (qos == 0) {
-        ESP_LOGW(TAG, "Publish: Loosing qos0 data when client not connected");
+        ESP_LOGW(TAG, "Publish: Losing qos0 data when client not connected");
     }
     MQTT_API_UNLOCK_FROM_OTHER_TASK(client);
     return 0;
