@@ -78,6 +78,8 @@ typedef struct {
     int network_timeout_ms;
     int refresh_connection_after_ms;
     int reconnect_timeout_ms;
+    char **alpn_protos;
+    int num_alpn_protos;
 } mqtt_config_storage_t;
 
 typedef enum {
@@ -253,6 +255,28 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
         cfg->reconnect_timeout_ms = MQTT_RECON_DEFAULT_MS;
     }
 
+    if(config->alpn_protos) {
+        for (int i = 0; i < cfg->num_alpn_protos; i++) {
+            free(cfg->alpn_protos[i]);
+        }
+        free(cfg->alpn_protos);
+        cfg->num_alpn_protos = 0;
+
+        const char **p;
+
+        for (p = config->alpn_protos; *p != NULL; p++ ) {
+            cfg->num_alpn_protos++;
+        }
+        // mbedTLS expects the list to be null-terminated
+        cfg->alpn_protos = calloc(cfg->num_alpn_protos + 1, sizeof(config->alpn_protos));
+        ESP_MEM_CHECK(TAG, cfg->alpn_protos, goto _mqtt_set_config_failed);
+
+        for (int i = 0; i < cfg->num_alpn_protos; i++) {
+            cfg->alpn_protos[i] = strdup(config->alpn_protos[i]);
+            ESP_MEM_CHECK(TAG, cfg->alpn_protos[i], goto _mqtt_set_config_failed);
+        }
+    }
+
     MQTT_API_UNLOCK_FROM_OTHER_TASK(client);
     return ESP_OK;
 _mqtt_set_config_failed:
@@ -268,6 +292,10 @@ static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
     free(cfg->uri);
     free(cfg->path);
     free(cfg->scheme);
+    for (int i = 0; i < cfg->num_alpn_protos; i++) {
+            free(cfg->alpn_protos[i]);
+    }
+    free(cfg->alpn_protos);
     memset(cfg, 0, sizeof(mqtt_config_storage_t));
     free(client->connect_info.will_topic);
     free(client->connect_info.will_message);
@@ -447,6 +475,16 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
         goto _mqtt_init_failed;
 #endif
     }
+
+    if (client->config->alpn_protos) {
+#ifdef MQTT_SUPPORTED_FEATURE_ALPN
+        esp_transport_ssl_set_alpn_protocol(ssl, (const char **)client->config->alpn_protos);
+#else
+        ESP_LOGE(TAG, "APLN is not available in IDF version %s", IDF_VER);
+        goto _mqtt_init_failed;
+#endif
+    }
+
     esp_transport_list_add(client->transport_list, ssl, "mqtts");
     if (config->transport == MQTT_TRANSPORT_OVER_SSL) {
         client->config->scheme = create_string("mqtts", 5);

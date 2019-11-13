@@ -167,6 +167,7 @@ typedef struct {
     const struct psk_key_hint* psk_hint_key;     /*!< Pointer to PSK struct defined in esp_tls.h to enable PSK authentication (as alternative to certificate verification). If not NULL and server/client certificates are NULL, PSK is enabled */
     bool          use_global_ca_store;      /*!< Use a global ca_store for all the connections in which this bool is set. */
     int reconnect_timeout_ms;               /*!< Reconnect to the broker after this value in miliseconds if auto reconnect is not disabled */
+    const char **alpn_protos;               /*!< NULL-terminated list of supported application protocols to be used for ALPN */
 } esp_mqtt_client_config_t;
 
 /**
