@@ -77,6 +77,7 @@ typedef struct {
     void *user_context;
     int network_timeout_ms;
     int refresh_connection_after_ms;
+    int reconnect_timeout_ms;
 } mqtt_config_storage_t;
 
 typedef enum {
@@ -245,6 +246,13 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     if (config->disable_auto_reconnect == cfg->auto_reconnect) {
         cfg->auto_reconnect = !config->disable_auto_reconnect;
     }
+
+    if (config->reconnect_timeout_ms) {
+        cfg->reconnect_timeout_ms = config->reconnect_timeout_ms;
+    } else {
+        cfg->reconnect_timeout_ms = MQTT_RECON_DEFAULT_MS;
+    }
+
     MQTT_API_UNLOCK_FROM_OTHER_TASK(client);
     return ESP_OK;
 _mqtt_set_config_failed:
@@ -353,7 +361,7 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
 static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
 {
     esp_transport_close(client->transport);
-    client->wait_timeout_ms = MQTT_RECONNECT_TIMEOUT_MS;
+    client->wait_timeout_ms = client->config->reconnect_timeout_ms;
     client->reconnect_tick = platform_tick_get_ms();
     client->state = MQTT_STATE_WAIT_TIMEOUT;
     ESP_LOGD(TAG, "Reconnect after %d ms", client->wait_timeout_ms);
@@ -1379,7 +1387,7 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         }
     }
 
-    if (qos > 0) {        
+    if (qos > 0) {
         //Tick is set after transmit to avoid retransmitting too early due slow network speed / big messages
         outbox_set_tick(client->outbox, pending_msg_id, platform_tick_get_ms());
         outbox_set_pending(client->outbox, pending_msg_id, TRANSMITTED);
