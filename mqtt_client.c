@@ -412,6 +412,7 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     }
     client->api_lock = xSemaphoreCreateMutex();
     if (!client->api_lock) {
+        free(client->event.error_handle);
         free(client);
         return NULL;
     }
