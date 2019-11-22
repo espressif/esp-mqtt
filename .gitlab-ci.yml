@@ -53,6 +53,7 @@ build_with_idf:
     - cit_add_ssh_key "${GITLAB_KEY}"
     - git clone "${IDF_REPO}"
     - cd esp-idf
+    - tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)" || exit 1
     - ./tools/ci/mirror-submodule-update.sh
     - export IDF_PATH=$(pwd)
     - cd $IDF_PATH/components/mqtt/esp-mqtt
