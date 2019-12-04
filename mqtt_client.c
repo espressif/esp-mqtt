@@ -296,7 +296,6 @@ static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
             free(cfg->alpn_protos[i]);
     }
     free(cfg->alpn_protos);
-    memset(cfg, 0, sizeof(mqtt_config_storage_t));
     free(client->connect_info.will_topic);
     free(client->connect_info.will_message);
     free(client->connect_info.client_id);
@@ -308,6 +307,7 @@ static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
         esp_event_loop_delete(client->config->event_loop_handle);
     }
 #endif
+    memset(cfg, 0, sizeof(mqtt_config_storage_t));
     free(client->config);
     return ESP_OK;
 }
