@@ -75,6 +75,34 @@ build_with_idf:
     - cd $IDF_PATH/examples/protocols/mqtt/ws && idf.py build
     - cd $IDF_PATH/examples/protocols/mqtt/wss && idf.py build
 
+build_and_test_qemu:
+  stage: build
+  image: ${CI_DOCKER_REGISTRY}/qemu:esp-develop-20191124
+  tags:
+    - build
+    - shiny
+  dependencies: []
+  script:
+    - cit_add_ssh_key "${GITLAB_KEY}"
+    - git clone "${IDF_REPO}"
+    - cd esp-idf
+    - tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)" || exit 1
+    - ./tools/ci/mirror-submodule-update.sh
+    - export IDF_PATH=$(pwd)
+    - cd $IDF_PATH/components/mqtt/esp-mqtt
+    - rm -rf .git
+    - cp -r $CI_PROJECT_DIR/.git .
+    - git reset --hard $CI_COMMIT_SHA
+    # build publish stress test
+    - cd $IDF_PATH/examples/protocols/mqtt/publish_test && cat sdkconfig.qemu | $IDF_PATH/tools/ci/envsubst.py >> sdkconfig.defaults && idf.py build
+    - source /opt/pyenv/activate && pyenv global 2.7.15 && python --version
+    # setup runner params
+    - export PYTHONPATH="$IDF_PATH/tools:$IDF_PATH/tools/ci/python_packages"
+    - export TEST_CASE_PATH=$IDF_PATH/components/mqtt/weekend_test
+    - cd $IDF_PATH/tools/ci/python_packages/tiny_test_fw/bin
+    # run test (with environment->qemu)
+    - python Runner.py $TEST_CASE_PATH -c $TEST_CASE_PATH/test_weekend_mqtt_qemu.yml -e $TEST_CASE_PATH/env.yml
+
 clang_tidy_check:
   stage: static_analysis
   image: ${CI_DOCKER_REGISTRY}/clang-static-analysis
@@ -109,6 +137,7 @@ deploy_report:
   image: $CI_DOCKER_REGISTRY/esp32-ci-env
   tags:
     - deploy
+    - shiny
   dependencies:
     - clang_tidy_check
   script:
