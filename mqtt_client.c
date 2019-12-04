@@ -343,7 +343,11 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
     client->mqtt_state.message_length = 0;
 
     /* wait configured network timeout for broker connection response */
-    read_len = mqtt_message_receive(client, client->config->network_timeout_ms);
+    uint64_t connack_recv_started = platform_tick_get_ms();
+    do {
+        read_len = mqtt_message_receive(client, client->config->network_timeout_ms);
+    } while (read_len == 0 && platform_tick_get_ms() - connack_recv_started < client->config->network_timeout_ms);
+
     if (read_len <= 0) {
         ESP_LOGE(TAG, "%s: mqtt_message_receive() returned %d", __func__, read_len);
         return ESP_FAIL;
