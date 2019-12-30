@@ -80,6 +80,8 @@ typedef struct {
     int reconnect_timeout_ms;
     char **alpn_protos;
     int num_alpn_protos;
+    char *clientkey_password;
+    int clientkey_password_len;
 } mqtt_config_storage_t;
 
 typedef enum {
@@ -277,6 +279,12 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
         }
     }
 
+    if (config->clientkey_password && config->clientkey_password_len) {
+        cfg->clientkey_password_len = config->clientkey_password_len;
+        cfg->clientkey_password = malloc(cfg->clientkey_password_len);
+        memcpy(cfg->clientkey_password, config->clientkey_password, cfg->clientkey_password_len);
+    }
+
     MQTT_API_UNLOCK_FROM_OTHER_TASK(client);
     return ESP_OK;
 _mqtt_set_config_failed:
@@ -296,6 +304,7 @@ static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
             free(cfg->alpn_protos[i]);
     }
     free(cfg->alpn_protos);
+    free(cfg->clientkey_password);
     free(client->connect_info.will_topic);
     free(client->connect_info.will_message);
     free(client->connect_info.client_id);
@@ -473,6 +482,13 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     }
     MQTT_TRANSPORT_SET_CERT_OR_KEY(esp_transport_ssl_set_client_cert_data, config->client_cert_pem, config->client_cert_len);
     MQTT_TRANSPORT_SET_CERT_OR_KEY(esp_transport_ssl_set_client_key_data, config->client_key_pem, config->client_key_len);
+#ifdef MQTT_SUPPORTED_FEATURE_CLIENT_KEY_PASSWORD
+    if (client->config->clientkey_password && client->config->clientkey_password_len) {
+        esp_transport_ssl_set_client_key_password(ssl,
+                                                  client->config->clientkey_password,
+                                                  client->config->clientkey_password_len);
+    }
+#endif
 
     if (config->psk_hint_key) {
 #ifdef MQTT_SUPPORTED_FEATURE_PSK_AUTHENTICATION
