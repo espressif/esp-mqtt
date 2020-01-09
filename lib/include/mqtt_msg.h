@@ -1,6 +1,7 @@
 #ifndef MQTT_MSG_H
 #define MQTT_MSG_H
 #include "mqtt_config.h"
+#include "mqtt_client.h"
 #ifdef  __cplusplus
 extern "C" {
 #endif
@@ -84,6 +85,7 @@ typedef struct mqtt_connect_info {
     int will_qos;
     int will_retain;
     int clean_session;
+    esp_mqtt_protocol_ver_t protocol_ver;
 
 } mqtt_connect_info_t;
 
