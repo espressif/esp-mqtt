@@ -34,6 +34,8 @@
     { if (key) { setfn(ssl, key, strlen(key)); } }
 #endif
 
+_Static_assert(sizeof(uint64_t) == sizeof(outbox_tick_t), "mqtt-client tick type size different from outbox tick type");
+
 static const char *TAG = "MQTT_CLIENT";
 
 #ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
@@ -1100,8 +1102,8 @@ static esp_err_t mqtt_resend_queued(esp_mqtt_client_handle_t client, outbox_item
 static void esp_mqtt_task(void *pv)
 {
     esp_mqtt_client_handle_t client = (esp_mqtt_client_handle_t) pv;
-    uint32_t last_retransmit = 0;
-    int32_t msg_tick = 0;
+    uint64_t last_retransmit = 0;
+    outbox_tick_t msg_tick = 0;
     client->run = true;
 
     //get transport by scheme
