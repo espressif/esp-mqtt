@@ -224,6 +224,15 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client);
 esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client);
 
 /**
+ * @brief This api is typically used to force disconnection from the broker
+ *
+ * @param client    mqtt client handle
+ *
+ * @return ESP_OK on success
+ */
+esp_err_t esp_mqtt_client_disconnect(esp_mqtt_client_handle_t client);
+
+/**
  * @brief Stops mqtt client tasks
  *
  * @param client    mqtt client handle

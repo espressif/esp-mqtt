@@ -26,14 +26,6 @@
 # define MQTT_API_UNLOCK_FROM_OTHER_TASK(c)  { if (c->task_handle != xTaskGetCurrentTaskHandle()) { xSemaphoreGive(c->api_lock); } }
 #endif /* MQTT_USE_API_LOCKS */
 
-#ifdef MQTT_SUPPORTED_FEATURE_DER_CERTIFICATES
-# define MQTT_TRANSPORT_SET_CERT_OR_KEY(setfn, key, len) \
-    { if (key) { if (len) { setfn##_der(ssl, key, len); } else { setfn(ssl, key, strlen(key)); } } }
-#else
-# define MQTT_TRANSPORT_SET_CERT_OR_KEY(setfn, key, len) \
-    { if (key) { setfn(ssl, key, strlen(key)); } }
-#endif
-
 _Static_assert(sizeof(uint64_t) == sizeof(outbox_tick_t), "mqtt-client tick type size different from outbox tick type");
 
 static const char *TAG = "MQTT_CLIENT";
@@ -121,8 +113,18 @@ struct esp_mqtt_client {
     TaskHandle_t       task_handle;
 };
 
+enum esp_mqtt_ssl_cert_key_api {
+    MQTT_SSL_DATA_API_CA_CERT,
+    MQTT_SSL_DATA_API_CA_CERT_PEM,
+    MQTT_SSL_DATA_API_CLIENT_CERT,
+    MQTT_SSL_DATA_API_CLIENT_CERT_PEM,
+    MQTT_SSL_DATA_API_CLIENT_KEY,
+    MQTT_SSL_DATA_API_CLIENT_KEY_PEM,
+};
+
 const static int STOPPED_BIT = BIT0;
 const static int RECONNECT_BIT = BIT1;
+const static int DISCONNECT_BIT = BIT2;
 
 static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_dispatch_event_with_msgid(esp_mqtt_client_handle_t client);
@@ -132,6 +134,58 @@ static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client);
 static char *create_string(const char *ptr, int len);
 static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_timeout_ms);
+
+static inline esp_err_t esp_mqtt_set_cert_key_data(esp_transport_handle_t ssl, enum esp_mqtt_ssl_cert_key_api what, const char *cert_key_data, int cert_key_len)
+{
+    char *data = (char *)cert_key_data;
+    int len = cert_key_len;
+    if (!data) {
+        return ESP_OK;
+    }
+
+    if (len == 0) {
+        what += 1;
+        len = strlen(data);
+    }
+#ifndef MQTT_SUPPORTED_FEATURE_DER_CERTIFICATES
+    else {
+        ESP_LOGE(TAG, "Explicit cert-/key-len is not available in IDF version %s", IDF_VER);
+        return ESP_FAIL;
+    }
+#endif
+
+    // option to force the cert/key config to null (i.e. skip validation) when setting new config
+    if (0 == strcmp(data, "NULL")) {
+        data = NULL;
+        len = 0;
+    }
+
+    switch (what) {
+#ifdef MQTT_SUPPORTED_FEATURE_DER_CERTIFICATES
+        case MQTT_SSL_DATA_API_CA_CERT:
+            esp_transport_ssl_set_cert_data_der(ssl, data, len);
+            break;
+        case MQTT_SSL_DATA_API_CLIENT_CERT:
+            esp_transport_ssl_set_client_cert_data_der(ssl, data, len);
+            break;
+        case MQTT_SSL_DATA_API_CLIENT_KEY:
+            esp_transport_ssl_set_client_key_data_der(ssl, data, len);
+            break;
+#endif
+        case MQTT_SSL_DATA_API_CA_CERT_PEM:
+            esp_transport_ssl_set_cert_data(ssl, data, len);
+            break;
+        case MQTT_SSL_DATA_API_CLIENT_CERT_PEM:
+            esp_transport_ssl_set_client_cert_data(ssl, data, len);
+            break;
+        case MQTT_SSL_DATA_API_CLIENT_KEY_PEM:
+            esp_transport_ssl_set_client_key_data(ssl, data, len);
+            break;
+        default:
+            return ESP_FAIL;
+    }
+    return ESP_OK;
+}
 
 esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_client_config_t *config)
 {
@@ -293,14 +347,72 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
             ESP_MEM_CHECK(TAG, cfg->alpn_protos[i], goto _mqtt_set_config_failed);
         }
     }
+    esp_transport_handle_t ssl = esp_transport_list_get_transport(client->transport_list, "mqtts");
 
     if (config->clientkey_password && config->clientkey_password_len) {
-        cfg->clientkey_password_len = config->clientkey_password_len;
-        cfg->clientkey_password = malloc(cfg->clientkey_password_len);
-        memcpy(cfg->clientkey_password, config->clientkey_password, cfg->clientkey_password_len);
+#ifdef MQTT_SUPPORTED_FEATURE_CLIENT_KEY_PASSWORD
+        esp_transport_ssl_set_client_key_password(ssl,
+                                                  config->clientkey_password,
+                                                  config->clientkey_password_len);
+#else
+        ESP_LOGE(TAG, "Password protected keys are not available in IDF version %s", IDF_VER);
+        goto _mqtt_set_config_failed;
+#endif
     }
 
+    if (config->transport) {
+        free(client->config->scheme);
+        if (config->transport == MQTT_TRANSPORT_OVER_WS) {
+            cfg->scheme = create_string("ws", 2);
+            ESP_MEM_CHECK(TAG, cfg->scheme, goto _mqtt_set_config_failed);
+        } else if (config->transport == MQTT_TRANSPORT_OVER_TCP) {
+            cfg->scheme = create_string("mqtt", 4);
+            ESP_MEM_CHECK(TAG, cfg->scheme, goto _mqtt_set_config_failed);
+        } else if (config->transport == MQTT_TRANSPORT_OVER_SSL) {
+            cfg->scheme = create_string("mqtts", 5);
+            ESP_MEM_CHECK(TAG, cfg->scheme, goto _mqtt_set_config_failed);
+        } else if (config->transport == MQTT_TRANSPORT_OVER_WSS) {
+            cfg->scheme = create_string("wss", 3);
+            ESP_MEM_CHECK(TAG, cfg->scheme, goto _mqtt_set_config_failed);
+        }
+    }
+
+    if (config->use_global_ca_store == true) {
+        esp_transport_ssl_enable_global_ca_store(ssl);
+    } else {
+        esp_mqtt_set_cert_key_data(ssl, MQTT_SSL_DATA_API_CA_CERT, config->cert_pem, config->cert_len);
+    }
+
+    esp_mqtt_set_cert_key_data(ssl, MQTT_SSL_DATA_API_CLIENT_CERT, config->client_cert_pem, config->client_cert_len);
+    esp_mqtt_set_cert_key_data(ssl, MQTT_SSL_DATA_API_CLIENT_KEY, config->client_key_pem, config->client_key_len);
+
+    if (config->psk_hint_key) {
+#ifdef MQTT_SUPPORTED_FEATURE_PSK_AUTHENTICATION
+        esp_transport_ssl_set_psk_key_hint(ssl, config->psk_hint_key);
+#else
+        ESP_LOGE(TAG, "PSK authentication is not available in IDF version %s", IDF_VER);
+        goto _mqtt_set_config_failed;
+#endif
+    }
+
+    if (cfg->alpn_protos) {
+#ifdef MQTT_SUPPORTED_FEATURE_ALPN
+        esp_transport_ssl_set_alpn_protocol(ssl, (const char **)cfg->alpn_protos);
+#else
+        ESP_LOGE(TAG, "APLN is not available in IDF version %s", IDF_VER);
+        goto _mqtt_set_config_failed;
+#endif
+    }
     MQTT_API_UNLOCK_FROM_OTHER_TASK(client);
+
+    // Set uri at the end of config to override separately configured uri elements
+    if (config->uri) {
+        if (esp_mqtt_client_set_uri(client, cfg->uri) != ESP_OK) {
+            esp_mqtt_destroy_config(client);
+            return ESP_FAIL;
+        }
+    }
+
     return ESP_OK;
 _mqtt_set_config_failed:
     esp_mqtt_destroy_config(client);
@@ -444,14 +556,7 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
         free(client);
         return NULL;
     }
-    esp_mqtt_set_config(client, config);
-#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
-    esp_event_loop_args_t no_task_loop = {
-        .queue_size = 1,
-        .task_name = NULL,
-    };
-    esp_event_loop_create(&no_task_loop, &client->config->event_loop_handle);
-#endif
+
     client->transport_list = esp_transport_list_init();
     ESP_MEM_CHECK(TAG, client->transport_list, goto _mqtt_init_failed);
 
@@ -459,10 +564,6 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     ESP_MEM_CHECK(TAG, tcp, goto _mqtt_init_failed);
     esp_transport_set_default_port(tcp, MQTT_TCP_DEFAULT_PORT);
     esp_transport_list_add(client->transport_list, tcp, "mqtt");
-    if (config->transport == MQTT_TRANSPORT_OVER_TCP) {
-        client->config->scheme = create_string("mqtt", 4);
-        ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_init_failed);
-    }
 
 #if MQTT_ENABLE_WS
     esp_transport_handle_t ws = esp_transport_ws_init(tcp);
@@ -472,10 +573,6 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     esp_transport_ws_set_subprotocol(ws, "mqtt");
 #endif
     esp_transport_list_add(client->transport_list, ws, "ws");
-    if (config->transport == MQTT_TRANSPORT_OVER_WS) {
-        client->config->scheme = create_string("ws", 2);
-        ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_init_failed);
-    }
 #endif
 
 #if MQTT_ENABLE_SSL
@@ -483,51 +580,7 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     ESP_MEM_CHECK(TAG, ssl, goto _mqtt_init_failed);
     esp_transport_set_default_port(ssl, MQTT_SSL_DEFAULT_PORT);
 
-#ifndef MQTT_SUPPORTED_FEATURE_DER_CERTIFICATES
-    if (config->cert_len || config->client_cert_len || config->client_key_len) {
-        ESP_LOGE(TAG, "Explicit cert-/key-len is not available in IDF version %s", IDF_VER);
-        goto _mqtt_init_failed;
-    }
-#endif
-
-    if (config->use_global_ca_store == true) {
-        esp_transport_ssl_enable_global_ca_store(ssl);
-    } else if (config->cert_pem) {
-        MQTT_TRANSPORT_SET_CERT_OR_KEY(esp_transport_ssl_set_cert_data, config->cert_pem, config->cert_len);
-    }
-    MQTT_TRANSPORT_SET_CERT_OR_KEY(esp_transport_ssl_set_client_cert_data, config->client_cert_pem, config->client_cert_len);
-    MQTT_TRANSPORT_SET_CERT_OR_KEY(esp_transport_ssl_set_client_key_data, config->client_key_pem, config->client_key_len);
-#ifdef MQTT_SUPPORTED_FEATURE_CLIENT_KEY_PASSWORD
-    if (client->config->clientkey_password && client->config->clientkey_password_len) {
-        esp_transport_ssl_set_client_key_password(ssl,
-                                                  client->config->clientkey_password,
-                                                  client->config->clientkey_password_len);
-    }
-#endif
-
-    if (config->psk_hint_key) {
-#ifdef MQTT_SUPPORTED_FEATURE_PSK_AUTHENTICATION
-        esp_transport_ssl_set_psk_key_hint(ssl, config->psk_hint_key);
-#else
-        ESP_LOGE(TAG, "PSK authentication is not available in IDF version %s", IDF_VER);
-        goto _mqtt_init_failed;
-#endif
-    }
-
-    if (client->config->alpn_protos) {
-#ifdef MQTT_SUPPORTED_FEATURE_ALPN
-        esp_transport_ssl_set_alpn_protocol(ssl, (const char **)client->config->alpn_protos);
-#else
-        ESP_LOGE(TAG, "APLN is not available in IDF version %s", IDF_VER);
-        goto _mqtt_init_failed;
-#endif
-    }
-
     esp_transport_list_add(client->transport_list, ssl, "mqtts");
-    if (config->transport == MQTT_TRANSPORT_OVER_SSL) {
-        client->config->scheme = create_string("mqtts", 5);
-        ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_init_failed);
-    }
 #endif
 
 #if MQTT_ENABLE_WSS
@@ -538,16 +591,18 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
 #endif
     esp_transport_set_default_port(wss, MQTT_WSS_DEFAULT_PORT);
     esp_transport_list_add(client->transport_list, wss, "wss");
-    if (config->transport == MQTT_TRANSPORT_OVER_WSS) {
-        client->config->scheme = create_string("wss", 3);
-        ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_init_failed);
-    }
 #endif
-    if (client->config->uri) {
-        if (esp_mqtt_client_set_uri(client, client->config->uri) != ESP_OK) {
-            goto _mqtt_init_failed;
-        }
+
+    if (esp_mqtt_set_config(client, config) != ESP_OK) {
+        goto _mqtt_init_failed;
     }
+#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
+    esp_event_loop_args_t no_task_loop = {
+            .queue_size = 1,
+            .task_name = NULL,
+    };
+    esp_event_loop_create(&no_task_loop, &client->config->event_loop_handle);
+#endif
 
     client->keepalive_tick = platform_tick_get_ms();
     client->reconnect_tick = platform_tick_get_ms();
@@ -1124,7 +1179,7 @@ static void esp_mqtt_task(void *pv)
         MQTT_API_LOCK(client);
         switch ((int)client->state) {
         case MQTT_STATE_INIT:
-            xEventGroupClearBits(client->status_bits, RECONNECT_BIT);
+            xEventGroupClearBits(client->status_bits, RECONNECT_BIT | DISCONNECT_BIT);
             client->event.event_id = MQTT_EVENT_BEFORE_CONNECT;
             esp_mqtt_dispatch_event_with_msgid(client);
 
@@ -1164,6 +1219,11 @@ static void esp_mqtt_task(void *pv)
 
             break;
         case MQTT_STATE_CONNECTED:
+            // check for disconnection request
+            if (xEventGroupWaitBits(client->status_bits, DISCONNECT_BIT, true, true, 0) & DISCONNECT_BIT) {
+                esp_mqtt_abort_connection(client);
+                break;
+            }
             // receive and process data
             if (mqtt_process_receive(client) == ESP_FAIL) {
                 esp_mqtt_abort_connection(client);
@@ -1283,9 +1343,17 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
     return err;
 }
 
+esp_err_t esp_mqtt_client_disconnect(esp_mqtt_client_handle_t client)
+{
+    ESP_LOGI(TAG, "Client asked to disconnect");
+    xEventGroupSetBits(client->status_bits, DISCONNECT_BIT);
+    return ESP_OK;
+}
+
 esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client)
 {
     ESP_LOGI(TAG, "Client force reconnect requested");
+
     if (client->state != MQTT_STATE_WAIT_TIMEOUT) {
         ESP_LOGD(TAG, "The client is not waiting for reconnection. Ignore the request");
         return ESP_FAIL;
@@ -1305,6 +1373,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
             client->mqtt_state.outbound_message = mqtt_msg_disconnect(&client->mqtt_state.mqtt_connection);
             if (client->mqtt_state.outbound_message->length == 0) {
                 ESP_LOGE(TAG, "Disconnect message cannot be created");
+                MQTT_API_UNLOCK_FROM_OTHER_TASK(client);
                 return ESP_FAIL;
             }
             if (mqtt_write_data(client) != ESP_OK) {
