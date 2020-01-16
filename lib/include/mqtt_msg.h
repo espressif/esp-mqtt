@@ -93,19 +93,19 @@ typedef struct mqtt_connect_info {
 } mqtt_connect_info_t;
 
 
-static inline int mqtt_get_type(uint8_t *buffer)
+static inline int mqtt_get_type(const uint8_t *buffer)
 {
     return (buffer[0] & 0xf0) >> 4;
 }
-static inline int mqtt_get_connect_session_present(uint8_t *buffer)
+static inline int mqtt_get_connect_session_present(const uint8_t *buffer)
 {
     return buffer[2] & 0x01;
 }
-static inline int mqtt_get_connect_return_code(uint8_t *buffer)
+static inline int mqtt_get_connect_return_code(const uint8_t *buffer)
 {
     return buffer[3];
 }
-static inline int mqtt_get_dup(uint8_t *buffer)
+static inline int mqtt_get_dup(const uint8_t *buffer)
 {
     return (buffer[0] & 0x08) >> 3;
 }
@@ -113,18 +113,18 @@ static inline void mqtt_set_dup(uint8_t *buffer)
 {
     buffer[0] |= 0x08;
 }
-static inline int mqtt_get_qos(uint8_t *buffer)
+static inline int mqtt_get_qos(const uint8_t *buffer)
 {
     return (buffer[0] & 0x06) >> 1;
 }
-static inline int mqtt_get_retain(uint8_t *buffer)
+static inline int mqtt_get_retain(const uint8_t *buffer)
 {
     return (buffer[0] & 0x01);
 }
 
 void mqtt_msg_init(mqtt_connection_t *connection, uint8_t *buffer, uint32_t buffer_length);
 bool mqtt_header_complete(uint8_t *buffer, uint32_t buffer_length);
-uint32_t mqtt_get_total_length(uint8_t *buffer, uint32_t length, int *fixed_size_len);
+uint32_t mqtt_get_total_length(const uint8_t *buffer, uint32_t length, int *fixed_size_len);
 char *mqtt_get_publish_topic(uint8_t *buffer, uint32_t *length);
 char *mqtt_get_publish_data(uint8_t *buffer, uint32_t *length);
 uint16_t mqtt_get_id(uint8_t *buffer, uint32_t length);
