@@ -402,8 +402,8 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     // Set uri at the end of config to override separately configured uri elements
     if (config->uri) {
         if (esp_mqtt_client_set_uri(client, cfg->uri) != ESP_OK) {
-            esp_mqtt_destroy_config(client);
-            return ESP_FAIL;
+            err = ESP_FAIL;
+            goto _mqtt_set_config_failed;
         }
     }
 
@@ -419,6 +419,9 @@ _mqtt_set_config_failed:
 static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
 {
     mqtt_config_storage_t *cfg = client->config;
+    if (cfg == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
     free(cfg->host);
     free(cfg->uri);
     free(cfg->path);
@@ -441,6 +444,7 @@ static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
 #endif
     memset(cfg, 0, sizeof(mqtt_config_storage_t));
     free(client->config);
+    client->config = NULL;
     return ESP_OK;
 }
 
