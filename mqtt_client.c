@@ -190,6 +190,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     } else if (client->connect_info.client_id == NULL) {
         client->connect_info.client_id = platform_create_id_string();
     }
+
     ESP_MEM_CHECK(TAG, client->connect_info.client_id, goto _mqtt_set_config_failed);
     ESP_LOGD(TAG, "MQTT client_id=%s", client->connect_info.client_id);
 
@@ -233,6 +234,18 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     if (client->connect_info.keepalive == 0) {
         client->connect_info.keepalive = MQTT_KEEPALIVE_TICK;
     }
+
+    if (config->protocol_ver) {
+        client->connect_info.protocol_ver = config->protocol_ver;
+    }
+    if (client->connect_info.protocol_ver== MQTT_PROTOCOL_UNDEFINED) {
+#ifdef MQTT_PROTOCOL_311
+        client->connect_info.protocol_ver = MQTT_PROTOCOL_V_3_1_1;
+#else
+        client->connect_info.protocol_ver = MQTT_PROTOCOL_V_3_1;
+#endif
+    }
+
     cfg->network_timeout_ms = MQTT_NETWORK_TIMEOUT_MS;
     if (config->user_context) {
         cfg->user_context = config->user_context;

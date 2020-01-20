@@ -34,6 +34,8 @@
 #include "platform.h"
 
 #define MQTT_MAX_FIXED_HEADER_SIZE 5
+#define MQTT_3_1_VARIABLE_HEADER_SIZE 12
+#define MQTT_3_1_1_VARIABLE_HEADER_SIZE 10
 
 enum mqtt_connect_flag {
     MQTT_CONNECT_FLAG_USERNAME = 1 << 7,
@@ -41,20 +43,6 @@ enum mqtt_connect_flag {
     MQTT_CONNECT_FLAG_WILL_RETAIN = 1 << 5,
     MQTT_CONNECT_FLAG_WILL = 1 << 2,
     MQTT_CONNECT_FLAG_CLEAN_SESSION = 1 << 1
-};
-
-struct __attribute((__packed__)) mqtt_connect_variable_header {
-    uint8_t lengthMsb;
-    uint8_t lengthLsb;
-#if defined(MQTT_PROTOCOL_311)
-    uint8_t magic[4];
-#else
-    uint8_t magic[6];
-#endif
-    uint8_t version;
-    uint8_t flags;
-    uint8_t keepaliveMsb;
-    uint8_t keepaliveLsb;
 };
 
 static int append_string(mqtt_connection_t *connection, const char *string, int len)
@@ -344,33 +332,45 @@ uint16_t mqtt_get_id(uint8_t *buffer, uint32_t length)
 
 mqtt_message_t *mqtt_msg_connect(mqtt_connection_t *connection, mqtt_connect_info_t *info)
 {
-    struct mqtt_connect_variable_header *variable_header;
 
     init_message(connection);
 
-    if (connection->message.length + sizeof(*variable_header) > connection->buffer_length) {
+    int header_len;
+    if (info->protocol_ver == MQTT_PROTOCOL_V_3_1) {
+        header_len = MQTT_3_1_VARIABLE_HEADER_SIZE;
+    } else {
+        header_len = MQTT_3_1_1_VARIABLE_HEADER_SIZE;
+    }
+
+    if (connection->message.length + header_len > connection->buffer_length) {
         return fail_message(connection);
     }
-    variable_header = (void *)(connection->buffer + connection->message.length);
-    connection->message.length += sizeof(*variable_header);
+    char* variable_header = (void *)(connection->buffer + connection->message.length);
+    connection->message.length += header_len;
 
-    variable_header->lengthMsb = 0;
-#if defined(CONFIG_MQTT_PROTOCOL_311)
-    variable_header->lengthLsb = 4;
-    memcpy(variable_header->magic, "MQTT", 4);
-    variable_header->version = 4;
-#else
-    variable_header->lengthLsb = 6;
-    memcpy(variable_header->magic, "MQIsdp", 6);
-    variable_header->version = 3;
-#endif
+    int header_idx = 0;
+    variable_header[header_idx++] = 0;                              // Variable header length MSB
 
-    variable_header->flags = 0;
-    variable_header->keepaliveMsb = info->keepalive >> 8;
-    variable_header->keepaliveLsb = info->keepalive & 0xff;
+    if (info->protocol_ver == MQTT_PROTOCOL_V_3_1) {
+        variable_header[header_idx++] = 6;                          // Variable header length LSB
+        memcpy(&variable_header[header_idx], "MQIsdp", 6);          // Protocol name
+        header_idx = header_idx + 6;
+        variable_header[header_idx++] = 3;                          // Protocol version
+    } else {
+        /* Defaults to protocol version 3.1.1 values */
+        variable_header[header_idx++] = 4;                          // Variable header length LSB
+        memcpy(&variable_header[header_idx], "MQTT", 4);            // Protocol name
+        header_idx = header_idx + 4;
+        variable_header[header_idx++] = 4;                          // Protocol version
+    }
+
+    int flags_offset = header_idx;
+    variable_header[header_idx++] = 0;                              // Flags
+    variable_header[header_idx++] = info->keepalive >> 8;           // Keep-alive MSB
+    variable_header[header_idx] = info->keepalive & 0xff;         // Keep-alive LSB
 
     if (info->clean_session) {
-        variable_header->flags |= MQTT_CONNECT_FLAG_CLEAN_SESSION;
+        variable_header[flags_offset] |= MQTT_CONNECT_FLAG_CLEAN_SESSION;
     }
 
     if (info->client_id != NULL && info->client_id[0] != '\0') {
@@ -390,11 +390,11 @@ mqtt_message_t *mqtt_msg_connect(mqtt_connection_t *connection, mqtt_connect_inf
             return fail_message(connection);
         }
 
-        variable_header->flags |= MQTT_CONNECT_FLAG_WILL;
+        variable_header[flags_offset] |= MQTT_CONNECT_FLAG_WILL;
         if (info->will_retain) {
-            variable_header->flags |= MQTT_CONNECT_FLAG_WILL_RETAIN;
+            variable_header[flags_offset] |= MQTT_CONNECT_FLAG_WILL_RETAIN;
         }
-        variable_header->flags |= (info->will_qos & 3) << 3;
+        variable_header[flags_offset] |= (info->will_qos & 3) << 3;
     }
 
     if (info->username != NULL && info->username[0] != '\0') {
@@ -402,7 +402,7 @@ mqtt_message_t *mqtt_msg_connect(mqtt_connection_t *connection, mqtt_connect_inf
             return fail_message(connection);
         }
 
-        variable_header->flags |= MQTT_CONNECT_FLAG_USERNAME;
+        variable_header[flags_offset] |= MQTT_CONNECT_FLAG_USERNAME;
     }
 
     if (info->password != NULL && info->password[0] != '\0') {
@@ -410,7 +410,7 @@ mqtt_message_t *mqtt_msg_connect(mqtt_connection_t *connection, mqtt_connect_inf
             return fail_message(connection);
         }
 
-        variable_header->flags |= MQTT_CONNECT_FLAG_PASSWORD;
+        variable_header[flags_offset] |= MQTT_CONNECT_FLAG_PASSWORD;
     }
 
     return fini_message(connection, MQTT_MSG_TYPE_CONNECT, 0, 0, 0);

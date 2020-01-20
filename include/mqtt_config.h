@@ -8,7 +8,10 @@
 
 #include "sdkconfig.h"
 
-#define MQTT_PROTOCOL_311           CONFIG_MQTT_PROTOCOL_311
+#ifdef CONFIG_MQTT_PROTOCOL_311
+#define MQTT_PROTOCOL_311
+#endif
+
 #define MQTT_RECON_DEFAULT_MS       (10*1000)
 #define MQTT_POLL_READ_TIMEOUT_MS   (1000)
 

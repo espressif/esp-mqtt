@@ -89,6 +89,15 @@ typedef enum {
 } esp_mqtt_transport_t;
 
 /**
+ *  MQTT protocol version used for connection
+ */
+typedef enum {
+    MQTT_PROTOCOL_UNDEFINED = 0,
+    MQTT_PROTOCOL_V_3_1,
+    MQTT_PROTOCOL_V_3_1_1
+} esp_mqtt_protocol_ver_t;
+
+/**
  * @brief MQTT error code structure to be passed as a contextual information into ERROR event
  *
  * Important: This structure extends `esp_tls_last_error` error structure and is backward compatible with it
@@ -170,6 +179,7 @@ typedef struct {
     const char **alpn_protos;               /*!< NULL-terminated list of supported application protocols to be used for ALPN */
     const char *clientkey_password;         /*!< Client key decryption password string */
     int clientkey_password_len;             /*!< String length of the password pointed to by clientkey_password */
+    esp_mqtt_protocol_ver_t protocol_ver;   /*!< MQTT protocol version used for connection, defaults to value from menuconfig*/
 } esp_mqtt_client_config_t;
 
 /**
