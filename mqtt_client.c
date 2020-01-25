@@ -854,15 +854,13 @@ post_data_event:
     esp_mqtt_dispatch_event(client);
 
     if (msg_read_len < msg_total_len) {
-        // if total data is longer then actual -> read payload only
         size_t buf_len = client->mqtt_state.in_buffer_length;
-        esp_transport_handle_t transport = esp_transport_get_payload_transport_handle(client->transport);
 
         msg_data = (char *)client->mqtt_state.in_buffer;
         msg_topic = NULL;
         msg_topic_len = 0;
         msg_data_offset += msg_data_len;
-        msg_data_len = esp_transport_read(transport, (char *)client->mqtt_state.in_buffer,
+        msg_data_len = esp_transport_read(client-> transport, (char *)client->mqtt_state.in_buffer,
                                           msg_total_len - msg_read_len > buf_len ? buf_len : msg_total_len - msg_read_len,
                                           client->config->network_timeout_ms);
         if (msg_data_len <= 0) {
@@ -968,8 +966,6 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
         buf++;
         client->mqtt_state.in_buffer_read_len++;
     }
-    /* any further reading only the underlying payload */
-    t = esp_transport_get_payload_transport_handle(t);
     if ((client->mqtt_state.in_buffer_read_len == 1) ||
             ((client->mqtt_state.in_buffer_read_len < 6) && (*(buf - 1) & 0x80))) {
         do {
