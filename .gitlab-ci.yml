@@ -20,8 +20,10 @@ before_script:
   - curl -sSL ${CIT_LOADER_URL} | sh
   - source citools/import_functions
   - PATH=$CI_PROJECT_DIR/esp-idf/tools:$PATH
+  - export IDF_PATH=$CI_PROJECT_DIR/esp-idf
+  - export MQTT_PATH=$CI_PROJECT_DIR
 
-build_with_older_idf:
+build_with_idf_v3:
   stage: build
   image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
   tags:
@@ -29,16 +31,21 @@ build_with_older_idf:
   dependencies: []
   script:
     - cit_add_ssh_key "${GITLAB_KEY}"
-    - git clone "${IDF_REPO}" && cd esp-idf && git checkout ${OLDER_IDF}
-    - ./tools/ci/mirror-submodule-update.sh
-    - export IDF_PATH=$(pwd)
-    - cd $CI_PROJECT_DIR
-    - ./modify_for_legacy_idf.sh ${RECENT_IDF} || true
-    - cd $CI_PROJECT_DIR/examples/tcp
-    - make defconfig
-    - make
+    - git clone "${IDF_REPO}"
+    # build with IDFv3.2
+    - $MQTT_PATH/ci/set_idf.sh release/v3.2
+    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
+    - $MQTT_PATH/ci/build_examples.sh make
+    # build with IDFv3.3
+    - $MQTT_PATH/ci/set_idf.sh release/v3.3
+    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
+    - $MQTT_PATH/ci/build_examples.sh make
+    # simple build with IDFv3.1 (buiding directly in mqtt repo)
+    - $MQTT_PATH/ci/set_idf.sh release/v3.1
+    - cd $MQTT_PATH && ./ci/modify_for_legacy_idf.sh ${RECENT_IDF} || true
+    - cd $MQTT_PATH/examples/tcp && rm -rf build && make defconfig && make
 
-build_with_idf:
+build_with_idf_v4:
   stage: build
   image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
   tags:
@@ -52,14 +59,9 @@ build_with_idf:
   script:
     - cit_add_ssh_key "${GITLAB_KEY}"
     - git clone "${IDF_REPO}"
-    - cd esp-idf
-    - tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)" || exit 1
-    - ./tools/ci/mirror-submodule-update.sh
-    - export IDF_PATH=$(pwd)
-    - cd $IDF_PATH/components/mqtt/esp-mqtt
-    - rm -rf .git
-    - cp -r $CI_PROJECT_DIR/.git .
-    - git reset --hard $CI_COMMIT_SHA
+    - $MQTT_PATH/ci/set_idf.sh master
+    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
+    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
     # capture compile commands/flags for static analysis
     - cd $IDF_PATH/examples/protocols/mqtt/tcp
     - mkdir -p tidybuild && cd tidybuild
@@ -69,11 +71,17 @@ build_with_idf:
     - export PEDANTIC_CFLAGS="-Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
     - export EXTRA_CFLAGS=${PEDANTIC_CFLAGS} && export EXTRA_CXXFLAGS=${EXTRA_CFLAGS}
     # build other examples
-    - cd $IDF_PATH/examples/protocols/mqtt/tcp && idf.py build
-    - cd $IDF_PATH/examples/protocols/mqtt/ssl && idf.py build
-    - cd $IDF_PATH/examples/protocols/mqtt/ssl_mutual_auth && idf.py build
-    - cd $IDF_PATH/examples/protocols/mqtt/ws && idf.py build
-    - cd $IDF_PATH/examples/protocols/mqtt/wss && idf.py build
+    - $MQTT_PATH/ci/build_examples.sh
+    # rebuild with IDFv4.1
+    - $MQTT_PATH/ci/set_idf.sh release/v4.1
+    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
+    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
+    - $MQTT_PATH/ci/build_examples.sh
+    # rebuild with IDFv4.0
+    - $MQTT_PATH/ci/set_idf.sh release/v4.0
+    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
+    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
+    - $MQTT_PATH/ci/build_examples.sh
 
 build_and_test_qemu:
   stage: build
@@ -85,14 +93,9 @@ build_and_test_qemu:
   script:
     - cit_add_ssh_key "${GITLAB_KEY}"
     - git clone "${IDF_REPO}"
-    - cd esp-idf
-    - tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)" || exit 1
-    - ./tools/ci/mirror-submodule-update.sh
-    - export IDF_PATH=$(pwd)
-    - cd $IDF_PATH/components/mqtt/esp-mqtt
-    - rm -rf .git
-    - cp -r $CI_PROJECT_DIR/.git .
-    - git reset --hard $CI_COMMIT_SHA
+    - $MQTT_PATH/ci/set_idf.sh master
+    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
+    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
     # build publish stress test
     - cd $IDF_PATH/examples/protocols/mqtt/publish_test && cat sdkconfig.qemu | $IDF_PATH/tools/ci/envsubst.py >> sdkconfig.defaults && idf.py build
     - source /opt/pyenv/activate && pyenv global 2.7.15 && python --version
@@ -109,7 +112,7 @@ clang_tidy_check:
   tags:
     - host_test
   dependencies:
-    - build_with_idf
+    - build_with_idf_v4
   artifacts:
     reports:
       junit: esp-idf/examples/protocols/mqtt/tcp/tidybuild/output.xml
