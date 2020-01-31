@@ -140,7 +140,7 @@ void mqtt_msg_init(mqtt_connection_t *connection, uint8_t *buffer, uint32_t buff
     connection->buffer_length = buffer_length;
 }
 
-uint32_t mqtt_get_total_length(uint8_t *buffer, uint32_t length, int *fixed_size_len)
+uint32_t mqtt_get_total_length(const uint8_t *buffer, uint32_t length, int *fixed_size_len)
 {
     int i;
     uint32_t totlen = 0;

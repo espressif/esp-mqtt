@@ -15,7 +15,7 @@ typedef struct outbox_item {
     int msg_id;
     int msg_type;
     int msg_qos;
-    int tick;
+    outbox_tick_t tick;
     int retry_count;
     pending_state_t pending;
     STAILQ_ENTRY(outbox_item) next;
@@ -32,7 +32,7 @@ outbox_handle_t outbox_init(void)
     return outbox;
 }
 
-outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, outbox_message_handle_t message, int tick)
+outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, outbox_message_handle_t message, outbox_tick_t tick)
 {
     outbox_item_handle_t item = calloc(1, sizeof(outbox_item_t));
     ESP_MEM_CHECK(TAG, item, return NULL);
@@ -67,7 +67,7 @@ outbox_item_handle_t outbox_get(outbox_handle_t outbox, int msg_id)
     return NULL;
 }
 
-outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox, pending_state_t pending, int *tick)
+outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox, pending_state_t pending, outbox_tick_t *tick)
 {
     outbox_item_handle_t item;
     STAILQ_FOREACH(item, outbox, next) {
@@ -131,7 +131,7 @@ esp_err_t outbox_set_pending(outbox_handle_t outbox, int msg_id, pending_state_t
     return ESP_FAIL;
 }
 
-esp_err_t outbox_set_tick(outbox_handle_t outbox, int msg_id, int tick)
+esp_err_t outbox_set_tick(outbox_handle_t outbox, int msg_id, outbox_tick_t tick)
 {
     outbox_item_handle_t item = outbox_get(outbox, msg_id);
     if (item) {
@@ -155,7 +155,7 @@ esp_err_t outbox_delete_msgtype(outbox_handle_t outbox, int msg_type)
     return ESP_OK;
 }
 
-int outbox_delete_expired(outbox_handle_t outbox, int current_tick, int timeout)
+int outbox_delete_expired(outbox_handle_t outbox, outbox_tick_t current_tick, outbox_tick_t timeout)
 {
     int deleted_items = 0;
     outbox_item_handle_t item, tmp;
@@ -199,7 +199,12 @@ esp_err_t outbox_cleanup(outbox_handle_t outbox, int max_size)
 
 void outbox_destroy(outbox_handle_t outbox)
 {
-    outbox_cleanup(outbox, 0);
+    outbox_item_handle_t item, tmp;
+    STAILQ_FOREACH_SAFE(item, outbox, next, tmp) {
+        STAILQ_REMOVE(outbox, item, outbox_item, next);
+        free(item->buffer);
+        free(item);
+    }
     free(outbox);
 }
 

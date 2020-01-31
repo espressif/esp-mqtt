@@ -32,4 +32,10 @@ void ms_to_timeval(int timeout_ms, struct timeval *tv);
         ESP_LOGE(TAG,"%s:%d (%s): %s", __FILE__, __LINE__, __FUNCTION__, "Memory exhausted");       \
         action;                                                                                         \
         }
+
+#define ESP_OK_CHECK(TAG, a, action) if ((a) != ESP_OK) {                                                     \
+        ESP_LOGE(TAG,"%s:%d (%s): %s", __FILE__, __LINE__, __FUNCTION__, "Failed with non ESP_OK err code");  \
+        action;                                                                                               \
+        }
+
 #endif
