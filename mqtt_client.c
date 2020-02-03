@@ -223,17 +223,16 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
         esp_transport_ssl_set_psk_key_hint(ssl, cfg->psk_hint_key);
 #else
         ESP_LOGE(TAG, "PSK authentication is not available in IDF version %s", IDF_VER);
-        goto _mqtt_set_config_failed;
+        goto esp_mqtt_set_transport_failed;
 #endif
     }
 
     if (cfg->alpn_protos) {
 #if defined(MQTT_SUPPORTED_FEATURE_ALPN) && MQTT_ENABLE_SSL
-        ESP_LOGE(TAG, "%p", cfg->alpn_protos);
         esp_transport_ssl_set_alpn_protocol(ssl, (const char **)cfg->alpn_protos);
 #else
         ESP_LOGE(TAG, "APLN is not available in IDF version %s", IDF_VER);
-        goto _mqtt_set_config_failed;
+        goto esp_mqtt_set_transport_failed;
 #endif
     }
 
