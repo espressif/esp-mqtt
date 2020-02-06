@@ -1460,6 +1460,7 @@ int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic
                                           &client->mqtt_state.pending_msg_id);
     if (client->mqtt_state.outbound_message->length == 0) {
         ESP_LOGE(TAG, "Subscribe message cannot be created");
+        MQTT_API_UNLOCK(client);
         return -1;
     }
 
