@@ -93,7 +93,7 @@ build_and_test_qemu:
   script:
     - cit_add_ssh_key "${GITLAB_KEY}"
     - git clone "${IDF_REPO}"
-    - $MQTT_PATH/ci/set_idf.sh master
+    - $MQTT_PATH/ci/set_idf.sh release/v4.1
     - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
     - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
     # build publish stress test
