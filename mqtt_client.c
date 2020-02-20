@@ -22,6 +22,9 @@
 #endif /* MQTT_USE_API_LOCKS */
 
 _Static_assert(sizeof(uint64_t) == sizeof(outbox_tick_t), "mqtt-client tick type size different from outbox tick type");
+#ifdef ESP_EVENT_ANY_ID
+_Static_assert(MQTT_EVENT_ANY == ESP_EVENT_ANY_ID, "mqtt-client event enum does not match the global EVENT_ANY_ID");
+#endif
 
 static const char *TAG = "MQTT_CLIENT";
 
