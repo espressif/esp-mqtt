@@ -1178,8 +1178,8 @@ static esp_err_t mqtt_resend_queued(esp_mqtt_client_handle_t client, outbox_item
     // decode queued data
     client->mqtt_state.outbound_message->data = outbox_item_get_data(item, &client->mqtt_state.outbound_message->length, &client->mqtt_state.pending_msg_id,
             &client->mqtt_state.pending_msg_type, &client->mqtt_state.pending_publish_qos);
-    // set duplicate flag for QoS-2 message
-    if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH && client->mqtt_state.pending_publish_qos == 2) {
+    // set duplicate flag for QoS-1 and QoS-2 messages
+    if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH && client->mqtt_state.pending_publish_qos > 0) {
         mqtt_set_dup(client->mqtt_state.outbound_message->data);
     }
 
