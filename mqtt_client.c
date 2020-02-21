@@ -22,6 +22,9 @@
 #endif /* MQTT_USE_API_LOCKS */
 
 _Static_assert(sizeof(uint64_t) == sizeof(outbox_tick_t), "mqtt-client tick type size different from outbox tick type");
+#ifdef ESP_EVENT_ANY_ID
+_Static_assert(MQTT_EVENT_ANY == ESP_EVENT_ANY_ID, "mqtt-client event enum does not match the global EVENT_ANY_ID");
+#endif
 
 static const char *TAG = "MQTT_CLIENT";
 
@@ -1175,8 +1178,8 @@ static esp_err_t mqtt_resend_queued(esp_mqtt_client_handle_t client, outbox_item
     // decode queued data
     client->mqtt_state.outbound_message->data = outbox_item_get_data(item, &client->mqtt_state.outbound_message->length, &client->mqtt_state.pending_msg_id,
             &client->mqtt_state.pending_msg_type, &client->mqtt_state.pending_publish_qos);
-    // set duplicate flag for QoS-2 message
-    if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH && client->mqtt_state.pending_publish_qos == 2) {
+    // set duplicate flag for QoS-1 and QoS-2 messages
+    if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH && client->mqtt_state.pending_publish_qos > 0) {
         mqtt_set_dup(client->mqtt_state.outbound_message->data);
     }
 

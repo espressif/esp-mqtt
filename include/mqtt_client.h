@@ -37,6 +37,7 @@ typedef struct esp_mqtt_client *esp_mqtt_client_handle_t;
  *
  */
 typedef enum {
+    MQTT_EVENT_ANY = -1,
     MQTT_EVENT_ERROR = 0,          /*!< on error event, additional context: connection return code, error handle from esp_tls (if supported) */
     MQTT_EVENT_CONNECTED,          /*!< connected event, additional context: session_present flag */
     MQTT_EVENT_DISCONNECTED,       /*!< disconnected event */
