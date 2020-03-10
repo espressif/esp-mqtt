@@ -165,7 +165,7 @@ typedef struct {
     void *user_context;                     /*!< pass user context to this option, then can receive that context in ``event->user_context`` */
     int task_prio;                          /*!< MQTT task priority, default is 5, can be changed in ``make menuconfig`` */
     int task_stack;                         /*!< MQTT task stack size, default is 6144 bytes, can be changed in ``make menuconfig`` */
-    int buffer_size;                        /*!< size of MQTT send/receive buffer, default is 1024 */
+    int buffer_size;                        /*!< size of MQTT send/receive buffer, default is 1024 (only receive buffer size if ``out_buffer_size`` defined) */
     const char *cert_pem;                   /*!< Pointer to certificate data in PEM or DER format for server verify (with SSL), default is NULL, not required to verify the server. PEM-format must have a terminating NULL-character. DER-format requires the length to be passed in cert_len. */
     size_t cert_len;                        /*!< Length of the buffer pointed to by cert_pem. May be 0 for null-terminated pem */
     const char *client_cert_pem;            /*!< Pointer to certificate data in PEM or DER format for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_key_pem` has to be provided. PEM-format must have a terminating NULL-character. DER-format requires the length to be passed in client_cert_len. */
@@ -181,6 +181,7 @@ typedef struct {
     const char *clientkey_password;         /*!< Client key decryption password string */
     int clientkey_password_len;             /*!< String length of the password pointed to by clientkey_password */
     esp_mqtt_protocol_ver_t protocol_ver;   /*!< MQTT protocol version used for connection, defaults to value from menuconfig*/
+    int out_buffer_size;                    /*!< size of MQTT output buffer. If not defined, both output and input buffers have the same size defined as ``buffer_size`` */
 } esp_mqtt_client_config_t;
 
 /**
