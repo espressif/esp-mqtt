@@ -654,14 +654,16 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     if (buffer_size <= 0) {
         buffer_size = MQTT_BUFFER_SIZE_BYTE;
     }
+    // use separate value for output buffer size if configured
+    int out_buffer_size = config->out_buffer_size > 0 ? config->out_buffer_size : buffer_size;
 
     client->mqtt_state.in_buffer = (uint8_t *)malloc(buffer_size);
     ESP_MEM_CHECK(TAG, client->mqtt_state.in_buffer, goto _mqtt_init_failed);
     client->mqtt_state.in_buffer_length = buffer_size;
-    client->mqtt_state.out_buffer = (uint8_t *)malloc(buffer_size);
+    client->mqtt_state.out_buffer = (uint8_t *)malloc(out_buffer_size);
     ESP_MEM_CHECK(TAG, client->mqtt_state.out_buffer, goto _mqtt_init_failed);
 
-    client->mqtt_state.out_buffer_length = buffer_size;
+    client->mqtt_state.out_buffer_length = out_buffer_size;
     client->mqtt_state.connect_info = &client->connect_info;
     client->outbox = outbox_init();
     ESP_MEM_CHECK(TAG, client->outbox, goto _mqtt_init_failed);
