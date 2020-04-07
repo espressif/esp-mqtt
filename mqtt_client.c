@@ -503,7 +503,7 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
     client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
     client->mqtt_state.pending_msg_id = mqtt_get_id(client->mqtt_state.outbound_message->data,
                                         client->mqtt_state.outbound_message->length);
-    ESP_LOGI(TAG, "Sending MQTT CONNECT message, type: %d, id: %04X",
+    ESP_LOGD(TAG, "Sending MQTT CONNECT message, type: %d, id: %04X",
              client->mqtt_state.pending_msg_type,
              client->mqtt_state.pending_msg_id);
 
@@ -1252,7 +1252,7 @@ static void esp_mqtt_task(void *pv)
             }
             ESP_LOGD(TAG, "Transport connected to %s://%s:%d", client->config->scheme, client->config->host, client->config->port);
             if (esp_mqtt_connect(client, client->config->network_timeout_ms) != ESP_OK) {
-                ESP_LOGI(TAG, "Error MQTT Connected");
+                ESP_LOGE(TAG, "Error MQTT Connected");
                 esp_mqtt_abort_connection(client);
                 break;
             }
