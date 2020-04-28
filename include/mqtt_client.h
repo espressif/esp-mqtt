@@ -282,6 +282,9 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
  * @brief Client to send a publish message to the broker
  *
  * Notes:
+ * - This API might block for several seconds, either due to network timeout (10s)
+ *   or if publishing payloads longer than internal buffer (due to message
+ *   fragmentation)
  * - Client doesn't have to be connected to send publish message
  *   (although it would drop all qos=0 messages, qos>1 messages would be enqueued)
  * - It is thread safe, please refer to `esp_mqtt_client_subscribe` for details
