@@ -1252,7 +1252,7 @@ static void esp_mqtt_task(void *pv)
             }
             ESP_LOGD(TAG, "Transport connected to %s://%s:%d", client->config->scheme, client->config->host, client->config->port);
             if (esp_mqtt_connect(client, client->config->network_timeout_ms) != ESP_OK) {
-                ESP_LOGE(TAG, "Error MQTT Connected");
+                ESP_LOGE(TAG, "MQTT connect failed");
                 esp_mqtt_abort_connection(client);
                 break;
             }
