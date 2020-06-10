@@ -80,6 +80,7 @@ typedef struct {
     const char *clientkey_buf;
     size_t clientkey_bytes;
     const struct psk_key_hint *psk_hint_key;
+    bool skip_cert_common_name_check;
 } mqtt_config_storage_t;
 
 typedef enum {
@@ -235,6 +236,16 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
         esp_transport_ssl_set_alpn_protocol(ssl, (const char **)cfg->alpn_protos);
 #else
         ESP_LOGE(TAG, "APLN is not available in IDF version %s", IDF_VER);
+        goto esp_mqtt_set_transport_failed;
+#endif
+    }
+
+
+    if (cfg->skip_cert_common_name_check) {
+#if defined(MQTT_SUPPORTED_FEATURE_SKIP_CRT_CMN_NAME_CHECK) && MQTT_ENABLE_SSL
+        esp_transport_ssl_skip_common_name_check(ssl);
+#else
+        ESP_LOGE(TAG, "Skip certificate common name check is not available in IDF version %s", IDF_VER);
         goto esp_mqtt_set_transport_failed;
 #endif
     }
@@ -416,6 +427,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     cfg->clientkey_buf = config->client_key_pem;
     cfg->clientkey_bytes = config->client_key_len;
     cfg->psk_hint_key = config->psk_hint_key;
+    cfg->skip_cert_common_name_check = config->skip_cert_common_name_check;
 
     if (config->clientkey_password && config->clientkey_password_len) {
         cfg->clientkey_password_len = config->clientkey_password_len;
