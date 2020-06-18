@@ -183,6 +183,7 @@ typedef struct {
     esp_mqtt_protocol_ver_t protocol_ver;   /*!< MQTT protocol version used for connection, defaults to value from menuconfig*/
     int out_buffer_size;                    /*!< size of MQTT output buffer. If not defined, both output and input buffers have the same size defined as ``buffer_size`` */
     bool skip_cert_common_name_check;       /*!< Skip any validation of server certificate CN field, this reduces the security of TLS and makes the mqtt client susceptible to MITM attacks  */
+    bool use_secure_element;                /*!< enable secure element for enabling SSL connection */
 } esp_mqtt_client_config_t;
 
 /**
