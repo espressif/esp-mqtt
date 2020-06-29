@@ -761,7 +761,22 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
 
     client->config->scheme = create_string(uri + puri.field_data[UF_SCHEMA].off, puri.field_data[UF_SCHEMA].len);
     client->config->host = create_string(uri + puri.field_data[UF_HOST].off, puri.field_data[UF_HOST].len);
-    client->config->path = create_string(uri + puri.field_data[UF_PATH].off, puri.field_data[UF_PATH].len);
+    client->config->path = NULL;
+
+    if (puri.field_data[UF_PATH].len || puri.field_data[UF_QUERY].len) {
+        if (puri.field_data[UF_QUERY].len == 0) {
+            asprintf(&client->config->path, "%.*s", puri.field_data[UF_PATH].len, uri + puri.field_data[UF_PATH].off);
+        } else if (puri.field_data[UF_PATH].len == 0)  {
+            asprintf(&client->config->path, "/?%.*s", puri.field_data[UF_QUERY].len, uri + puri.field_data[UF_QUERY].off);
+        } else {
+            asprintf(&client->config->path, "%.*s?%.*s", puri.field_data[UF_PATH].len, uri + puri.field_data[UF_PATH].off,
+                    puri.field_data[UF_QUERY].len, uri + puri.field_data[UF_QUERY].off);
+        }
+        ESP_MEM_CHECK(TAG, client->config->path, {
+            MQTT_API_UNLOCK(client);
+            return ESP_ERR_NO_MEM;
+        });
+    }
 
     if (client->config->path) {
         esp_transport_handle_t trans = esp_transport_list_get_transport(client->transport_list, "ws");
