@@ -319,6 +319,25 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
 int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain);
 
 /**
+ * @brief Enqueue a message (with qos set to 1 or 2) to the outbox, to be sent later.
+ *
+ * This API generates and stores the publish message into the internal outbox and the actual sending
+ * to the network is performed in the mqtt-task context (in contrast to the esp_mqtt_client_publish()
+ * which sends the publish message immediately in the user task's context).
+ * Thus, it could be used as a non blocking version of esp_mqtt_client_publish().
+ *
+ * @param client    mqtt client handle
+ * @param topic     topic string
+ * @param data      payload string (set to NULL, sending empty payload message)
+ * @param len       data length, if set to 0, length is calculated from payload string
+ * @param qos       qos of publish message, this API is applicable only to qos=1 or 2
+ * @param retain    retain flag
+ *
+ * @return message_id if queued successfully, -1 otherwise
+ */
+int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain);
+
+/**
  * @brief Destroys the client handle
  *
  * Notes:
