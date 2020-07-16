@@ -269,6 +269,34 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
 }
 #endif // MQTT_ENABLE_SSL
 
+/* Checks if the user supplied config values are internally consistent */
+static esp_err_t esp_mqtt_check_cfg_conflict(const mqtt_config_storage_t *cfg, const esp_mqtt_client_config_t *user_cfg)
+{
+    esp_err_t ret = ESP_OK;
+
+    bool ssl_cfg_enabled = cfg->use_global_ca_store || cfg->cacert_buf || cfg->clientcert_buf || cfg->psk_hint_key || cfg->alpn_protos;
+    bool is_ssl_scheme = false;
+    if (cfg->scheme) {
+        is_ssl_scheme = (strcasecmp(cfg->scheme, "mqtts") == 0) || (strcasecmp(cfg->scheme, "wss") == 0);
+    }
+
+    if (!is_ssl_scheme && ssl_cfg_enabled) {
+        if (cfg->uri) {
+            ESP_LOGW(TAG, "SSL related configs set, but the URI scheme specifies a non-SSL scheme, scheme = %s", cfg->scheme);
+        } else {
+            ESP_LOGW(TAG, "SSL related configs set, but the transport protocol is a non-SSL scheme, transport = %d", user_cfg->transport);
+        }
+        ret = ESP_ERR_INVALID_ARG;
+    }
+
+    if (cfg->uri && user_cfg->transport) {
+        ESP_LOGW(TAG, "Transport config set, but overridden by scheme from URI: transport = %d, uri scheme = %s", user_cfg->transport, cfg->scheme);
+        ret = ESP_ERR_INVALID_ARG;
+    }
+
+    return ret;
+}
+
 esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_client_config_t *config)
 {
     MQTT_API_LOCK(client);
@@ -472,6 +500,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
             goto _mqtt_set_config_failed;
         }
     }
+    esp_mqtt_check_cfg_conflict(cfg, config);
 
     MQTT_API_UNLOCK(client);
 
