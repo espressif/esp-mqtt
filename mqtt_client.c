@@ -208,15 +208,17 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
     }
 
     if (cfg->use_secure_element) {
-#if defined(MQTT_SUPPORTED_FEATURE_SECURE_ELEMENT) && (CONFIG_ESP_TLS_USE_SECURE_ELEMENT)
+#ifdef MQTT_SUPPORTED_FEATURE_SECURE_ELEMENT
+#ifdef CONFIG_ESP_TLS_USE_SECURE_ELEMENT
         esp_transport_ssl_use_secure_element(ssl);
-#ifdef CONFIG_ATECC608A_TCUSTOM
-        ESP_OK_CHECK(TAG, esp_mqtt_set_cert_key_data(ssl, MQTT_SSL_DATA_API_CLIENT_CERT, cfg->clientcert_buf, cfg->clientcert_bytes),
-                    goto esp_mqtt_set_transport_failed);
-#endif
 #else
-        ESP_LOGE(TAG, "secure element not enabled for esp-tls in menuconfig");
-#endif
+        ESP_LOGE(TAG, "Secure element not enabled for esp-tls in menuconfig");
+        goto esp_mqtt_set_transport_failed;
+#endif /* CONFIG_ESP_TLS_USE_SECURE_ELEMENT */
+#else
+        ESP_LOGE(TAG, "Secure element feature is not available in IDF version %s", IDF_VER);
+        goto esp_mqtt_set_transport_failed;
+#endif /* MQTT_SUPPORTED_FEATURE_SECURE_ELEMENT */
     }
     ESP_OK_CHECK(TAG, esp_mqtt_set_cert_key_data(ssl, MQTT_SSL_DATA_API_CLIENT_CERT, cfg->clientcert_buf, cfg->clientcert_bytes),
                  goto esp_mqtt_set_transport_failed);
