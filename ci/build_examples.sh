@@ -16,7 +16,7 @@ for i in $examples; do
         make defconfig
         make -j 4
     else
-        rm -rf build
+        rm -rf build sdkconfig
         idf.py build
     fi;
 done
