@@ -72,6 +72,11 @@ build_with_idf_v4:
     - export EXTRA_CFLAGS=${PEDANTIC_CFLAGS} && export EXTRA_CXXFLAGS=${EXTRA_CFLAGS}
     # build other examples
     - $MQTT_PATH/ci/build_examples.sh
+    # rebuild with IDFv4.2
+    - $MQTT_PATH/ci/set_idf.sh release/v4.2
+    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
+    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
+    - $MQTT_PATH/ci/build_examples.sh
     # rebuild with IDFv4.1
     - $MQTT_PATH/ci/set_idf.sh release/v4.1
     - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"

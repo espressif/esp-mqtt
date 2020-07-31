@@ -13,7 +13,7 @@ cd $IDF_PATH
 # Cleans out the untracked files in the repo, so the next "git checkout" doesn't fail
 git clean -f
 git checkout $1
-# Removes the mqtt submodule, not the next submodule update doesn't fail
+# Removes the mqtt submodule, so the next submodule update doesn't fail
 rm -rf $IDF_PATH/components/mqtt/esp-mqtt
-./tools/ci/mirror-submodule-update.sh
+git submodule update --init --recursive
 
