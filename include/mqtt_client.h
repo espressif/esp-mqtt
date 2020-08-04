@@ -239,6 +239,9 @@ esp_err_t esp_mqtt_client_disconnect(esp_mqtt_client_handle_t client);
 /**
  * @brief Stops mqtt client tasks
  *
+ *  * Notes:
+ *  - Cannot be called from the mqtt event handler
+ *
  * @param client    mqtt client handle
  *
  * @return ESP_OK on success
@@ -305,6 +308,9 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
 
 /**
  * @brief Destroys the client handle
+ *
+ * Notes:
+ *  - Cannot be called from the mqtt event handler
  *
  * @param client    mqtt client handle
  *

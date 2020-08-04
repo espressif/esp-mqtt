@@ -1481,6 +1481,13 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 {
     MQTT_API_LOCK(client);
     if (client->run) {
+        /* A running client cannot be stopped from the MQTT task/event handler */
+        TaskHandle_t running_task = xTaskGetCurrentTaskHandle();
+        if (running_task == client->task_handle) {
+            ESP_LOGE(TAG, "Client cannot be stopped from MQTT task");
+            return ESP_FAIL;
+        }
+
         // Only send the disconnect message if the client is connected
         if(client->state == MQTT_STATE_CONNECTED) {
             // Notify the broker we are disconnecting
