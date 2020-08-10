@@ -1634,6 +1634,9 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
     /* Skip sending if not connected (rely on resending) */
     if (client->state != MQTT_STATE_CONNECTED) {
         ESP_LOGD(TAG, "Publish: client is not connected");
+        if (qos > 0) {
+            ret = pending_msg_id;
+        }
         goto cannot_publish;
     }
 
