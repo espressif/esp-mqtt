@@ -1344,6 +1344,14 @@ static void esp_mqtt_task(void *pv)
                 break;
             }
 
+            //Delete message after OUTBOX_EXPIRED_TIMEOUT_MS miliseconds
+            int deleted = outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
+            client->mqtt_state.pending_msg_count -= deleted;
+
+            if (client->mqtt_state.pending_msg_count < 0) {
+                client->mqtt_state.pending_msg_count = 0;
+            }
+
             // resend all non-transmitted messages first
             outbox_item_handle_t item = outbox_dequeue(client->outbox, QUEUED, NULL);
             if (item) {
@@ -1384,13 +1392,6 @@ static void esp_mqtt_task(void *pv)
                 client->state = MQTT_STATE_INIT;
             }
 
-            //Delete message after 30 seconds
-            int deleted = outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
-            client->mqtt_state.pending_msg_count -= deleted;
-            if (client->mqtt_state.pending_msg_count < 0) {
-                client->mqtt_state.pending_msg_count = 0;
-            }
-            //
             outbox_cleanup(client->outbox, OUTBOX_MAX_SIZE);
             break;
         case MQTT_STATE_WAIT_TIMEOUT:
@@ -1637,6 +1638,15 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         if (qos > 0) {
             ret = pending_msg_id;
         }
+
+        //Delete message after OUTBOX_EXPIRED_TIMEOUT_MS miliseconds
+        int deleted = outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
+        client->mqtt_state.pending_msg_count -= deleted;
+
+        if (client->mqtt_state.pending_msg_count < 0) {
+            client->mqtt_state.pending_msg_count = 0;
+        }
+
         goto cannot_publish;
     }
 
