@@ -14,6 +14,9 @@
 
 #include "mqtt_config.h"
 #include "esp_event.h"
+#if CONFIG_ESP_TLS_USE_DS_PERIPHERAL
+#include "rsa_sign_alt.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -184,6 +187,7 @@ typedef struct {
     int out_buffer_size;                    /*!< size of MQTT output buffer. If not defined, both output and input buffers have the same size defined as ``buffer_size`` */
     bool skip_cert_common_name_check;       /*!< Skip any validation of server certificate CN field, this reduces the security of TLS and makes the mqtt client susceptible to MITM attacks  */
     bool use_secure_element;                /*!< enable secure element for enabling SSL connection */
+    void *ds_data;                          /*!< carrier of handle for digital signature parameters */
 } esp_mqtt_client_config_t;
 
 /**
