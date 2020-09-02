@@ -431,7 +431,11 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
 #endif
     }
 
-    cfg->network_timeout_ms = MQTT_NETWORK_TIMEOUT_MS;
+    cfg->network_timeout_ms = config->network_timeout_ms;
+    if (cfg->network_timeout_ms <= 0) {
+        cfg->network_timeout_ms = MQTT_NETWORK_TIMEOUT_MS;
+    }
+
     if (config->user_context) {
         cfg->user_context = config->user_context;
     }
