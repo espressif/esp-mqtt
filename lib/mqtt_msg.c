@@ -133,17 +133,17 @@ static mqtt_message_t *fini_message(mqtt_connection_t *connection, int type, int
     return &connection->message;
 }
 
-void mqtt_msg_init(mqtt_connection_t *connection, uint8_t *buffer, uint32_t buffer_length)
+void mqtt_msg_init(mqtt_connection_t *connection, uint8_t *buffer, size_t buffer_length)
 {
     memset(connection, 0, sizeof(mqtt_connection_t));
     connection->buffer = buffer;
     connection->buffer_length = buffer_length;
 }
 
-uint32_t mqtt_get_total_length(const uint8_t *buffer, uint32_t length, int *fixed_size_len)
+size_t mqtt_get_total_length(const uint8_t *buffer, size_t length, int *fixed_size_len)
 {
     int i;
-    uint32_t totlen = 0;
+    size_t totlen = 0;
 
     for (i = 1; i < length; ++i) {
         totlen += (buffer[i] & 0x7f) << (7 * (i - 1));
@@ -160,7 +160,7 @@ uint32_t mqtt_get_total_length(const uint8_t *buffer, uint32_t length, int *fixe
     return totlen;
 }
 
-bool mqtt_header_complete(uint8_t *buffer, uint32_t buffer_length)
+bool mqtt_header_complete(uint8_t *buffer, size_t buffer_length)
 {
     uint16_t i;
     uint16_t topiclen;
@@ -191,7 +191,7 @@ bool mqtt_header_complete(uint8_t *buffer, uint32_t buffer_length)
     return buffer_length >= i;
 }
 
-char *mqtt_get_publish_topic(uint8_t *buffer, uint32_t *length)
+char *mqtt_get_publish_topic(uint8_t *buffer, size_t *length)
 {
     int i;
     int totlen = 0;
@@ -220,7 +220,7 @@ char *mqtt_get_publish_topic(uint8_t *buffer, uint32_t *length)
     return (char *)(buffer + i);
 }
 
-char *mqtt_get_publish_data(uint8_t *buffer, uint32_t *length)
+char *mqtt_get_publish_data(uint8_t *buffer, size_t *length)
 {
     int i;
     int totlen = 0;
@@ -268,7 +268,7 @@ char *mqtt_get_publish_data(uint8_t *buffer, uint32_t *length)
     return (char *)(buffer + i);
 }
 
-uint16_t mqtt_get_id(uint8_t *buffer, uint32_t length)
+uint16_t mqtt_get_id(uint8_t *buffer, size_t length)
 {
     if (length < 1) {
         return 0;
@@ -558,7 +558,7 @@ mqtt_message_t *mqtt_msg_disconnect(mqtt_connection_t *connection)
  * check flags: [MQTT-2.2.2-1], [MQTT-2.2.2-2]
  * returns 0 if flags are invalid, otherwise returns 1
  */
-int mqtt_has_valid_msg_hdr(uint8_t *buffer, uint32_t length)
+int mqtt_has_valid_msg_hdr(uint8_t *buffer, size_t length)
 {
     int qos, dup;
 
