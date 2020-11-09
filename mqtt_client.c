@@ -1494,6 +1494,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
         /* A running client cannot be stopped from the MQTT task/event handler */
         TaskHandle_t running_task = xTaskGetCurrentTaskHandle();
         if (running_task == client->task_handle) {
+            MQTT_API_UNLOCK(client);
             ESP_LOGE(TAG, "Client cannot be stopped from MQTT task");
             return ESP_FAIL;
         }
