@@ -649,7 +649,6 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
 
 static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
 {
-    MQTT_API_LOCK(client);
     esp_transport_close(client->transport);
     client->wait_timeout_ms = client->config->reconnect_timeout_ms;
     client->reconnect_tick = platform_tick_get_ms();
@@ -658,7 +657,6 @@ static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
     client->event.event_id = MQTT_EVENT_DISCONNECTED;
     client->wait_for_ping_resp = false;
     esp_mqtt_dispatch_event_with_msgid(client);
-    MQTT_API_UNLOCK(client);
     return ESP_OK;
 }
 
@@ -1426,7 +1424,9 @@ static void esp_mqtt_task(void *pv)
         if (MQTT_STATE_CONNECTED == client->state) {
             if (esp_transport_poll_read(client->transport, MQTT_POLL_READ_TIMEOUT_MS) < 0) {
                 ESP_LOGE(TAG, "Poll read error: %d, aborting connection", errno);
+                MQTT_API_LOCK(client);
                 esp_mqtt_abort_connection(client);
+                MQTT_API_UNLOCK(client);
             }
         }
 
