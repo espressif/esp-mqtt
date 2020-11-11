@@ -1622,6 +1622,23 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
     }
 
     MQTT_API_LOCK(client);
+
+    /* Skip sending if not connected (rely on resending) */
+    if (client->state != MQTT_STATE_CONNECTED) {
+        ESP_LOGD(TAG, "Publish: client is not connected");
+        //Delete message after OUTBOX_EXPIRED_TIMEOUT_MS miliseconds
+        int deleted = outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
+        client->mqtt_state.pending_msg_count -= deleted;
+
+        if (client->mqtt_state.pending_msg_count < 0) {
+            client->mqtt_state.pending_msg_count = 0;
+        }
+
+        MQTT_API_UNLOCK(client);
+        return -1;
+
+    }
+
     mqtt_message_t *publish_msg = mqtt_msg_publish(&client->mqtt_state.mqtt_connection,
                                   topic, data, len,
                                   qos, retain,
@@ -1646,24 +1663,6 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
             int first_fragment = client->mqtt_state.outbound_message->length - client->mqtt_state.outbound_message->fragmented_msg_data_offset;
             mqtt_enqueue_oversized(client, ((uint8_t *)data) + first_fragment, len - first_fragment);
         }
-    }
-
-    /* Skip sending if not connected (rely on resending) */
-    if (client->state != MQTT_STATE_CONNECTED) {
-        ESP_LOGD(TAG, "Publish: client is not connected");
-        if (qos > 0) {
-            ret = pending_msg_id;
-        }
-
-        //Delete message after OUTBOX_EXPIRED_TIMEOUT_MS miliseconds
-        int deleted = outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
-        client->mqtt_state.pending_msg_count -= deleted;
-
-        if (client->mqtt_state.pending_msg_count < 0) {
-            client->mqtt_state.pending_msg_count = 0;
-        }
-
-        goto cannot_publish;
     }
 
     /* Provide support for sending fragmented message if it doesn't fit buffer */
