@@ -80,9 +80,16 @@ typedef enum {
  */
 typedef enum {
     MQTT_ERROR_TYPE_NONE = 0,
-    MQTT_ERROR_TYPE_ESP_TLS,
+    MQTT_ERROR_TYPE_TCP_TRANSPORT,
     MQTT_ERROR_TYPE_CONNECTION_REFUSED,
 } esp_mqtt_error_type_t;
+
+/**
+ * MQTT_ERROR_TYPE_TCP_TRANSPORT error type hold all sorts of transport layer errors,
+ * including ESP-TLS error, but in the past only the errors from MQTT_ERROR_TYPE_ESP_TLS layer
+ * were reported, so the ESP-TLS error type is re-defined here for backward compatibility
+ */
+#define MQTT_ERROR_TYPE_ESP_TLS MQTT_ERROR_TYPE_TCP_TRANSPORT
 
 typedef enum {
     MQTT_TRANSPORT_UNKNOWN = 0x0,
@@ -110,7 +117,7 @@ typedef enum {
  * Use this structure directly checking error_type first and then appropriate error code depending on the source of the error:
  *
  * | error_type | related member variables | note |
- * | MQTT_ERROR_TYPE_ESP_TLS | esp_tls_last_esp_err, esp_tls_stack_err, esp_tls_cert_verify_flags | Error reported from esp-tls |
+ * | MQTT_ERROR_TYPE_TCP_TRANSPORT | esp_tls_last_esp_err, esp_tls_stack_err, esp_tls_cert_verify_flags, sock_errno | Error reported from tcp_transport/esp-tls |
  * | MQTT_ERROR_TYPE_CONNECTION_REFUSED | connect_return_code | Internal error reported from MQTT broker on connection |
  */
 typedef struct esp_mqtt_error_codes {
@@ -121,6 +128,9 @@ typedef struct esp_mqtt_error_codes {
     /* esp-mqtt specific structure extension */
     esp_mqtt_error_type_t error_type;            /*!< error type referring to the source of the error */
     esp_mqtt_connect_return_code_t connect_return_code; /*!< connection refused error code reported from MQTT broker on connection */
+    /* tcp_transport extension */
+    int       esp_transport_sock_errno;         /*!< errno from the underlying socket */
+
 } esp_mqtt_error_codes_t;
 
 /**

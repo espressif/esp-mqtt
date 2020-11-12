@@ -132,7 +132,7 @@ static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client);
 static char *create_string(const char *ptr, int len);
 static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_timeout_ms);
-static void esp_mqtt_client_dispatch_tls_error(esp_mqtt_client_handle_t client);
+static void esp_mqtt_client_dispatch_transport_error(esp_mqtt_client_handle_t client);
 
 
 #if MQTT_ENABLE_SSL
@@ -871,7 +871,7 @@ static esp_err_t mqtt_write_data(esp_mqtt_client_handle_t client)
                                         client->config->network_timeout_ms);
     // client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
     if (write_len <= 0) {
-        esp_mqtt_client_dispatch_tls_error(client);
+        esp_mqtt_client_dispatch_transport_error(client);
         ESP_LOGE(TAG, "Error write data or timeout, written len = %d, errno=%d", write_len, errno);
         return ESP_FAIL;
     }
@@ -1147,7 +1147,7 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
     ESP_LOGD(TAG, "%s: transport_read():%d %d", __func__, client->mqtt_state.in_buffer_read_len, client->mqtt_state.message_length);
     return 1;
 err:
-    esp_mqtt_client_dispatch_tls_error(client);
+    esp_mqtt_client_dispatch_transport_error(client);
     return -1;
 }
 
@@ -1324,7 +1324,7 @@ static void esp_mqtt_task(void *pv)
                                       client->config->port,
                                       client->config->network_timeout_ms) < 0) {
                 ESP_LOGE(TAG, "Error transport connect");
-                esp_mqtt_client_dispatch_tls_error(client);
+                esp_mqtt_client_dispatch_transport_error(client);
                 esp_mqtt_abort_connection(client);
                 break;
             }
@@ -1745,15 +1745,18 @@ esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mq
 }
 
 
-static void esp_mqtt_client_dispatch_tls_error(esp_mqtt_client_handle_t client)
+static void esp_mqtt_client_dispatch_transport_error(esp_mqtt_client_handle_t client)
 {
         client->event.event_id = MQTT_EVENT_ERROR;
-        client->event.error_handle->error_type = MQTT_ERROR_TYPE_ESP_TLS;
+        client->event.error_handle->error_type = MQTT_ERROR_TYPE_TCP_TRANSPORT;
         client->event.error_handle->connect_return_code = 0;
 #ifdef MQTT_SUPPORTED_FEATURE_TRANSPORT_ERR_REPORTING
         client->event.error_handle->esp_tls_last_esp_err = esp_tls_get_and_clear_last_error(esp_transport_get_error_handle(client->transport),
                                                                                             &client->event.error_handle->esp_tls_stack_err,
                                                                                             &client->event.error_handle->esp_tls_cert_verify_flags);
+#ifdef MQTT_SUPPORTED_FEATURE_TRANSPORT_SOCK_ERRNO_REPORTING
+        client->event.error_handle->esp_transport_sock_errno = esp_transport_get_errno(client->transport);
+#endif
 #endif
         esp_mqtt_dispatch_event_with_msgid(client);
 }
