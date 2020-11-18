@@ -16,7 +16,6 @@ typedef struct outbox_item {
     int msg_type;
     int msg_qos;
     outbox_tick_t tick;
-    int retry_count;
     pending_state_t pending;
     STAILQ_ENTRY(outbox_item) next;
 } outbox_item_t;
