@@ -1761,3 +1761,22 @@ static void esp_mqtt_client_dispatch_transport_error(esp_mqtt_client_handle_t cl
 #endif
         esp_mqtt_dispatch_event_with_msgid(client);
 }
+
+int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client)
+{
+    int outbox_size = 0;
+
+    if (client == NULL) {
+        return 0;
+    }
+
+    MQTT_API_LOCK(client);
+
+    if (client->outbox) {
+        outbox_size = outbox_get_size(client->outbox);
+    }
+
+    MQTT_API_UNLOCK(client);
+
+    return outbox_size;
+}

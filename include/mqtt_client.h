@@ -358,6 +358,14 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
  */
 esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mqtt_event_id_t event, esp_event_handler_t event_handler, void* event_handler_arg);
 
+/**
+ * @brief Get outbox size
+ *
+ * @param client            mqtt client handle
+ * @return outbox size
+ */
+int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client);
+
 #ifdef __cplusplus
 }
 #endif //__cplusplus
