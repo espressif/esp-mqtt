@@ -419,6 +419,12 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     if (client->connect_info.keepalive == 0) {
         client->connect_info.keepalive = MQTT_KEEPALIVE_TICK;
     }
+    if (config->disable_keepalive) {
+        // internal `keepalive` value (in connect_info) is in line with 3.1.2.10 Keep Alive from mqtt spec:
+        //      * keepalive=0: Keep alive mechanism disabled (server not to disconnect the client on its inactivity)
+        //      * period in seconds to send a Control packet if inactive
+        client->connect_info.keepalive = 0;
+    }
 
     if (config->protocol_ver) {
         client->connect_info.protocol_ver = config->protocol_ver;
@@ -1376,7 +1382,8 @@ static void esp_mqtt_task(void *pv)
                 }
             }
 
-            if (platform_tick_get_ms() - client->keepalive_tick > client->connect_info.keepalive * 1000 / 2) {
+            if (client->connect_info.keepalive &&       // connect_info.keepalive=0 means that the keepslive is disabled
+                platform_tick_get_ms() - client->keepalive_tick > client->connect_info.keepalive * 1000 / 2) {
                 //No ping resp from last ping => Disconnected
                 if (client->wait_for_ping_resp) {
                     ESP_LOGE(TAG, "No PING_RESP, disconnected");

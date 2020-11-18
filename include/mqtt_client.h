@@ -199,6 +199,7 @@ typedef struct {
     bool use_secure_element;                /*!< enable secure element for enabling SSL connection */
     void *ds_data;                          /*!< carrier of handle for digital signature parameters */
     int network_timeout_ms;                 /*!< Abort network operation if it is not completed after this value, in milliseconds (defaults to 10s) */
+    bool disable_keepalive;                 /*!< Set disable_keepalive=true to turn off keep-alive mechanism, false by default (keepalive is active by default). Note: setting the config value `keepalive` to `0` doesn't disable keepalive feature, but uses a default keepalive period */
 } esp_mqtt_client_config_t;
 
 /**
