@@ -93,12 +93,6 @@ typedef enum {
     MQTT_STATE_WAIT_TIMEOUT,
 } mqtt_client_state_t;
 
-/* State values for reading MQTT message header */
-typedef enum {
-    MQTT_HEADER_STATE_INCOMPLETE = -1,
-    MQTT_HEADER_STATE_COMPLETE = 0,
-} mqtt_header_state_t;
-
 struct esp_mqtt_client {
     esp_transport_list_handle_t transport_list;
     esp_transport_handle_t transport;
