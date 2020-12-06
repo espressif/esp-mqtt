@@ -12,11 +12,7 @@
 #include <string.h>
 #include "esp_err.h"
 
-#include "mqtt_config.h"
 #include "esp_event.h"
-#if CONFIG_ESP_TLS_USE_DS_PERIPHERAL
-#include "rsa_sign_alt.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
