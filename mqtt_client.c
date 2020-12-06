@@ -1653,6 +1653,13 @@ static inline int mqtt_client_enqueue_priv(esp_mqtt_client_handle_t client, cons
 int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain)
 {
     MQTT_API_LOCK(client);
+#if MQTT_SKIP_PUBLISH_IF_DISCONNECTED
+    if (client->state != MQTT_STATE_CONNECTED) {
+        ESP_LOGE(TAG, "Publish failed: client is not connected");
+        MQTT_API_UNLOCK(client);
+        return -1;
+    }
+#endif
     int pending_msg_id = mqtt_client_enqueue_priv(client, topic, data, len, qos, retain);
     if (pending_msg_id < 0) {
         MQTT_API_UNLOCK(client);

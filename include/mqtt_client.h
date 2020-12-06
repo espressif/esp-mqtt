@@ -302,8 +302,10 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
  * - This API might block for several seconds, either due to network timeout (10s)
  *   or if publishing payloads longer than internal buffer (due to message
  *   fragmentation)
- * - Client doesn't have to be connected to send publish message
- *   (although it would drop all qos=0 messages, qos>1 messages would be enqueued)
+ * - Client doesn't have to be connected for this API to work, enqueueing the messages
+ *   with qos>1 (returning -1 for all the qos=0 messages if disconnected).
+ *   If MQTT_SKIP_PUBLISH_IF_DISCONNECTED is enabled, this API will not attempt to publish
+ *   when the client is not connected and will always return -1.
  * - It is thread safe, please refer to `esp_mqtt_client_subscribe` for details
  *
  * @param client    mqtt client handle
