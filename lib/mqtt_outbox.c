@@ -153,6 +153,22 @@ esp_err_t outbox_delete_msgtype(outbox_handle_t outbox, int msg_type)
     }
     return ESP_OK;
 }
+int outbox_delete_single_expired(outbox_handle_t outbox, outbox_tick_t current_tick, outbox_tick_t timeout)
+{
+    int msg_id = -1;
+    outbox_item_handle_t item, tmp;
+    STAILQ_FOREACH_SAFE(item, outbox, next, tmp) {
+        if (current_tick - item->tick > timeout) {
+            STAILQ_REMOVE(outbox, item, outbox_item, next);
+            free(item->buffer);
+            msg_id = item->msg_id;
+            free(item);
+            return msg_id;
+        }
+
+    }
+    return msg_id;
+}
 
 int outbox_delete_expired(outbox_handle_t outbox, outbox_tick_t current_tick, outbox_tick_t timeout)
 {

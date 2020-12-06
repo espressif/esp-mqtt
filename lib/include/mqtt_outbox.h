@@ -44,6 +44,12 @@ esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type);
 esp_err_t outbox_delete_msgid(outbox_handle_t outbox, int msg_id);
 esp_err_t outbox_delete_msgtype(outbox_handle_t outbox, int msg_type);
 int outbox_delete_expired(outbox_handle_t outbox, outbox_tick_t current_tick, outbox_tick_t timeout);
+/**
+ * @brief Deletes single expired message returning it's message id
+ *
+ * @return msg id of the deleted message, -1 if no expired message in the outbox
+ */
+int outbox_delete_single_expired(outbox_handle_t outbox, outbox_tick_t current_tick, outbox_tick_t timeout);
 
 esp_err_t outbox_set_pending(outbox_handle_t outbox, int msg_id, pending_state_t pending);
 esp_err_t outbox_set_tick(outbox_handle_t outbox, int msg_id, outbox_tick_t tick);

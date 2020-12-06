@@ -57,6 +57,13 @@ typedef enum {
                                         and current data offset updating.
                                          */
     MQTT_EVENT_BEFORE_CONNECT,     /*!< The event occurs before connecting */
+    MQTT_EVENT_DELETED,            /*!< Notification on delete of one message from the internal outbox,
+                                        if the message couldn't have been sent and acknowledged before expiring
+                                        defined in OUTBOX_EXPIRED_TIMEOUT_MS.
+                                        (events are not posted upon deletion of successfully acknowledged messages)
+                                        - This event id is posted only if MQTT_REPORT_DELETED_MESSAGES==1
+                                        - Additional context: msg_id (id of the deleted message).
+                                        */
 } esp_mqtt_event_id_t;
 
 /**
