@@ -43,6 +43,7 @@ uint8_t *outbox_item_get_data(outbox_item_handle_t item,  size_t *len, uint16_t 
 esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type);
 esp_err_t outbox_delete_msgid(outbox_handle_t outbox, int msg_id);
 esp_err_t outbox_delete_msgtype(outbox_handle_t outbox, int msg_type);
+esp_err_t outbox_delete_item(outbox_handle_t outbox, outbox_item_handle_t item);
 int outbox_delete_expired(outbox_handle_t outbox, outbox_tick_t current_tick, outbox_tick_t timeout);
 /**
  * @brief Deletes single expired message returning it's message id

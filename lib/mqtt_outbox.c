@@ -80,6 +80,20 @@ outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox, pending_state_t pend
     return NULL;
 }
 
+esp_err_t outbox_delete_item(outbox_handle_t outbox, outbox_item_handle_t item_to_delete)
+{
+    outbox_item_handle_t item;
+    STAILQ_FOREACH(item, outbox, next) {
+        if (item == item_to_delete) {
+            STAILQ_REMOVE(outbox, item, outbox_item, next);
+            free(item->buffer);
+            free(item);
+            return ESP_OK;
+        }
+    }
+    return ESP_FAIL;
+}
+
 uint8_t *outbox_item_get_data(outbox_item_handle_t item,  size_t *len, uint16_t *msg_id, int *msg_type, int *qos)
 {
     if (item) {
