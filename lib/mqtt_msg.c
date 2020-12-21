@@ -64,7 +64,11 @@ static uint16_t append_message_id(mqtt_connection_t *connection, uint16_t messag
     // If message_id is zero then we should assign one, otherwise
     // we'll use the one supplied by the caller
     while (message_id == 0) {
+#if MQTT_MSG_ID_INCREMENTAL
+        message_id = ++connection->last_message_id;
+#else
         message_id = platform_random(65535);
+#endif
     }
 
     if (connection->message.length + 2 > connection->buffer_length) {

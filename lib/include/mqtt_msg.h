@@ -70,8 +70,9 @@ typedef struct mqtt_message {
 
 typedef struct mqtt_connection {
     mqtt_message_t message;
-
-    uint16_t message_id;
+#if MQTT_MSG_ID_INCREMENTAL
+    uint16_t last_message_id;   /*!< last used id if incremental message id configured */
+#endif
     uint8_t *buffer;
     size_t buffer_length;
 
@@ -83,7 +84,7 @@ typedef struct mqtt_connect_info {
     char *password;
     char *will_topic;
     char *will_message;
-    int keepalive;          // keepalive=0 -> keepalive is disabled
+    int keepalive;          /*!< keepalive=0 -> keepalive is disabled */
     int will_length;
     int will_qos;
     int will_retain;

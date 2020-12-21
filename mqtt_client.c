@@ -1279,7 +1279,40 @@ static esp_err_t mqtt_resend_queued(esp_mqtt_client_handle_t client, outbox_item
         esp_mqtt_abort_connection(client);
         return ESP_FAIL;
     }
+
+    // check if it was QoS-0 publish message
+    if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH && client->mqtt_state.pending_publish_qos == 0) {
+            // delete all qos0 publish messages once we process them
+            if (outbox_delete_item(client->outbox, item) != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to remove queued qos0 message from the outbox");
+            }
+    }
     return ESP_OK;
+}
+
+static void mqtt_delete_expired_messages(esp_mqtt_client_handle_t client)
+{
+    // Delete message after OUTBOX_EXPIRED_TIMEOUT_MS milliseconds
+#if MQTT_REPORT_DELETED_MESSAGES
+    // also report the deleted items as MQTT_EVENT_DELETED events if enabled
+    int deleted_items = 0;
+    int msg_id = 0;
+    while ((msg_id = outbox_delete_single_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS)) > 0) {
+        client->event.event_id = MQTT_EVENT_DELETED;
+        client->event.msg_id = msg_id;
+        if (esp_mqtt_dispatch_event(client) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to post event on deleting message id=%d", msg_id);
+        }
+        deleted_items ++;
+    }
+#else
+    int deleted_items = outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
+#endif
+    client->mqtt_state.pending_msg_count -= deleted_items;
+
+    if (client->mqtt_state.pending_msg_count < 0) {
+        client->mqtt_state.pending_msg_count = 0;
+    }
 }
 
 static void esp_mqtt_task(void *pv)
@@ -1353,13 +1386,8 @@ static void esp_mqtt_task(void *pv)
                 break;
             }
 
-            //Delete message after OUTBOX_EXPIRED_TIMEOUT_MS miliseconds
-            int deleted = outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
-            client->mqtt_state.pending_msg_count -= deleted;
-
-            if (client->mqtt_state.pending_msg_count < 0) {
-                client->mqtt_state.pending_msg_count = 0;
-            }
+            // delete long pending messages
+            mqtt_delete_expired_messages(client);
 
             // resend all non-transmitted messages first
             outbox_item_handle_t item = outbox_dequeue(client->outbox, QUEUED, NULL);
@@ -1609,10 +1637,10 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
     return client->mqtt_state.pending_msg_id;
 }
 
-int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain)
+static inline int mqtt_client_enqueue_priv(esp_mqtt_client_handle_t client, const char *topic, const char *data,
+                                           int len, int qos, int retain, bool store)
 {
     uint16_t pending_msg_id = 0;
-    int ret = 0;
 
     /* Acceptable publish messages:
         data == NULL, len == 0: publish null message
@@ -1623,20 +1651,18 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         len = strlen(data);
     }
 
-    MQTT_API_LOCK(client);
     mqtt_message_t *publish_msg = mqtt_msg_publish(&client->mqtt_state.mqtt_connection,
-                                  topic, data, len,
-                                  qos, retain,
-                                  &pending_msg_id);
+                                                   topic, data, len,
+                                                   qos, retain,
+                                                   &pending_msg_id);
 
     if (publish_msg->length == 0) {
         ESP_LOGE(TAG, "Publish message cannot be created");
-        MQTT_API_UNLOCK(client);
         return -1;
     }
     /* We have to set as pending all the qos>0 messages */
     client->mqtt_state.outbound_message = publish_msg;
-    if (qos > 0) {
+    if (qos > 0 || store) {
         client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
         client->mqtt_state.pending_msg_id = pending_msg_id;
         client->mqtt_state.pending_publish_qos = qos;
@@ -1647,8 +1673,28 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         } else {
             int first_fragment = client->mqtt_state.outbound_message->length - client->mqtt_state.outbound_message->fragmented_msg_data_offset;
             mqtt_enqueue_oversized(client, ((uint8_t *)data) + first_fragment, len - first_fragment);
+            client->mqtt_state.outbound_message->fragmented_msg_total_length = 0;
         }
     }
+    return pending_msg_id;
+}
+
+int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain)
+{
+    MQTT_API_LOCK(client);
+#if MQTT_SKIP_PUBLISH_IF_DISCONNECTED
+    if (client->state != MQTT_STATE_CONNECTED) {
+        ESP_LOGI(TAG, "Publishing skipped: client is not connected");
+        MQTT_API_UNLOCK(client);
+        return -1;
+    }
+#endif
+    int pending_msg_id = mqtt_client_enqueue_priv(client, topic, data, len, qos, retain, false);
+    if (pending_msg_id < 0) {
+        MQTT_API_UNLOCK(client);
+        return -1;
+    }
+    int ret = 0;
 
     /* Skip sending if not connected (rely on resending) */
     if (client->state != MQTT_STATE_CONNECTED) {
@@ -1657,13 +1703,8 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
             ret = pending_msg_id;
         }
 
-        //Delete message after OUTBOX_EXPIRED_TIMEOUT_MS miliseconds
-        int deleted = outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
-        client->mqtt_state.pending_msg_count -= deleted;
-
-        if (client->mqtt_state.pending_msg_count < 0) {
-            client->mqtt_state.pending_msg_count = 0;
-        }
+        // delete long pending messages
+        mqtt_delete_expired_messages(client);
 
         goto cannot_publish;
     }
@@ -1727,6 +1768,17 @@ cannot_publish:
     return ret;
 }
 
+int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain, bool store)
+{
+    MQTT_API_LOCK(client);
+    int ret = mqtt_client_enqueue_priv(client, topic, data, len, qos, retain, store);
+    MQTT_API_UNLOCK(client);
+    if (ret == 0 && store == false) {
+        // messages with qos=0 are not enqueued if not overridden by store_in_outobx -> indicate as error
+        return -1;
+    }
+    return ret;
+}
 
 esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mqtt_event_id_t event, esp_event_handler_t event_handler, void* event_handler_arg)
 {
