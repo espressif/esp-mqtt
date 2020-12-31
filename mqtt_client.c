@@ -120,7 +120,7 @@ const static int DISCONNECT_BIT = BIT2;
 
 static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_dispatch_event_with_msgid(esp_mqtt_client_handle_t client);
-static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client);
+static void esp_mqtt_destroy_config(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms);
 static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client);
@@ -535,21 +535,20 @@ _mqtt_set_config_failed:
     return err;
 }
 
-static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
+static void esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
 {
-    mqtt_config_storage_t *cfg = client->config;
-    if (cfg == NULL) {
-        return ESP_ERR_INVALID_STATE;
+    if (client->config == NULL) {
+        return;
     }
-    free(cfg->host);
-    free(cfg->uri);
-    free(cfg->path);
-    free(cfg->scheme);
-    for (int i = 0; i < cfg->num_alpn_protos; i++) {
-            free(cfg->alpn_protos[i]);
+    free(client->config->host);
+    free(client->config->uri);
+    free(client->config->path);
+    free(client->config->scheme);
+    for (int i = 0; i < client->config->num_alpn_protos; i++) {
+        free(client->config->alpn_protos[i]);
     }
-    free(cfg->alpn_protos);
-    free(cfg->clientkey_password);
+    free(client->config->alpn_protos);
+    free(client->config->clientkey_password);
     free(client->connect_info.will_topic);
     free(client->connect_info.will_message);
     free(client->connect_info.client_id);
@@ -561,10 +560,9 @@ static esp_err_t esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
         esp_event_loop_delete(client->config->event_loop_handle);
     }
 #endif
-    memset(cfg, 0, sizeof(mqtt_config_storage_t));
+    memset(client->config, 0, sizeof(mqtt_config_storage_t));
     free(client->config);
     client->config = NULL;
-    return ESP_OK;
 }
 
 static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms)
