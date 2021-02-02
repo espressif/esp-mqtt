@@ -85,11 +85,10 @@ typedef struct {
 } mqtt_config_storage_t;
 
 typedef enum {
-    MQTT_STATE_ERROR = -1,
-    MQTT_STATE_UNKNOWN = 0,
-    MQTT_STATE_INIT,
+    MQTT_STATE_INIT = 0,
+    MQTT_STATE_DISCONNECTED,
     MQTT_STATE_CONNECTED,
-    MQTT_STATE_WAIT_TIMEOUT,
+    MQTT_STATE_WAIT_RECONNECT,
 } mqtt_client_state_t;
 
 struct esp_mqtt_client {
@@ -630,7 +629,7 @@ static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
     esp_transport_close(client->transport);
     client->wait_timeout_ms = client->config->reconnect_timeout_ms;
     client->reconnect_tick = platform_tick_get_ms();
-    client->state = MQTT_STATE_WAIT_TIMEOUT;
+    client->state = MQTT_STATE_WAIT_RECONNECT;
     ESP_LOGD(TAG, "Reconnect after %d ms", client->wait_timeout_ms);
     client->event.event_id = MQTT_EVENT_DISCONNECTED;
     client->wait_for_ping_resp = false;
@@ -1321,7 +1320,9 @@ static void esp_mqtt_task(void *pv)
     xEventGroupClearBits(client->status_bits, STOPPED_BIT);
     while (client->run) {
         MQTT_API_LOCK(client);
-        switch ((int)client->state) {
+        switch (client->state) {
+        case MQTT_STATE_DISCONNECTED:
+            break;
         case MQTT_STATE_INIT:
             xEventGroupClearBits(client->status_bits, RECONNECT_BIT | DISCONNECT_BIT);
             client->event.event_id = MQTT_EVENT_BEFORE_CONNECT;
@@ -1415,11 +1416,12 @@ static void esp_mqtt_task(void *pv)
 
             outbox_cleanup(client->outbox, OUTBOX_MAX_SIZE);
             break;
-        case MQTT_STATE_WAIT_TIMEOUT:
+        case MQTT_STATE_WAIT_RECONNECT:
 
             if (!client->config->auto_reconnect) {
                 client->run = false;
-                client->state = MQTT_STATE_UNKNOWN;
+                client->state = MQTT_STATE_DISCONNECTED;
+                ESP_LOGD(TAG, "MQTT client disconnected.");
                 break;
             }
             if (platform_tick_get_ms() - client->reconnect_tick > client->wait_timeout_ms) {
@@ -1433,6 +1435,9 @@ static void esp_mqtt_task(void *pv)
                                 client->wait_timeout_ms / 2 / portTICK_RATE_MS);
             // continue the while loop instead of break, as the mutex is unlocked
             continue;
+        default:
+            ESP_LOGE(TAG, "MQTT client error, client is in an unrecoverable state.");
+            break;
         }
         MQTT_API_UNLOCK(client);
         if (MQTT_STATE_CONNECTED == client->state) {
@@ -1456,7 +1461,7 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
         return ESP_ERR_INVALID_ARG;
     }
     MQTT_API_LOCK(client);
-    if (client->state >= MQTT_STATE_INIT) {
+    if (client->state != MQTT_STATE_INIT && client->state != MQTT_STATE_DISCONNECTED) {
         ESP_LOGE(TAG, "Client has started");
         MQTT_API_UNLOCK(client);
         return ESP_FAIL;
@@ -1490,7 +1495,7 @@ esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client)
 {
     ESP_LOGI(TAG, "Client force reconnect requested");
 
-    if (client->state != MQTT_STATE_WAIT_TIMEOUT) {
+    if (client->state != MQTT_STATE_WAIT_RECONNECT) {
         ESP_LOGD(TAG, "The client is not waiting for reconnection. Ignore the request");
         return ESP_FAIL;
     }
@@ -1526,7 +1531,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
         }
 
         client->run = false;
-        client->state = MQTT_STATE_UNKNOWN;
+        client->state = MQTT_STATE_DISCONNECTED;
         MQTT_API_UNLOCK(client);
         xEventGroupWaitBits(client->status_bits, STOPPED_BIT, false, true, portMAX_DELAY);
         return ESP_OK;
