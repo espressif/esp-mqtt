@@ -475,6 +475,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     if (config->clientkey_password && config->clientkey_password_len) {
         client->config->clientkey_password_len = config->clientkey_password_len;
         client->config->clientkey_password = malloc(client->config->clientkey_password_len);
+        ESP_MEM_CHECK(TAG, client->config->clientkey_password, goto _mqtt_set_config_failed);
         memcpy(client->config->clientkey_password, config->clientkey_password, client->config->clientkey_password_len);
     }
 
