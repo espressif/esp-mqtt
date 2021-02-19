@@ -5,8 +5,6 @@
 #include "esp_log.h"
 
 #ifndef CONFIG_MQTT_CUSTOM_OUTBOX
-
-
 static const char *TAG = "OUTBOX";
 
 typedef struct outbox_item {
@@ -151,7 +149,7 @@ esp_err_t outbox_set_tick(outbox_handle_t outbox, int msg_id, outbox_tick_t tick
         item->tick = tick;
         return ESP_OK;
     }
-    return ESP_FAIL; 
+    return ESP_FAIL;
 }
 
 esp_err_t outbox_delete_msgtype(outbox_handle_t outbox, int msg_type)

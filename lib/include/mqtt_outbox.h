@@ -6,6 +6,7 @@
 #ifndef _MQTT_OUTOBX_H_
 #define _MQTT_OUTOBX_H_
 #include "platform.h"
+#include "esp_err.h"
 
 #ifdef  __cplusplus
 extern "C" {

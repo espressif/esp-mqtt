@@ -11,7 +11,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include "esp_err.h"
-
 #include "esp_event.h"
 
 #ifdef __cplusplus
@@ -20,8 +19,8 @@ extern "C" {
 
 #ifndef ESP_EVENT_DECLARE_BASE
 // Define event loop types if macros not available
-typedef void * esp_event_loop_handle_t;
-typedef void * esp_event_handler_t;
+typedef void *esp_event_loop_handle_t;
+typedef void *esp_event_handler_t;
 #endif
 
 typedef struct esp_mqtt_client *esp_mqtt_client_handle_t;
@@ -190,7 +189,7 @@ typedef struct {
     size_t client_key_len;                  /*!< Length of the buffer pointed to by client_key_pem. May be 0 for null-terminated pem */
     esp_mqtt_transport_t transport;         /*!< overrides URI transport */
     int refresh_connection_after_ms;        /*!< Refresh connection after this value (in milliseconds) */
-    const struct psk_key_hint* psk_hint_key;     /*!< Pointer to PSK struct defined in esp_tls.h to enable PSK authentication (as alternative to certificate verification). If not NULL and server/client certificates are NULL, PSK is enabled */
+    const struct psk_key_hint *psk_hint_key;     /*!< Pointer to PSK struct defined in esp_tls.h to enable PSK authentication (as alternative to certificate verification). If not NULL and server/client certificates are NULL, PSK is enabled */
     bool          use_global_ca_store;      /*!< Use a global ca_store for all the connections in which this bool is set. */
     int reconnect_timeout_ms;               /*!< Reconnect to the broker after this value in miliseconds if auto reconnect is not disabled (defaults to 10s) */
     const char **alpn_protos;               /*!< NULL-terminated list of supported application protocols to be used for ALPN */
@@ -383,7 +382,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
  * @return ESP_ERR_NO_MEM if failed to allocate
  *         ESP_OK on success
  */
-esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mqtt_event_id_t event, esp_event_handler_t event_handler, void* event_handler_arg);
+esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mqtt_event_id_t event, esp_event_handler_t event_handler, void *event_handler_arg);
 
 /**
  * @brief Get outbox size

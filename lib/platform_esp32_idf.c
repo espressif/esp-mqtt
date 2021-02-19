@@ -1,9 +1,11 @@
 #include "platform.h"
 
 #ifdef ESP_PLATFORM
-#include "esp_system.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include <sys/time.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 static const char *TAG = "PLATFORM";
 
