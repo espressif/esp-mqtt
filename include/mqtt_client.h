@@ -242,6 +242,7 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client);
  * @param client    mqtt client handle
  *
  * @return ESP_OK on success
+ *         ESP_ERR_INVALID_ARG on wrong initialization
  *         ESP_FAIL if client is in invalid state
  */
 esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client);
@@ -252,6 +253,7 @@ esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client);
  * @param client    mqtt client handle
  *
  * @return ESP_OK on success
+ *         ESP_ERR_INVALID_ARG on wrong initialization
  */
 esp_err_t esp_mqtt_client_disconnect(esp_mqtt_client_handle_t client);
 
@@ -264,6 +266,7 @@ esp_err_t esp_mqtt_client_disconnect(esp_mqtt_client_handle_t client);
  * @param client    mqtt client handle
  *
  * @return ESP_OK on success
+ *         ESP_ERR_INVALID_ARG on wrong initialization
  *         ESP_FAIL if client is in invalid state
  */
 esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
@@ -357,6 +360,7 @@ int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic, 
  * @param client    mqtt client handle
  *
  * @return ESP_OK
+ *         ESP_ERR_INVALID_ARG on wrong initialization
  */
 esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client);
 
@@ -381,6 +385,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
  * @param event_handler_arg handlers context
  *
  * @return ESP_ERR_NO_MEM if failed to allocate
+ *         ESP_ERR_INVALID_ARG on wrong initialization
  *         ESP_OK on success
  */
 esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mqtt_event_id_t event, esp_event_handler_t event_handler, void* event_handler_arg);
@@ -390,6 +395,7 @@ esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mq
  *
  * @param client            mqtt client handle
  * @return outbox size
+ *         0 on wrong initialization
  */
 int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client);
 
