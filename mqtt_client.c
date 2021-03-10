@@ -322,6 +322,10 @@ static bool set_if_config(char const *const new_config, char **old_config)
 
 esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_client_config_t *config)
 {
+    if (!client) {
+        ESP_LOGE(TAG, "Client was not initialized");
+        return ESP_ERR_INVALID_ARG;
+    }
     MQTT_API_LOCK(client);
     //Copy user configurations to client context
     esp_err_t err = ESP_OK;
@@ -1487,6 +1491,10 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
 
 esp_err_t esp_mqtt_client_disconnect(esp_mqtt_client_handle_t client)
 {
+    if (!client) {
+        ESP_LOGE(TAG, "Client was not initialized");
+        return ESP_ERR_INVALID_ARG;
+    }
     ESP_LOGI(TAG, "Client asked to disconnect");
     xEventGroupSetBits(client->status_bits, DISCONNECT_BIT);
     return ESP_OK;
@@ -1494,8 +1502,11 @@ esp_err_t esp_mqtt_client_disconnect(esp_mqtt_client_handle_t client)
 
 esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client)
 {
+    if (!client) {
+        ESP_LOGE(TAG, "Client was not initialized");
+        return ESP_ERR_INVALID_ARG;
+    }
     ESP_LOGI(TAG, "Client force reconnect requested");
-
     if (client->state != MQTT_STATE_WAIT_RECONNECT) {
         ESP_LOGD(TAG, "The client is not waiting for reconnection. Ignore the request");
         return ESP_FAIL;
@@ -1507,6 +1518,10 @@ esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client)
 
 esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 {
+    if (!client) {
+        ESP_LOGE(TAG, "Client was not initialized");
+        return ESP_ERR_INVALID_ARG;
+    }
     MQTT_API_LOCK(client);
     if (client->run) {
         /* A running client cannot be stopped from the MQTT task/event handler */
@@ -1561,6 +1576,10 @@ static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client)
 
 int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic, int qos)
 {
+    if (!client) {
+        ESP_LOGE(TAG, "Client was not initialized");
+        return -1;
+    }
     MQTT_API_LOCK(client);
     if (client->state != MQTT_STATE_CONNECTED) {
         ESP_LOGE(TAG, "Client has not connected");
@@ -1594,6 +1613,10 @@ int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic
 
 int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *topic)
 {
+    if (!client) {
+        ESP_LOGE(TAG, "Client was not initialized");
+        return -1;
+    }
     MQTT_API_LOCK(client);
     if (client->state != MQTT_STATE_CONNECTED) {
         MQTT_API_UNLOCK(client);
@@ -1670,6 +1693,10 @@ static inline int mqtt_client_enqueue_priv(esp_mqtt_client_handle_t client, cons
 
 int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain)
 {
+    if (!client) {
+        ESP_LOGE(TAG, "Client was not initialized");
+        return -1;
+    }
     MQTT_API_LOCK(client);
 #if MQTT_SKIP_PUBLISH_IF_DISCONNECTED
     if (client->state != MQTT_STATE_CONNECTED) {
@@ -1759,6 +1786,10 @@ cannot_publish:
 
 int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain, bool store)
 {
+    if (!client) {
+        ESP_LOGE(TAG, "Client was not initialized");
+        return -1;
+    }
     MQTT_API_LOCK(client);
     int ret = mqtt_client_enqueue_priv(client, topic, data, len, qos, retain, store);
     MQTT_API_UNLOCK(client);
