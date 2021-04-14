@@ -253,7 +253,12 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
 
     if (cfg->psk_hint_key) {
 #if defined(MQTT_SUPPORTED_FEATURE_PSK_AUTHENTICATION) && MQTT_ENABLE_SSL
+#ifdef CONFIG_ESP_TLS_PSK_VERIFICATION
         esp_transport_ssl_set_psk_key_hint(ssl, cfg->psk_hint_key);
+#else
+        ESP_LOGE(TAG, "PSK authentication configured but not enabled in menuconfig: Please enable ESP_TLS_PSK_VERIFICATION option");
+        goto esp_mqtt_set_transport_failed;
+#endif
 #else
         ESP_LOGE(TAG, "PSK authentication is not available in IDF version %s", IDF_VER);
         goto esp_mqtt_set_transport_failed;
@@ -262,7 +267,12 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
 
     if (cfg->alpn_protos) {
 #if defined(MQTT_SUPPORTED_FEATURE_ALPN) && MQTT_ENABLE_SSL
+#if defined(CONFIG_MBEDTLS_SSL_ALPN) || defined(CONFIG_WOLFSSL_HAVE_ALPN)
         esp_transport_ssl_set_alpn_protocol(ssl, (const char **)cfg->alpn_protos);
+#else
+        ESP_LOGE(TAG, "APLN configured but not enabled in menuconfig: Please enable MBEDTLS_SSL_ALPN or WOLFSSL_HAVE_ALPN option");
+        goto esp_mqtt_set_transport_failed;
+#endif
 #else
         ESP_LOGE(TAG, "APLN is not available in IDF version %s", IDF_VER);
         goto esp_mqtt_set_transport_failed;
