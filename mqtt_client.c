@@ -78,6 +78,7 @@ typedef struct {
     char *clientkey_password;
     int clientkey_password_len;
     bool use_global_ca_store;
+    esp_err_t ((*crt_bundle_attach)(void *conf));
     const char *cacert_buf;
     size_t cacert_bytes;
     const char *clientcert_buf;
@@ -206,6 +207,10 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
     } else {
         ESP_OK_CHECK(TAG, esp_mqtt_set_cert_key_data(ssl, MQTT_SSL_DATA_API_CA_CERT, cfg->cacert_buf, cfg->cacert_bytes),
                      goto esp_mqtt_set_transport_failed);
+    }
+
+    if (cfg->crt_bundle_attach != NULL) {
+        esp_transport_ssl_crt_bundle_attach(ssl, cfg->crt_bundle_attach);
     }
 
     if (cfg->use_secure_element) {
@@ -480,6 +485,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     client->config->psk_hint_key = config->psk_hint_key;
     client->config->skip_cert_common_name_check = config->skip_cert_common_name_check;
     client->config->use_secure_element = config->use_secure_element;
+    client->config->crt_bundle_attach = config->crt_bundle_attach;
     client->config->ds_data = config->ds_data;
 
     if (config->clientkey_password && config->clientkey_password_len) {
