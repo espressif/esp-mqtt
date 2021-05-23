@@ -554,9 +554,30 @@ static void esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
     client->config = NULL;
 }
 
+static inline esp_err_t esp_mqtt_write(esp_mqtt_client_handle_t client)
+{
+    int wlen = 0, widx = 0, len = client->mqtt_state.outbound_message->length;
+    while (len > 0) {
+        wlen = esp_transport_write(client->transport,
+                                   (char *)client->mqtt_state.outbound_message->data + widx,
+                                   len,
+                                   client->config->network_timeout_ms);
+        if (wlen < 0) {
+            ESP_LOGE(TAG, "Writing failed: errno=%d", errno);
+            return ESP_FAIL;
+        } else if (wlen == 0) {
+            ESP_LOGE(TAG, "Writing didn't complete in specified timeout: errno=%d", errno);
+            return ESP_ERR_TIMEOUT;
+        }
+        widx += wlen;
+        len -= wlen;
+    }
+    return ESP_OK;
+}
+
 static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms)
 {
-    int write_len, read_len, connect_rsp_code;
+    int read_len, connect_rsp_code;
     client->wait_for_ping_resp = false;
     client->mqtt_state.outbound_message = mqtt_msg_connect(&client->mqtt_state.mqtt_connection,
                                           client->mqtt_state.connect_info);
@@ -572,12 +593,7 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
              client->mqtt_state.pending_msg_type,
              client->mqtt_state.pending_msg_id);
 
-    write_len = esp_transport_write(client->transport,
-                                    (char *)client->mqtt_state.outbound_message->data,
-                                    client->mqtt_state.outbound_message->length,
-                                    client->config->network_timeout_ms);
-    if (write_len < 0) {
-        ESP_LOGE(TAG, "Writing failed, errno= %d", errno);
+    if (esp_mqtt_write(client) != ESP_OK) {
         return ESP_FAIL;
     }
 
@@ -858,14 +874,8 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
 
 static esp_err_t mqtt_write_data(esp_mqtt_client_handle_t client)
 {
-    int write_len = esp_transport_write(client->transport,
-                                        (char *)client->mqtt_state.outbound_message->data,
-                                        client->mqtt_state.outbound_message->length,
-                                        client->config->network_timeout_ms);
-    // client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
-    if (write_len <= 0) {
+    if (esp_mqtt_write(client) != ESP_OK) {
         esp_mqtt_client_dispatch_transport_error(client);
-        ESP_LOGE(TAG, "Error write data or timeout, written len = %d, errno=%d", write_len, errno);
         return ESP_FAIL;
     }
     /* we've just sent a mqtt control packet, update keepalive counter
