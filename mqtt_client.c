@@ -923,6 +923,7 @@ static esp_err_t deliver_publish(esp_mqtt_client_handle_t client)
     }
 
     // post data event
+    client->event.retain = mqtt_get_retain(msg_buf);
     client->event.msg_id = mqtt_get_id(msg_buf, msg_data_len);
     client->event.total_data_len = msg_data_len + msg_total_len - msg_read_len;
 
