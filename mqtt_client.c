@@ -369,6 +369,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
 
     err = ESP_ERR_NO_MEM;
     ESP_MEM_CHECK(TAG, set_if_config(config->host, &client->config->host), goto _mqtt_set_config_failed);
+    ESP_MEM_CHECK(TAG, set_if_config(config->path, &client->config->path), goto _mqtt_set_config_failed);
     ESP_MEM_CHECK(TAG, set_if_config(config->username, &client->connect_info.username), goto _mqtt_set_config_failed);
     ESP_MEM_CHECK(TAG, set_if_config(config->password, &client->connect_info.password), goto _mqtt_set_config_failed);
 
