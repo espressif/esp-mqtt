@@ -50,6 +50,7 @@ typedef enum {
                                         - data_len             length of the data for this event
                                         - current_data_offset  offset of the current data for this event
                                         - total_data_len       total length of the data received
+                                        - retain               retain flag of the message
                                         Note: Multiple MQTT_EVENT_DATA could be fired for one message, if it is
                                         longer than internal buffer. In that case only first event contains topic
                                         pointer and length, other contain data only with current data length
@@ -151,6 +152,7 @@ typedef struct {
     int msg_id;                         /*!< MQTT messaged id of message */
     int session_present;                /*!< MQTT session_present flag for connection event */
     esp_mqtt_error_codes_t *error_handle; /*!< esp-mqtt error handle including esp-tls errors as well as internal mqtt errors */
+    bool retain;                        /*!< Retained flag of the message associated with this event */
 } esp_mqtt_event_t;
 
 typedef esp_mqtt_event_t *esp_mqtt_event_handle_t;
