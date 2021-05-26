@@ -191,6 +191,7 @@ typedef struct {
     int refresh_connection_after_ms;        /*!< Refresh connection after this value (in milliseconds) */
     const struct psk_key_hint *psk_hint_key;     /*!< Pointer to PSK struct defined in esp_tls.h to enable PSK authentication (as alternative to certificate verification). If not NULL and server/client certificates are NULL, PSK is enabled */
     bool          use_global_ca_store;      /*!< Use a global ca_store for all the connections in which this bool is set. */
+    esp_err_t ((*crt_bundle_attach)(void *conf)); /*!< Pointer to ESP x509 Certificate Bundle attach function for the usage of certification bundles in mqtts */
     int reconnect_timeout_ms;               /*!< Reconnect to the broker after this value in miliseconds if auto reconnect is not disabled (defaults to 10s) */
     const char **alpn_protos;               /*!< NULL-terminated list of supported application protocols to be used for ALPN */
     const char *clientkey_password;         /*!< Client key decryption password string */
