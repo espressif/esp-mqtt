@@ -27,13 +27,6 @@
 #define MQTT_BUFFER_SIZE_BYTE       1024
 #endif
 
-#define MQTT_MAX_HOST_LEN           64
-#define MQTT_MAX_CLIENT_LEN         32
-#define MQTT_MAX_USERNAME_LEN       32
-#define MQTT_MAX_PASSWORD_LEN       65
-#define MQTT_MAX_LWT_TOPIC          32
-#define MQTT_MAX_LWT_MSG            128
-
 #if CONFIG_MQTT_TASK_PRIORITY
 #define MQTT_TASK_PRIORITY          CONFIG_MQTT_TASK_PRIORITY
 #else
@@ -47,7 +40,6 @@
 #endif
 
 #define MQTT_KEEPALIVE_TICK         (120)
-#define MQTT_CMD_QUEUE_SIZE         (10)
 #define MQTT_NETWORK_TIMEOUT_MS     (10000)
 
 #ifdef CONFIG_MQTT_TCP_DEFAULT_PORT
