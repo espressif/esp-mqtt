@@ -127,7 +127,7 @@ static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_dispatch_event_with_msgid(esp_mqtt_client_handle_t client);
 static void esp_mqtt_destroy_config(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms);
-static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client);
+static void esp_mqtt_abort_connection(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client);
 static char *create_string(const char *ptr, int len);
 static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_timeout_ms);
@@ -673,7 +673,7 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
     return ESP_FAIL;
 }
 
-static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
+static void esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
 {
     MQTT_API_LOCK(client);
     esp_transport_close(client->transport);
@@ -685,7 +685,6 @@ static esp_err_t esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
     client->wait_for_ping_resp = false;
     esp_mqtt_dispatch_event_with_msgid(client);
     MQTT_API_UNLOCK(client);
-    return ESP_OK;
 }
 
 static bool create_client_data(esp_mqtt_client_handle_t client)
