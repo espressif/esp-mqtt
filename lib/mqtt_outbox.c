@@ -224,7 +224,7 @@ esp_err_t outbox_cleanup(outbox_handle_t outbox, int max_size)
     return ESP_OK;
 }
 
-void outbox_destroy(outbox_handle_t outbox)
+void outbox_delete_all_items(outbox_handle_t outbox)
 {
     outbox_item_handle_t item, tmp;
     STAILQ_FOREACH_SAFE(item, outbox, next, tmp) {
@@ -232,6 +232,10 @@ void outbox_destroy(outbox_handle_t outbox)
         free(item->buffer);
         free(item);
     }
+}
+void outbox_destroy(outbox_handle_t outbox)
+{
+    outbox_delete_all_items(outbox);
     free(outbox);
 }
 

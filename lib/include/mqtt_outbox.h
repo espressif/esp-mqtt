@@ -58,6 +58,7 @@ esp_err_t outbox_set_tick(outbox_handle_t outbox, int msg_id, outbox_tick_t tick
 int outbox_get_size(outbox_handle_t outbox);
 esp_err_t outbox_cleanup(outbox_handle_t outbox, int max_size);
 void outbox_destroy(outbox_handle_t outbox);
+void outbox_delete_all_items(outbox_handle_t outbox);
 
 #ifdef  __cplusplus
 }
