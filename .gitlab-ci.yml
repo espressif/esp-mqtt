@@ -47,7 +47,7 @@ build_with_idf_v3:
 
 build_with_idf_v4:
   stage: build
-  image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
+  image: ${CI_DOCKER_REGISTRY}/esp-env:v4.4-1
   tags:
     - build
   dependencies: []
@@ -56,9 +56,12 @@ build_with_idf_v4:
     paths:
       - tidybuild/*
     expire_in: 1 day
+  variables:
+    PYTHON_VER: 3.6.13
   script:
     - cit_add_ssh_key "${GITLAB_KEY}"
     - git clone "${IDF_REPO}"
+    - source /opt/pyenv/activate && pyenv global $PYTHON_VER
     - $MQTT_PATH/ci/set_idf.sh master
     - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
     - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
@@ -71,6 +74,11 @@ build_with_idf_v4:
     - export PEDANTIC_CFLAGS="-Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
     - export EXTRA_CFLAGS=${PEDANTIC_CFLAGS} && export EXTRA_CXXFLAGS=${EXTRA_CFLAGS}
     # build other examples
+    - $MQTT_PATH/ci/build_examples.sh
+    # rebuild with IDFv4.3
+    - $MQTT_PATH/ci/set_idf.sh release/v4.3
+    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
+    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
     - $MQTT_PATH/ci/build_examples.sh
     # rebuild with IDFv4.2
     - $MQTT_PATH/ci/set_idf.sh release/v4.2
@@ -90,26 +98,30 @@ build_with_idf_v4:
 
 build_and_test_qemu:
   stage: build
-  image: ${CI_DOCKER_REGISTRY}/qemu:esp-develop-20191124
+  image: ${CI_DOCKER_REGISTRY}/qemu:esp-develop-20210517-dda2caf0
   tags:
     - build
     - shiny
   dependencies: []
+  variables:
+    PYTHON_VER: 3.7.0
   script:
     - cit_add_ssh_key "${GITLAB_KEY}"
     - git clone "${IDF_REPO}"
-    - $MQTT_PATH/ci/set_idf.sh release/v4.1
+    # switch to IDF and setup the right tools
+    - $MQTT_PATH/ci/set_idf.sh master
+    - source /opt/pyenv/activate && pyenv install $PYTHON_VER && pyenv global $PYTHON_VER
     - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
+    - ./install.sh && source  export.sh
+    - python -m pip install -r $IDF_PATH/tools/ci/python_packages/ttfw_idf/requirements.txt && python -m pip install paho-mqtt
     - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    # build publish stress test
-    - cd $IDF_PATH/examples/protocols/mqtt/publish_test && cat sdkconfig.qemu | $IDF_PATH/tools/ci/envsubst.py >> sdkconfig.defaults && idf.py build
-    - source /opt/pyenv/activate && pyenv global 2.7.15 && python --version
-    # setup runner params
+    # build publish-connect stress test, setup test parameters
+    - cd tools/test_apps/protocols/mqtt/publish_connect_test && cat sdkconfig.qemu | $IDF_PATH/tools/ci/envsubst.py > sdkconfig.defaults && idf.py build
+    - export TEST_PATH=`pwd` && export MQTT_PUBLISH_TEST=1
     - export PYTHONPATH="$IDF_PATH/tools:$IDF_PATH/tools/ci/python_packages"
-    - export TEST_CASE_PATH=$IDF_PATH/components/mqtt/weekend_test
-    - cd $IDF_PATH/tools/ci/python_packages/tiny_test_fw/bin
     # run test (with environment->qemu)
-    - python Runner.py $TEST_CASE_PATH -c $TEST_CASE_PATH/test_weekend_mqtt_qemu.yml -e $TEST_CASE_PATH/env.yml
+    - cd $IDF_PATH/tools/ci/python_packages/tiny_test_fw/bin
+    - python Runner.py $TEST_PATH -c $TEST_PATH/publish_connect_mqtt_qemu.yml -e $TEST_PATH/env.yml
 
 clang_tidy_check:
   stage: static_analysis
