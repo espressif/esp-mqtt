@@ -98,22 +98,20 @@ build_with_idf_v4:
 
 build_and_test_qemu:
   stage: build
-  image: ${CI_DOCKER_REGISTRY}/qemu:esp-develop-20210517-dda2caf0
+  image: ${CI_DOCKER_REGISTRY}/qemu:v4.4-1-20210517
   tags:
     - build
     - shiny
   dependencies: []
   variables:
-    PYTHON_VER: 3.7.0
+    PYTHON_VER: 3.6.13
   script:
     - cit_add_ssh_key "${GITLAB_KEY}"
     - git clone "${IDF_REPO}"
-    # switch to IDF and setup the right tools
+    - source /opt/pyenv/activate && pyenv global $PYTHON_VER
+    # switch to IDF and setup the tools
     - $MQTT_PATH/ci/set_idf.sh master
-    - source /opt/pyenv/activate && pyenv install $PYTHON_VER && pyenv global $PYTHON_VER
     - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - ./install.sh && source  export.sh
-    - python -m pip install -r $IDF_PATH/tools/ci/python_packages/ttfw_idf/requirements.txt && python -m pip install paho-mqtt
     - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
     # build publish-connect stress test, setup test parameters
     - cd tools/test_apps/protocols/mqtt/publish_connect_test && cat sdkconfig.qemu | $IDF_PATH/tools/ci/envsubst.py > sdkconfig.defaults && idf.py build
