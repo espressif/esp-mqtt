@@ -1456,7 +1456,6 @@ static void esp_mqtt_task(void *pv)
                 client->state = MQTT_STATE_INIT;
             }
 
-            outbox_cleanup(client->outbox, OUTBOX_MAX_SIZE);
             break;
         case MQTT_STATE_WAIT_RECONNECT:
 
