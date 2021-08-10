@@ -204,12 +204,14 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
 
     if (cfg->use_global_ca_store == true) {
         esp_transport_ssl_enable_global_ca_store(ssl);
+#ifdef CONFIG_MBEDTLS_CERTIFICATE_BUNDLE
     } else if (cfg->crt_bundle_attach != NULL) {
-#ifdef MQTT_SUPPORTED_FEATURE_CERTIFICATE_BUNDLE
+  #ifdef MQTT_SUPPORTED_FEATURE_CERTIFICATE_BUNDLE
         esp_transport_ssl_crt_bundle_attach(ssl, cfg->crt_bundle_attach);
-#else
+  #else
         ESP_LOGE(TAG, "Certificate bundle feature is not available in IDF version %s", IDF_VER);
         goto esp_mqtt_set_transport_failed;
+  #endif
 #endif
     } else {
         ESP_OK_CHECK(TAG, esp_mqtt_set_cert_key_data(ssl, MQTT_SSL_DATA_API_CA_CERT, cfg->cacert_buf, cfg->cacert_bytes),
