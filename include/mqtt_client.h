@@ -206,6 +206,7 @@ typedef struct {
     int network_timeout_ms;                 /*!< Abort network operation if it is not completed after this value, in milliseconds (defaults to 10s) */
     bool disable_keepalive;                 /*!< Set disable_keepalive=true to turn off keep-alive mechanism, false by default (keepalive is active by default). Note: setting the config value `keepalive` to `0` doesn't disable keepalive feature, but uses a default keepalive period */
     const char *path;                       /*!< Path in the URI*/
+    int message_retransmit_timeout;         /*!< timeout for retansmit of failded packet */
 } esp_mqtt_client_config_t;
 
 /**
@@ -401,6 +402,16 @@ esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mq
  *         0 on wrong initialization
  */
 int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client);
+
+/**
+ * @brief set update Retransmit timeout
+ *
+ * @param client            mqtt client handle
+ * @param timeout_ms        Retransmit timeout
+ * @return ESP_OK on success
+ *         ESP_ERR_INVALID_ARG on wrong initialization
+ */
+esp_err_t esp_mqtt_client_update_retransmit_timeout(esp_mqtt_client_handle_t client, int timeout_ms);
 
 #ifdef __cplusplus
 }

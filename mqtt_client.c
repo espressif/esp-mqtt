@@ -89,6 +89,7 @@ typedef struct {
     bool skip_cert_common_name_check;
     bool use_secure_element;
     void *ds_data;
+    int message_retransmit_timeout;
 } mqtt_config_storage_t;
 
 typedef enum {
@@ -362,6 +363,11 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
             MQTT_API_UNLOCK(client);
             return ESP_ERR_NO_MEM;
         });
+    }
+
+    client->config->message_retransmit_timeout = config->message_retransmit_timeout;
+    if (config->message_retransmit_timeout <= 0) {
+       client->config->message_retransmit_timeout = 1000;
     }
 
     client->config->task_prio = config->task_prio;
@@ -1420,10 +1426,10 @@ static void esp_mqtt_task(void *pv)
                     outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED);
                 }
                 // resend other "transmitted" messages after 1s
-            } else if (platform_tick_get_ms() - last_retransmit > 1000) {
+            } else if (platform_tick_get_ms() - last_retransmit > client->config->message_retransmit_timeout) {
                 last_retransmit = platform_tick_get_ms();
                 item = outbox_dequeue(client->outbox, TRANSMITTED, &msg_tick);
-                if (item && (last_retransmit - msg_tick > 1000))  {
+                if (item && (last_retransmit - msg_tick > client->config->message_retransmit_timeout))  {
                     mqtt_resend_queued(client, item);
                 }
             }
@@ -1898,4 +1904,14 @@ int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client)
     MQTT_API_UNLOCK(client);
 
     return outbox_size;
+}
+
+void esp_mqtt_client_update_retransmit_timeout(esp_mqtt_client_handle_t client, int timeout_ms)
+{
+    if (client == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }        
+
+    client->config->message_retransmit_timeout = timeout_ms;  
+    return ESP_OK;
 }
