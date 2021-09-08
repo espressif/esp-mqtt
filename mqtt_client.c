@@ -1906,12 +1906,3 @@ int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client)
     return outbox_size;
 }
 
-void esp_mqtt_client_update_retransmit_timeout(esp_mqtt_client_handle_t client, int timeout_ms)
-{
-    if (client == NULL) {
-        return ESP_ERR_INVALID_ARG;
-    }        
-
-    client->config->message_retransmit_timeout = timeout_ms;  
-    return ESP_OK;
-}

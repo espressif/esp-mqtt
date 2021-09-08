@@ -403,16 +403,6 @@ esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mq
  */
 int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client);
 
-/**
- * @brief set update Retransmit timeout
- *
- * @param client            mqtt client handle
- * @param timeout_ms        Retransmit timeout
- * @return ESP_OK on success
- *         ESP_ERR_INVALID_ARG on wrong initialization
- */
-esp_err_t esp_mqtt_client_update_retransmit_timeout(esp_mqtt_client_handle_t client, int timeout_ms);
-
 #ifdef __cplusplus
 }
 #endif //__cplusplus
