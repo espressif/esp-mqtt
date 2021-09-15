@@ -206,11 +206,16 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
         esp_transport_ssl_enable_global_ca_store(ssl);
     } else if (cfg->crt_bundle_attach != NULL) {
 #ifdef MQTT_SUPPORTED_FEATURE_CERTIFICATE_BUNDLE
+#ifdef CONFIG_MBEDTLS_CERTIFICATE_BUNDLE
         esp_transport_ssl_crt_bundle_attach(ssl, cfg->crt_bundle_attach);
+#else
+        ESP_LOGE(TAG, "Certificate bundle is not enabled for mbedTLS in menuconfig");
+        goto esp_mqtt_set_transport_failed;
+#endif /* CONFIG_MBEDTLS_CERTIFICATE_BUNDLE */
 #else
         ESP_LOGE(TAG, "Certificate bundle feature is not available in IDF version %s", IDF_VER);
         goto esp_mqtt_set_transport_failed;
-#endif
+#endif /* MQTT_SUPPORTED_FEATURE_CERTIFICATE_BUNDLE */
     } else {
         ESP_OK_CHECK(TAG, esp_mqtt_set_cert_key_data(ssl, MQTT_SSL_DATA_API_CA_CERT, cfg->cacert_buf, cfg->cacert_bytes),
                      goto esp_mqtt_set_transport_failed);
@@ -514,19 +519,28 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
 
     if (config->transport) {
         free(client->config->scheme);
-        if (config->transport == MQTT_TRANSPORT_OVER_WS) {
-            client->config->scheme = create_string("ws", 2);
-            ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
-        } else if (config->transport == MQTT_TRANSPORT_OVER_TCP) {
+        if (config->transport == MQTT_TRANSPORT_OVER_TCP) {
             client->config->scheme = create_string("mqtt", 4);
             ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
-        } else if (config->transport == MQTT_TRANSPORT_OVER_SSL) {
+        }
+#if MQTT_ENABLE_WS
+        else if (config->transport == MQTT_TRANSPORT_OVER_WS) {
+            client->config->scheme = create_string("ws", 2);
+            ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
+        }
+#endif
+#if MQTT_ENABLE_SSL
+        else if (config->transport == MQTT_TRANSPORT_OVER_SSL) {
             client->config->scheme = create_string("mqtts", 5);
             ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
-        } else if (config->transport == MQTT_TRANSPORT_OVER_WSS) {
+        }
+#endif
+#if MQTT_ENABLE_WSS
+        else if (config->transport == MQTT_TRANSPORT_OVER_WSS) {
             client->config->scheme = create_string("wss", 3);
             ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
         }
+#endif
     }
 
     // Set uri at the end of config to override separately configured uri elements
@@ -863,14 +877,18 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
     }
 
     if (client->config->path) {
-        esp_transport_handle_t trans = esp_transport_list_get_transport(client->transport_list, "ws");
-        if (trans) {
-            esp_transport_ws_set_path(trans, client->config->path);
+#if MQTT_ENABLE_WS
+        esp_transport_handle_t ws_trans = esp_transport_list_get_transport(client->transport_list, "ws");
+        if (ws_trans) {
+            esp_transport_ws_set_path(ws_trans, client->config->path);
         }
-        trans = esp_transport_list_get_transport(client->transport_list, "wss");
-        if (trans) {
-            esp_transport_ws_set_path(trans, client->config->path);
+#endif
+#if MQTT_ENABLE_WSS
+        esp_transport_handle_t wss_trans = esp_transport_list_get_transport(client->transport_list, "wss");
+        if (wss_trans) {
+            esp_transport_ws_set_path(wss_trans, client->config->path);
         }
+#endif
     }
 
     if (puri.field_data[UF_PORT].len) {
