@@ -550,11 +550,11 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
             goto _mqtt_set_config_failed;
         }
     }
-    esp_mqtt_check_cfg_conflict(client->config, config);
+    esp_err_t config_has_conflict = esp_mqtt_check_cfg_conflict(client->config, config);
 
     MQTT_API_UNLOCK(client);
 
-    return ESP_OK;
+    return config_has_conflict;
 _mqtt_set_config_failed:
     esp_mqtt_destroy_config(client);
     MQTT_API_UNLOCK(client);

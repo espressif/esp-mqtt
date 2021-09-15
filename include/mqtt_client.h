@@ -375,6 +375,7 @@ esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client);
  * @param config    mqtt configuration structure
  *
  * @return ESP_ERR_NO_MEM if failed to allocate
+ *         ESP_ERR_INVALID_ARG if conflicts on transport configuration.
  *         ESP_OK on success
  */
 esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_client_config_t *config);
