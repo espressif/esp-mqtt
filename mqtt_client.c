@@ -982,7 +982,7 @@ static esp_err_t deliver_publish(esp_mqtt_client_handle_t client)
     client->event.retain = mqtt_get_retain(msg_buf);
     client->event.msg_id = mqtt_get_id(msg_buf, msg_data_len);
     client->event.qos = mqtt_get_qos(msg_buf);
-    client->event.dup = mqtt_get_dup(msg_buff);
+    client->event.dup = mqtt_get_dup(msg_buf);
     client->event.total_data_len = msg_data_len + msg_total_len - msg_read_len;
 
 post_data_event:
@@ -1013,6 +1013,28 @@ post_data_event:
         msg_read_len += msg_data_len;
         goto post_data_event;
     }
+    return ESP_OK;
+}
+
+static esp_err_t deliver_suback(esp_mqtt_client_handle_t client)
+{
+    uint8_t *msg_buf = client->mqtt_state.in_buffer;
+    size_t msg_data_len = client->mqtt_state.in_buffer_read_len;
+    char *msg_data = NULL;
+
+    msg_data = mqtt_get_suback_data(msg_buf, &msg_data_len);
+    if (msg_data_len <= 0) {
+        ESP_LOGE(TAG, "Failed to acquire suback data");
+        return ESP_FAIL;
+    }
+    // post data event
+    client->event.data_len = msg_data_len;
+    client->event.total_data_len = msg_data_len;
+    client->event.event_id = MQTT_EVENT_SUBSCRIBED;
+    client->event.data = msg_data;
+    client->event.current_data_offset = 0;
+    esp_mqtt_dispatch_event_with_msgid(client);
+
     return ESP_OK;
 }
 
@@ -1228,9 +1250,11 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
     switch (msg_type) {
     case MQTT_MSG_TYPE_SUBACK:
         if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_SUBSCRIBE, msg_id)) {
-            ESP_LOGD(TAG, "Subscribe successful");
-            client->event.event_id = MQTT_EVENT_SUBSCRIBED;
-            esp_mqtt_dispatch_event_with_msgid(client);
+            ESP_LOGD(TAG, "deliver_suback, message_length_read=%zu, message_length=%zu", client->mqtt_state.in_buffer_read_len, client->mqtt_state.message_length);
+            if (deliver_suback(client) != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to deliver suback message id=%d", msg_id);
+                return ESP_FAIL;
+            }
         }
         break;
     case MQTT_MSG_TYPE_UNSUBACK:
