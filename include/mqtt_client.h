@@ -153,6 +153,8 @@ typedef struct {
     int session_present;                /*!< MQTT session_present flag for connection event */
     esp_mqtt_error_codes_t *error_handle; /*!< esp-mqtt error handle including esp-tls errors as well as internal mqtt errors */
     bool retain;                        /*!< Retained flag of the message associated with this event */
+    int qos;                            /*!< qos of the messages associated with this event */
+    int dup;                            /*!< Dup flag of the message associated with this event */
 } esp_mqtt_event_t;
 
 typedef esp_mqtt_event_t *esp_mqtt_event_handle_t;
