@@ -998,11 +998,10 @@ static esp_err_t deliver_suback(esp_mqtt_client_handle_t client)
     size_t msg_read_len = client->mqtt_state.in_buffer_read_len;
     size_t msg_data_len = msg_read_len;
     char *msg_data = NULL;
-    ESP_LOGD(TAG, "Get data len= %zu, read len= %zu", msg_data_len, msg_read_len);
 
     msg_data = mqtt_get_suback_data(msg_buf, &msg_data_len);
     if (msg_data_len <= 0) {
-        ESP_LOGE(TAG, "Read error or timeout: len_read=%zu, errno=%d", msg_data_len, errno);
+        ESP_LOGE(TAG, "Failed to acquire suback data");
         return ESP_FAIL;
     }
     // post data event
