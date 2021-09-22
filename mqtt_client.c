@@ -995,8 +995,7 @@ post_data_event:
 static esp_err_t deliver_suback(esp_mqtt_client_handle_t client)
 {
     uint8_t *msg_buf = client->mqtt_state.in_buffer;
-    size_t msg_read_len = client->mqtt_state.in_buffer_read_len;
-    size_t msg_data_len = msg_read_len;
+    size_t msg_data_len = client->mqtt_state.in_buffer_read_len;
     char *msg_data = NULL;
 
     msg_data = mqtt_get_suback_data(msg_buf, &msg_data_len);

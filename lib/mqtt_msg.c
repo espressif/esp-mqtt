@@ -275,7 +275,8 @@ char *mqtt_get_publish_data(uint8_t *buffer, size_t *length)
 char *mqtt_get_suback_data(uint8_t *buffer, size_t *length)
 {
     // SUBACK payload length = total length - (fixed header (2 bytes) + variable header (2 bytes))
-    if ((int)*length - 4 > 0) {
+    // This requires the remaining length to be encoded in 1 byte.
+    if (*length > 4) {
         *length -= 4;
         return (char *)(buffer + 4);
     }
