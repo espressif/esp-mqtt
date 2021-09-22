@@ -958,7 +958,7 @@ static esp_err_t deliver_publish(esp_mqtt_client_handle_t client)
     client->event.retain = mqtt_get_retain(msg_buf);
     client->event.msg_id = mqtt_get_id(msg_buf, msg_data_len);
     client->event.qos = mqtt_get_qos(msg_buf);
-    client->event.dup = mqtt_get_dup(msg_buff);
+    client->event.dup = mqtt_get_dup(msg_buf);
     client->event.total_data_len = msg_data_len + msg_total_len - msg_read_len;
 
 post_data_event:
@@ -995,24 +995,24 @@ post_data_event:
 static esp_err_t deliver_suback(esp_mqtt_client_handle_t client)
 {
     uint8_t *msg_buf = client->mqtt_state.in_buffer;
-    size_t msg_total_len = client->mqtt_state.message_length;
-    // SUBACK payload length = total length - (fixed header (2 bytes) + variable header (2 bytes))
-    int total_data_len = msg_total_len - 4;
-    char *msg_data = (char *)&msg_buf[4];
+    size_t msg_read_len = client->mqtt_state.in_buffer_read_len;
+    size_t msg_data_len = msg_read_len;
+    char *msg_data = NULL;
+    ESP_LOGD(TAG, "Get data len= %zu, read len= %zu", msg_data_len, msg_read_len);
 
+    msg_data = mqtt_get_suback_data(msg_buf, &msg_data_len);
+    if (msg_data_len <= 0) {
+        ESP_LOGE(TAG, "Read error or timeout: len_read=%zu, errno=%d", msg_data_len, errno);
+        return ESP_FAIL;
+    }
     // post data event
-    client->event.retain = false;
-    client->event.msg_id = mqtt_get_id(msg_buf, msg_total_len);
-    client->event.qos = 0;
-    client->event.dup = 0;
-    client->event.total_data_len = total_data_len;
+    client->event.data_len = msg_data_len;
+    client->event.total_data_len = msg_data_len;
     client->event.event_id = MQTT_EVENT_SUBSCRIBED;
-    client->event.data = total_data_len > 0 ? msg_data : NULL;
-    client->event.data_len = total_data_len;
+    client->event.data = msg_data;
     client->event.current_data_offset = 0;
-    client->event.topic = NULL;
-    client->event.topic_len = 0;
-    esp_mqtt_dispatch_event(client);
+    esp_mqtt_dispatch_event_with_msgid(client);
+
     return ESP_OK;
 }
 
