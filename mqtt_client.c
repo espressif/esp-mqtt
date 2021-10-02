@@ -133,7 +133,7 @@ static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client);
 static char *create_string(const char *ptr, int len);
 static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_timeout_ms);
 static void esp_mqtt_client_dispatch_transport_error(esp_mqtt_client_handle_t client);
-
+static esp_err_t send_disconnect_msg(esp_mqtt_client_handle_t client);
 
 #if MQTT_ENABLE_SSL
 enum esp_mqtt_ssl_cert_key_api {
@@ -1451,6 +1451,7 @@ static void esp_mqtt_task(void *pv)
         case MQTT_STATE_CONNECTED:
             // check for disconnection request
             if (xEventGroupWaitBits(client->status_bits, DISCONNECT_BIT, true, true, 0) & DISCONNECT_BIT) {
+                send_disconnect_msg(client);    // ignore error, if clean disconnect fails, just abort the connection
                 esp_mqtt_abort_connection(client);
                 break;
             }
@@ -1601,6 +1602,20 @@ esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client)
     return ESP_OK;
 }
 
+static esp_err_t send_disconnect_msg(esp_mqtt_client_handle_t client)
+{
+    // Notify the broker we are disconnecting
+    client->mqtt_state.outbound_message = mqtt_msg_disconnect(&client->mqtt_state.mqtt_connection);
+    if (client->mqtt_state.outbound_message->length == 0) {
+        ESP_LOGE(TAG, "Disconnect message cannot be created");
+        return ESP_FAIL;
+    }
+    if (mqtt_write_data(client) != ESP_OK) {
+        ESP_LOGE(TAG, "Error sending disconnect message");
+    }
+    return ESP_OK;
+}
+
 esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 {
     if (!client) {
@@ -1619,15 +1634,9 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 
         // Only send the disconnect message if the client is connected
         if (client->state == MQTT_STATE_CONNECTED) {
-            // Notify the broker we are disconnecting
-            client->mqtt_state.outbound_message = mqtt_msg_disconnect(&client->mqtt_state.mqtt_connection);
-            if (client->mqtt_state.outbound_message->length == 0) {
-                ESP_LOGE(TAG, "Disconnect message cannot be created");
+            if (send_disconnect_msg(client) != ESP_OK) {
                 MQTT_API_UNLOCK(client);
                 return ESP_FAIL;
-            }
-            if (mqtt_write_data(client) != ESP_OK) {
-                ESP_LOGE(TAG, "Error sending disconnect message");
             }
         }
 
