@@ -1508,13 +1508,14 @@ static void esp_mqtt_task(void *pv)
             break;
         case MQTT_STATE_WAIT_RECONNECT:
 
-            if (!client->config->auto_reconnect) {
-                client->run = false;
-                client->state = MQTT_STATE_DISCONNECTED;
-                ESP_LOGD(TAG, "MQTT client disconnected.");
+            if (!client->config->auto_reconnect && xEventGroupGetBits(client->status_bits)&RECONNECT_BIT) {
+                xEventGroupClearBits(client->status_bits, RECONNECT_BIT);
+                client->state = MQTT_STATE_INIT;
+                client->wait_timeout_ms = MQTT_RECON_DEFAULT_MS;
+                ESP_LOGD(TAG, "Reconnecting per user request...");
                 break;
-            }
-            if (platform_tick_get_ms() - client->reconnect_tick > client->wait_timeout_ms) {
+            } else if (client->config->auto_reconnect &&
+                       platform_tick_get_ms() - client->reconnect_tick > client->wait_timeout_ms) {
                 client->state = MQTT_STATE_INIT;
                 client->reconnect_tick = platform_tick_get_ms();
                 ESP_LOGD(TAG, "Reconnecting...");
