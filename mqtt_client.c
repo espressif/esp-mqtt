@@ -43,7 +43,6 @@ ESP_EVENT_DEFINE_BASE(MQTT_EVENTS);
 #endif
 
 typedef struct mqtt_state {
-    mqtt_connect_info_t *connect_info;
     uint8_t *in_buffer;
     uint8_t *out_buffer;
     int in_buffer_length;
@@ -372,7 +371,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
 
     client->config->message_retransmit_timeout = config->message_retransmit_timeout;
     if (config->message_retransmit_timeout <= 0) {
-       client->config->message_retransmit_timeout = 1000;
+        client->config->message_retransmit_timeout = 1000;
     }
 
     client->config->task_prio = config->task_prio;
@@ -628,7 +627,7 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
     int read_len, connect_rsp_code;
     client->wait_for_ping_resp = false;
     client->mqtt_state.outbound_message = mqtt_msg_connect(&client->mqtt_state.mqtt_connection,
-                                          client->mqtt_state.connect_info);
+                                          &client->connect_info);
     if (client->mqtt_state.outbound_message->length == 0) {
         ESP_LOGE(TAG, "Connect message cannot be created");
         return ESP_FAIL;
@@ -796,7 +795,6 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     ESP_MEM_CHECK(TAG, client->mqtt_state.out_buffer, goto _mqtt_init_failed);
 
     client->mqtt_state.out_buffer_length = out_buffer_size;
-    client->mqtt_state.connect_info = &client->connect_info;
     client->outbox = outbox_init();
     ESP_MEM_CHECK(TAG, client->outbox, goto _mqtt_init_failed);
     client->status_bits = xEventGroupCreate();
