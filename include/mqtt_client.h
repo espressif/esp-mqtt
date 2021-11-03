@@ -176,7 +176,11 @@ typedef struct {
     const char *host;                       /*!< MQTT server domain (ipv4 as string) */
     const char *uri;                        /*!< Complete MQTT broker URI */
     uint32_t port;                          /*!< MQTT server port */
-    const char *client_id;                  /*!< default client id is ``ESP32_%CHIPID%`` where %CHIPID% are last 3 bytes of MAC address in hex format */
+    bool set_null_client_id;                /*!< Selects a NULL client id */
+    const char *client_id;                  /*!< Set client id.
+                                                 Ignored if set_null_client_id == true
+                                                 If NULL set the default client id.
+                                                 Default client id is ``ESP32_%CHIPID%`` where %CHIPID% are last 3 bytes of MAC address in hex format */
     const char *username;                   /*!< MQTT username */
     const char *password;                   /*!< MQTT password */
     const char *lwt_topic;                  /*!< LWT (Last Will and Testament) message topic (NULL by default) */

@@ -43,7 +43,6 @@ ESP_EVENT_DEFINE_BASE(MQTT_EVENTS);
 #endif
 
 typedef struct mqtt_state {
-    mqtt_connect_info_t *connect_info;
     uint8_t *in_buffer;
     uint8_t *out_buffer;
     int in_buffer_length;
@@ -372,7 +371,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
 
     client->config->message_retransmit_timeout = config->message_retransmit_timeout;
     if (config->message_retransmit_timeout <= 0) {
-       client->config->message_retransmit_timeout = 1000;
+        client->config->message_retransmit_timeout = 1000;
     }
 
     client->config->task_prio = config->task_prio;
@@ -395,13 +394,15 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     ESP_MEM_CHECK(TAG, set_if_config(config->username, &client->connect_info.username), goto _mqtt_set_config_failed);
     ESP_MEM_CHECK(TAG, set_if_config(config->password, &client->connect_info.password), goto _mqtt_set_config_failed);
 
-    if (config->client_id) {
-        ESP_MEM_CHECK(TAG, set_if_config(config->client_id, &client->connect_info.client_id), goto _mqtt_set_config_failed);
-    } else if (client->connect_info.client_id == NULL) {
-        client->connect_info.client_id = platform_create_id_string();
+    if (!config->set_null_client_id) {
+        if (config->client_id) {
+            ESP_MEM_CHECK(TAG, set_if_config(config->client_id, &client->connect_info.client_id), goto _mqtt_set_config_failed);
+        } else if (client->connect_info.client_id == NULL) {
+            client->connect_info.client_id = platform_create_id_string();
+        }
+        ESP_MEM_CHECK(TAG, client->connect_info.client_id, goto _mqtt_set_config_failed);
+        ESP_LOGD(TAG, "MQTT client_id=%s", client->connect_info.client_id);
     }
-    ESP_MEM_CHECK(TAG, client->connect_info.client_id, goto _mqtt_set_config_failed);
-    ESP_LOGD(TAG, "MQTT client_id=%s", client->connect_info.client_id);
 
     ESP_MEM_CHECK(TAG, set_if_config(config->uri, &client->config->uri), goto _mqtt_set_config_failed);
     ESP_MEM_CHECK(TAG, set_if_config(config->lwt_topic, &client->connect_info.will_topic), goto _mqtt_set_config_failed);
@@ -427,6 +428,9 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
 
     if (config->disable_clean_session == client->connect_info.clean_session) {
         client->connect_info.clean_session = !config->disable_clean_session;
+        if (!client->connect_info.clean_session && config->set_null_client_id) {
+            ESP_LOGE(TAG, "Clean Session flag must be true if client has a null id");
+        }
     }
     if (config->keepalive) {
         client->connect_info.keepalive = config->keepalive;
@@ -623,7 +627,7 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
     int read_len, connect_rsp_code;
     client->wait_for_ping_resp = false;
     client->mqtt_state.outbound_message = mqtt_msg_connect(&client->mqtt_state.mqtt_connection,
-                                          client->mqtt_state.connect_info);
+                                          &client->connect_info);
     if (client->mqtt_state.outbound_message->length == 0) {
         ESP_LOGE(TAG, "Connect message cannot be created");
         return ESP_FAIL;
@@ -791,7 +795,6 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     ESP_MEM_CHECK(TAG, client->mqtt_state.out_buffer, goto _mqtt_init_failed);
 
     client->mqtt_state.out_buffer_length = out_buffer_size;
-    client->mqtt_state.connect_info = &client->connect_info;
     client->outbox = outbox_init();
     ESP_MEM_CHECK(TAG, client->outbox, goto _mqtt_init_failed);
     client->status_bits = xEventGroupCreate();

@@ -361,7 +361,7 @@ mqtt_message_t *mqtt_msg_connect(mqtt_connection_t *connection, mqtt_connect_inf
     if (connection->message.length + header_len > connection->buffer_length) {
         return fail_message(connection);
     }
-    char* variable_header = (void *)(connection->buffer + connection->message.length);
+    char *variable_header = (char *)(connection->buffer + connection->message.length);
     connection->message.length += header_len;
 
     int header_idx = 0;
@@ -394,7 +394,9 @@ mqtt_message_t *mqtt_msg_connect(mqtt_connection_t *connection, mqtt_connect_inf
             return fail_message(connection);
         }
     } else {
-        return fail_message(connection);
+        if (append_string(connection, "", 0) < 0) {
+            return fail_message(connection);
+        }
     }
 
     if (info->will_topic != NULL && info->will_topic[0] != '\0') {
@@ -456,7 +458,7 @@ mqtt_message_t *mqtt_msg_publish(mqtt_connection_t *connection, const char *topi
     }
 
     if (data == NULL && data_length > 0) {
-       return fail_message(connection);
+        return fail_message(connection);
     }
 
     if (qos > 0) {
@@ -474,8 +476,7 @@ mqtt_message_t *mqtt_msg_publish(mqtt_connection_t *connection, const char *topi
         connection->message.length = connection->buffer_length;
         connection->message.fragmented_msg_total_length = data_length + connection->message.fragmented_msg_data_offset;
     } else {
-        if (data != NULL)
-        {
+        if (data != NULL) {
             memcpy(connection->buffer + connection->message.length, data, data_length);
             connection->message.length += data_length;
         }

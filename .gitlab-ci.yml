@@ -17,6 +17,13 @@ before_script:
   # Use CI Tools
   - curl -sSL ${CIT_LOADER_URL} | sh
   - source citools/import_functions
+  # Add gitlab ssh key
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - echo -n $GITLAB_KEY > ~/.ssh/id_rsa_base64
+  - base64 --decode --ignore-garbage ~/.ssh/id_rsa_base64 > ~/.ssh/id_rsa
+  - chmod 600 ~/.ssh/id_rsa
+  - echo -e "Host gitlab.espressif.cn\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
   - PATH=$CI_PROJECT_DIR/esp-idf/tools:$PATH
   - export IDF_PATH=$CI_PROJECT_DIR/esp-idf
   - export MQTT_PATH=$CI_PROJECT_DIR
@@ -28,7 +35,6 @@ build_with_idf_v3:
     - build
   dependencies: []
   script:
-    - cit_add_ssh_key "${GITLAB_KEY}"
     - git clone "${IDF_REPO}"
     # build with IDFv3.2
     - $MQTT_PATH/ci/set_idf.sh release/v3.2
@@ -53,7 +59,6 @@ build_with_idf_v4:
   variables:
     PYTHON_VER: 3.6.13
   script:
-    - cit_add_ssh_key "${GITLAB_KEY}"
     - git clone "${IDF_REPO}"
     - source /opt/pyenv/activate && pyenv global $PYTHON_VER
     - $MQTT_PATH/ci/set_idf.sh master
@@ -105,7 +110,6 @@ build_and_test_qemu:
   variables:
     PYTHON_VER: 3.6.13
   script:
-    - cit_add_ssh_key "${GITLAB_KEY}"
     - git clone "${IDF_REPO}"
     - source /opt/pyenv/activate && pyenv global $PYTHON_VER
     # switch to IDF and setup the tools
