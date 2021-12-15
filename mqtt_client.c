@@ -148,6 +148,23 @@ enum esp_mqtt_ssl_cert_key_api {
     MQTT_SSL_DATA_API_MAX,
 };
 
+static int esp_mqtt_handle_transport_read_error(int err, esp_mqtt_client_handle_t client)
+{
+    if (err == ERR_TCP_TRANSPORT_CONNECTION_CLOSED_BY_FIN) {
+        ESP_LOGD(TAG, "%s: transport_read(): EOF", __func__);
+        return 0;
+    }
+
+    if (err == ERR_TCP_TRANSPORT_CONNECTION_TIMEOUT) {
+        ESP_LOGD(TAG, "%s: transport_read(): call timed out before data was ready!", __func__);
+        return 0;
+    }
+
+    ESP_LOGE(TAG, "%s: transport_read() error: errno=%d", __func__, errno);
+    esp_mqtt_client_dispatch_transport_error(client);
+    return -1;
+}
+
 static esp_err_t esp_mqtt_set_cert_key_data(esp_transport_handle_t ssl, enum esp_mqtt_ssl_cert_key_api what, const char *cert_key_data, int cert_key_len)
 {
     char *data = (char *)cert_key_data;
@@ -227,8 +244,6 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
                      goto esp_mqtt_set_transport_failed);
 
     }
-
-
 
     if (cfg->use_secure_element) {
 #ifdef MQTT_SUPPORTED_FEATURE_SECURE_ELEMENT
@@ -1061,9 +1076,9 @@ post_data_event:
                                           msg_total_len - msg_read_len > buf_len ? buf_len : msg_total_len - msg_read_len,
                                           client->config->network_timeout_ms);
         if (ret <= 0) {
-            ESP_LOGE(TAG, "Read error or timeout: len_read=%d, errno=%d", ret, errno);
-            return ESP_FAIL;
+            return esp_mqtt_handle_transport_read_error(ret, client) == 0 ? ESP_OK : ESP_FAIL;
         }
+
         msg_data_len = ret;
         msg_read_len += msg_data_len;
         goto post_data_event;
@@ -1164,13 +1179,8 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
          * type and flags.
          */
         read_len = esp_transport_read(t, (char *)buf, 1, read_poll_timeout_ms);
-        if (read_len < 0) {
-            ESP_LOGE(TAG, "%s: transport_read() error: errno=%d", __func__, errno);
-            goto err;
-        }
-        if (read_len == 0) {
-            ESP_LOGV(TAG, "%s: transport_read(): no data or EOF", __func__);
-            return 0;
+        if (read_len <= 0) {
+            return esp_mqtt_handle_transport_read_error(read_len, client);
         }
         ESP_LOGD(TAG, "%s: first byte: 0x%x", __func__, *buf);
         /*
@@ -1195,13 +1205,8 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
              * size of 16386 bytes).
              */
             read_len = esp_transport_read(t, (char *)buf, 1, read_poll_timeout_ms);
-            if (read_len < 0) {
-                ESP_LOGE(TAG, "%s: transport_read() error: errno=%d", __func__, errno);
-                goto err;
-            }
-            if (read_len == 0) {
-                ESP_LOGD(TAG, "%s: transport_read(): no data or EOF", __func__);
-                return 0;
+            if (read_len <= 0) {
+                return esp_mqtt_handle_transport_read_error(read_len, client);
             }
             ESP_LOGD(TAG, "%s: read \"remaining length\" byte: 0x%x", __func__, *buf);
             buf++;
@@ -1221,12 +1226,8 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
                 /* read next 2 bytes - topic length to get minimum portion of publish packet */
                 read_len = esp_transport_read(t, (char *)buf, client->mqtt_state.in_buffer_read_len - fixed_header_len + 2, read_poll_timeout_ms);
                 ESP_LOGD(TAG, "%s: read_len=%d", __func__, read_len);
-                if (read_len < 0) {
-                    ESP_LOGE(TAG, "%s: transport_read() error: errno=%d", __func__, errno);
-                    goto err;
-                } else if (read_len == 0) {
-                    ESP_LOGD(TAG, "%s: transport_read(): no data or EOF", __func__);
-                    return 0;
+                if (read_len <= 0) {
+                    return esp_mqtt_handle_transport_read_error(read_len, client);
                 }
                 client->mqtt_state.in_buffer_read_len += read_len;
                 buf += read_len;
@@ -1256,13 +1257,8 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
         /* read the rest of the mqtt message */
         read_len = esp_transport_read(t, (char *)buf, total_len - client->mqtt_state.in_buffer_read_len, read_poll_timeout_ms);
         ESP_LOGD(TAG, "%s: read_len=%d", __func__, read_len);
-        if (read_len < 0) {
-            ESP_LOGE(TAG, "%s: transport_read() error: errno=%d", __func__, errno);
-            goto err;
-        }
-        if (read_len == 0) {
-            ESP_LOGD(TAG, "%s: transport_read(): no data or EOF", __func__);
-            return 0;
+        if (read_len <= 0) {
+            return esp_mqtt_handle_transport_read_error(read_len, client);
         }
         client->mqtt_state.in_buffer_read_len += read_len;
         if (client->mqtt_state.in_buffer_read_len < total_len) {
