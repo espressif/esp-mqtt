@@ -1758,16 +1758,6 @@ static inline int mqtt_client_enqueue_priv(esp_mqtt_client_handle_t client, cons
         int len, int qos, int retain, bool store)
 {
     uint16_t pending_msg_id = 0;
-
-    /* Acceptable publish messages:
-        data == NULL, len == 0: publish null message
-        data valid,   len == 0: publish all data, payload len is determined from string length
-        data valid,   len >  0: publish data with defined length
-     */
-    if (len <= 0 && data != NULL) {
-        len = strlen(data);
-    }
-
     mqtt_message_t *publish_msg = mqtt_msg_publish(&client->mqtt_state.mqtt_connection,
                                   topic, data, len,
                                   qos, retain,
@@ -1814,6 +1804,16 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         return -1;
     }
 #endif
+
+    /* Acceptable publish messages:
+        data == NULL, len == 0: publish null message
+        data valid,   len == 0: publish all data, payload len is determined from string length
+        data valid,   len >  0: publish data with defined length
+     */
+    if (len <= 0 && data != NULL) {
+        len = strlen(data);
+    }
+
     int pending_msg_id = mqtt_client_enqueue_priv(client, topic, data, len, qos, retain, false);
     if (pending_msg_id < 0) {
         MQTT_API_UNLOCK(client);
