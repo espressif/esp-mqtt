@@ -2,7 +2,8 @@
 
 #ifdef ESP_PLATFORM
 #include "esp_log.h"
-#include "esp_system.h"
+#include "esp_mac.h"
+#include "esp_random.h"
 #include <sys/time.h>
 #include <stdlib.h>
 #include <stdint.h>
