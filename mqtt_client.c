@@ -1526,7 +1526,7 @@ static void esp_mqtt_task(void *pv)
             }
             MQTT_API_UNLOCK(client);
             xEventGroupWaitBits(client->status_bits, RECONNECT_BIT, false, true,
-                                client->wait_timeout_ms / 2 / portTICK_RATE_MS);
+                                client->wait_timeout_ms / 2 / portTICK_PERIOD_MS);
             // continue the while loop instead of break, as the mutex is unlocked
             continue;
         default:

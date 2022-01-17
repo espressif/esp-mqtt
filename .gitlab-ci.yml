@@ -51,28 +51,18 @@ build_with_idf_v4:
   tags:
     - build
   dependencies: []
-  artifacts:
-    when: always
-    paths:
-      - tidybuild/*
-    expire_in: 1 day
   variables:
     PYTHON_VER: 3.6.13
   script:
     - git clone "${IDF_REPO}"
     - source /opt/pyenv/activate && pyenv global $PYTHON_VER
-    - $MQTT_PATH/ci/set_idf.sh master
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    # capture compile commands/flags for static analysis
-    - cd $IDF_PATH/examples/protocols/mqtt/tcp
-    - mkdir -p tidybuild && cd tidybuild
-    - cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
-    - mv $IDF_PATH/examples/protocols/mqtt/tcp/tidybuild $CI_PROJECT_DIR/tidybuild
     # enable pedantic flags for compilation
     - export PEDANTIC_CFLAGS="-Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
     - export EXTRA_CFLAGS=${PEDANTIC_CFLAGS} && export EXTRA_CXXFLAGS=${EXTRA_CFLAGS}
-    # build other examples
+    # rebuild with IDFv4.4
+    - $MQTT_PATH/ci/set_idf.sh release/v4.4
+    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
+    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
     - $MQTT_PATH/ci/build_examples.sh
     # rebuild with IDFv4.3
     - $MQTT_PATH/ci/set_idf.sh release/v4.3
@@ -113,7 +103,7 @@ build_and_test_qemu:
     - git clone "${IDF_REPO}"
     - source /opt/pyenv/activate && pyenv global $PYTHON_VER
     # switch to IDF and setup the tools
-    - $MQTT_PATH/ci/set_idf.sh master
+    - $MQTT_PATH/ci/set_idf.sh release/v4.4
     - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
     - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
     # build publish-connect stress test, setup test parameters
