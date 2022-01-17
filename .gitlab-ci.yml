@@ -45,6 +45,24 @@ build_with_idf_v3:
     - cd $MQTT_PATH && ./ci/modify_for_legacy_idf.sh ${RECENT_IDF} || true
     - cd $MQTT_PATH/examples/tcp && rm -rf build && make defconfig && make
 
+build_with_idf_v5:
+  stage: build
+  image: ${CI_DOCKER_REGISTRY}/esp-env-v5.0:1
+  tags:
+    - build
+  dependencies: []
+  variables:
+    PYTHON_VER: 3.6.13
+  script:
+    - git clone "${IDF_REPO}"
+    - source /opt/pyenv/activate && pyenv global $PYTHON_VER
+    - $MQTT_PATH/ci/set_idf.sh master
+    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
+    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
+    - export PEDANTIC_CFLAGS="-Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
+    - export EXTRA_CFLAGS=${PEDANTIC_CFLAGS} && export EXTRA_CXXFLAGS=${EXTRA_CFLAGS}
+    - $MQTT_PATH/ci/build_examples.sh
+
 build_with_idf_v4:
   stage: build
   image: ${CI_DOCKER_REGISTRY}/esp-env:v4.4-1
