@@ -46,6 +46,33 @@ build_with_idf_v5:
     - export EXTRA_CFLAGS=${PEDANTIC_CFLAGS} && export EXTRA_CXXFLAGS=${EXTRA_CFLAGS}
     - $MQTT_PATH/ci/build_examples.sh
 
+build_and_test_qemu:
+  stage: build
+  image: ${CI_DOCKER_REGISTRY}/qemu-v5.0:1-20210826
+  tags:
+    - build
+    - shiny
+  dependencies: []
+  variables:
+    PYTHON_VER: 3.6.13
+  script:
+    - git clone "${IDF_REPO}"
+    - source /opt/pyenv/activate && pyenv global $PYTHON_VER
+    # switch to IDF and setup the tools
+    - $MQTT_PATH/ci/set_idf.sh master
+    - $IDF_PATH/tools/idf_tools.py install-python-env
+    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
+    - python -m pip install -r $IDF_PATH/tools/ci/python_packages/ttfw_idf/requirements.txt
+    - python -m pip install paho-mqtt
+    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
+    # build publish-connect stress test, setup test parameters
+    - cd tools/test_apps/protocols/mqtt/publish_connect_test && cat sdkconfig.qemu | $IDF_PATH/tools/ci/envsubst.py > sdkconfig.defaults && idf.py build
+    - export TEST_PATH=`pwd` && export MQTT_PUBLISH_TEST=1
+    - export PYTHONPATH="$IDF_PATH/tools:$IDF_PATH/tools/ci/python_packages"
+    # run test (with environment->qemu)
+    - cd $IDF_PATH/tools/ci/python_packages/tiny_test_fw/bin
+    - python Runner.py $TEST_PATH -c $TEST_PATH/publish_connect_mqtt_qemu.yml -e $TEST_PATH/env.yml
+
 push_master_to_github:
   stage: deploy
   image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
