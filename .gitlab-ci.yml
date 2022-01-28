@@ -5,8 +5,6 @@ stages:
 
 variables:
   IDF_REPO: ${GITLAB_SSH_SERVER}/idf/esp-idf.git
-  OLDER_IDF: release/v3.1
-  RECENT_IDF: release/v3.3
 
 .add_gh_key_remote: &add_gh_key_remote |
   cit_add_ssh_key "${GH_PUSH_KEY}"
@@ -28,89 +26,9 @@ before_script:
   - export IDF_PATH=$CI_PROJECT_DIR/esp-idf
   - export MQTT_PATH=$CI_PROJECT_DIR
 
-build_with_idf_v3:
-  stage: build
-  image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
-  tags:
-    - build
-  dependencies: []
-  script:
-    - git clone "${IDF_REPO}"
-    # build with IDFv3.2
-    - $MQTT_PATH/ci/set_idf.sh release/v3.2
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh make
-    # simple build with IDFv3.1 (buiding directly in mqtt repo)
-    - $MQTT_PATH/ci/set_idf.sh release/v3.1
-    - cd $MQTT_PATH && ./ci/modify_for_legacy_idf.sh ${RECENT_IDF} || true
-    - cd $MQTT_PATH/examples/tcp && rm -rf build && make defconfig && make
-
 build_with_idf_v5:
   stage: build
   image: ${CI_DOCKER_REGISTRY}/esp-env-v5.0:1
-  tags:
-    - build
-  dependencies: []
-  variables:
-    PYTHON_VER: 3.6.13
-  script:
-    - git clone "${IDF_REPO}"
-    - source /opt/pyenv/activate && pyenv global $PYTHON_VER
-    - $MQTT_PATH/ci/set_idf.sh master
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - export PEDANTIC_CFLAGS="-Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
-    - export EXTRA_CFLAGS=${PEDANTIC_CFLAGS} && export EXTRA_CXXFLAGS=${EXTRA_CFLAGS}
-    - $MQTT_PATH/ci/build_examples.sh
-
-build_with_idf_v4:
-  stage: build
-  image: ${CI_DOCKER_REGISTRY}/esp-env:v4.4-1
-  tags:
-    - build
-  dependencies: []
-  variables:
-    PYTHON_VER: 3.6.13
-  script:
-    - git clone "${IDF_REPO}"
-    - source /opt/pyenv/activate && pyenv global $PYTHON_VER
-    # enable pedantic flags for compilation
-    - export PEDANTIC_CFLAGS="-Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
-    - export EXTRA_CFLAGS=${PEDANTIC_CFLAGS} && export EXTRA_CXXFLAGS=${EXTRA_CFLAGS}
-    # rebuild with IDFv4.4
-    - $MQTT_PATH/ci/set_idf.sh release/v4.4
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh
-    # rebuild with IDFv4.3
-    - $MQTT_PATH/ci/set_idf.sh release/v4.3
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh
-    # rebuild with IDFv4.2
-    - $MQTT_PATH/ci/set_idf.sh release/v4.2
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh
-    # rebuild with IDFv4.1
-    - $MQTT_PATH/ci/set_idf.sh release/v4.1
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh
-    # rebuild with IDFv4.0
-    - $MQTT_PATH/ci/set_idf.sh release/v4.0
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh
-    # build with IDFv3.3
-    - $MQTT_PATH/ci/set_idf.sh release/v3.3
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh make    
-
-build_and_test_qemu:
-  stage: build
-  image: ${CI_DOCKER_REGISTRY}/qemu:v4.4-1-20210517
   tags:
     - build
     - shiny
@@ -119,18 +37,14 @@ build_and_test_qemu:
     PYTHON_VER: 3.6.13
   script:
     - git clone "${IDF_REPO}"
-    - source /opt/pyenv/activate && pyenv global $PYTHON_VER
-    # switch to IDF and setup the tools
-    - $MQTT_PATH/ci/set_idf.sh release/v4.4
+    - cd ${IDF_PATH} && set +u && source tools/ci/setup_python.sh
+    - $MQTT_PATH/ci/set_idf.sh master
+    - $IDF_PATH/tools/idf_tools.py install-python-env
     - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
     - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    # build publish-connect stress test, setup test parameters
-    - cd tools/test_apps/protocols/mqtt/publish_connect_test && cat sdkconfig.qemu | $IDF_PATH/tools/ci/envsubst.py > sdkconfig.defaults && idf.py build
-    - export TEST_PATH=`pwd` && export MQTT_PUBLISH_TEST=1
-    - export PYTHONPATH="$IDF_PATH/tools:$IDF_PATH/tools/ci/python_packages"
-    # run test (with environment->qemu)
-    - cd $IDF_PATH/tools/ci/python_packages/tiny_test_fw/bin
-    - python Runner.py $TEST_PATH -c $TEST_PATH/publish_connect_mqtt_qemu.yml -e $TEST_PATH/env.yml
+    - export PEDANTIC_CFLAGS="-Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
+    - export EXTRA_CFLAGS=${PEDANTIC_CFLAGS} && export EXTRA_CXXFLAGS=${EXTRA_CFLAGS}
+    - $MQTT_PATH/ci/build_examples.sh
 
 push_master_to_github:
   stage: deploy
