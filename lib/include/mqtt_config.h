@@ -12,6 +12,10 @@
 #define MQTT_PROTOCOL_311
 #endif
 
+#ifdef CONFIG_MQTT_PROTOCOL_5
+#define MQTT_PROTOCOL_5
+#endif
+
 #define MQTT_RECON_DEFAULT_MS       (10*1000)
 #define MQTT_POLL_READ_TIMEOUT_MS   (1000)
 
