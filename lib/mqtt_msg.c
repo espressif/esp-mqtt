@@ -198,17 +198,14 @@ bool mqtt_header_complete(uint8_t *buffer, size_t buffer_length)
 char *mqtt_get_publish_topic(uint8_t *buffer, size_t *length)
 {
     int i;
-    int totlen = 0;
     int topiclen;
 
     for (i = 1; i < *length; ++i) {
-        totlen += (buffer[i] & 0x7f) << (7 * (i - 1));
         if ((buffer[i] & 0x80) == 0) {
             ++i;
             break;
         }
     }
-    totlen += i;
 
     if (i + 2 >= *length) {
         return NULL;
