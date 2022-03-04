@@ -28,13 +28,11 @@ before_script:
 
 build_with_idf_v5:
   stage: build
-  image: ${CI_DOCKER_REGISTRY}/esp-env-v5.0:1
+  image: ${CI_DOCKER_REGISTRY}/esp-env-v5.0:2
   tags:
     - build
     - shiny
   dependencies: []
-  variables:
-    PYTHON_VER: 3.6.13
   script:
     - git clone "${IDF_REPO}"
     - cd ${IDF_PATH} && set +u && source tools/ci/setup_python.sh
@@ -48,16 +46,13 @@ build_with_idf_v5:
 
 build_and_test_qemu:
   stage: build
-  image: ${CI_DOCKER_REGISTRY}/qemu-v5.0:1-20210826
+  image: ${CI_DOCKER_REGISTRY}/qemu-v5.0:2-20210826
   tags:
     - build
     - shiny
   dependencies: []
-  variables:
-    PYTHON_VER: 3.6.13
   script:
     - git clone "${IDF_REPO}"
-    - source /opt/pyenv/activate && pyenv global $PYTHON_VER
     # switch to IDF and setup the tools
     - $MQTT_PATH/ci/set_idf.sh master
     - $IDF_PATH/tools/idf_tools.py install-python-env
