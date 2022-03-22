@@ -84,7 +84,7 @@ typedef struct mqtt_connect_info {
     char *password;
     char *will_topic;
     char *will_message;
-    int keepalive;          /*!< keepalive=0 -> keepalive is disabled */
+    int64_t keepalive;          /*!< keepalive=0 -> keepalive is disabled */
     int will_length;
     int will_qos;
     int will_retain;

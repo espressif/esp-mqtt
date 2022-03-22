@@ -27,7 +27,7 @@ int platform_random(int max)
     return esp_random() % max;
 }
 
-long long platform_tick_get_ms(void)
+int64_t platform_tick_get_ms(void)
 {
     struct timeval te;
     gettimeofday(&te, NULL); // get current time
