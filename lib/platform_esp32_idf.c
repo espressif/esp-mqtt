@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-static const char *TAG = "PLATFORM";
+static const char *TAG = "platform";
 
 #define MAX_ID_STRING (32)
 

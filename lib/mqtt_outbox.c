@@ -5,7 +5,7 @@
 #include "esp_log.h"
 
 #ifndef CONFIG_MQTT_CUSTOM_OUTBOX
-static const char *TAG = "OUTBOX";
+static const char *TAG = "outbox";
 
 typedef struct outbox_item {
     char *buffer;
