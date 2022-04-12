@@ -1006,13 +1006,14 @@ post_data_event:
         msg_topic = NULL;
         msg_topic_len = 0;
         msg_data_offset += msg_data_len;
-        msg_data_len = esp_transport_read(client-> transport, (char *)client->mqtt_state.in_buffer,
+        int ret = esp_transport_read(client->transport, (char *)client->mqtt_state.in_buffer,
                                           msg_total_len - msg_read_len > buf_len ? buf_len : msg_total_len - msg_read_len,
                                           client->config->network_timeout_ms);
-        if (msg_data_len <= 0) {
-            ESP_LOGE(TAG, "Read error or timeout: len_read=%zu, errno=%d", msg_data_len, errno);
+        if (ret <= 0) {
+            ESP_LOGE(TAG, "Read error or timeout: len_read=%d, errno=%d", ret, errno);
             return ESP_FAIL;
         }
+        msg_data_len = ret;
         msg_read_len += msg_data_len;
         goto post_data_event;
     }
