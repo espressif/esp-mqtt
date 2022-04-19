@@ -9,11 +9,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 
+#include <stdint.h>
 #include <sys/time.h>
 
 char *platform_create_id_string(void);
 int platform_random(int max);
-long long platform_tick_get_ms(void);
+int64_t platform_tick_get_ms(void);
 void ms_to_timeval(int timeout_ms, struct timeval *tv);
 
 #define ESP_MEM_CHECK(TAG, a, action) if (!(a)) {                                                      \
