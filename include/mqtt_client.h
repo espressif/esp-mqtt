@@ -34,7 +34,7 @@ typedef struct esp_mqtt_client *esp_mqtt_client_handle_t;
  *  - various other data depending on event type
  *
  */
-typedef enum {
+typedef enum esp_mqtt_event_id_t {
     MQTT_EVENT_ANY = -1,
     MQTT_EVENT_ERROR = 0,          /*!< on error event, additional context: connection return code, error handle from esp_tls (if supported) */
     MQTT_EVENT_CONNECTED,          /*!< connected event, additional context: session_present flag */
@@ -43,7 +43,7 @@ typedef enum {
                                         - msg_id               message id
                                         - data                 pointer to the received data
                                         - data_len             length of the data for this event
-                                        */ 
+                                        */
     MQTT_EVENT_UNSUBSCRIBED,       /*!< unsubscribed event */
     MQTT_EVENT_PUBLISHED,          /*!< published event, additional context:  msg_id */
     MQTT_EVENT_DATA,               /*!< data event, additional context:
@@ -75,7 +75,7 @@ typedef enum {
 /**
  * MQTT connection error codes propagated via ERROR event
  */
-typedef enum {
+typedef enum esp_mqtt_connect_return_code_t {
     MQTT_CONNECTION_ACCEPTED = 0,                   /*!< Connection accepted  */
     MQTT_CONNECTION_REFUSE_PROTOCOL,                /*!< MQTT connection refused reason: Wrong protocol */
     MQTT_CONNECTION_REFUSE_ID_REJECTED,             /*!< MQTT connection refused reason: ID rejected */
@@ -87,7 +87,7 @@ typedef enum {
 /**
  * MQTT connection error codes propagated via ERROR event
  */
-typedef enum {
+typedef enum esp_mqtt_error_type_t {
     MQTT_ERROR_TYPE_NONE = 0,
     MQTT_ERROR_TYPE_TCP_TRANSPORT,
     MQTT_ERROR_TYPE_CONNECTION_REFUSED,
@@ -100,7 +100,7 @@ typedef enum {
  */
 #define MQTT_ERROR_TYPE_ESP_TLS MQTT_ERROR_TYPE_TCP_TRANSPORT
 
-typedef enum {
+typedef enum esp_mqtt_transport_t {
     MQTT_TRANSPORT_UNKNOWN = 0x0,
     MQTT_TRANSPORT_OVER_TCP,      /*!< MQTT over TCP, using scheme: ``mqtt`` */
     MQTT_TRANSPORT_OVER_SSL,      /*!< MQTT over SSL, using scheme: ``mqtts`` */
@@ -111,7 +111,7 @@ typedef enum {
 /**
  *  MQTT protocol version used for connection
  */
-typedef enum {
+typedef enum esp_mqtt_protocol_ver_t {
     MQTT_PROTOCOL_UNDEFINED = 0,
     MQTT_PROTOCOL_V_3_1,
     MQTT_PROTOCOL_V_3_1_1
@@ -145,7 +145,7 @@ typedef struct esp_mqtt_error_codes {
 /**
  * MQTT event configuration structure
  */
-typedef struct {
+typedef struct esp_mqtt_event_t {
     esp_mqtt_event_id_t event_id;       /*!< MQTT event type */
     esp_mqtt_client_handle_t client;    /*!< MQTT client handle for this event */
     void *user_context;                 /*!< User context passed from MQTT client config */
@@ -170,19 +170,43 @@ typedef esp_err_t (* mqtt_event_callback_t)(esp_mqtt_event_handle_t event);
 /**
  * MQTT client configuration structure
  */
-typedef struct {
-    mqtt_event_callback_t event_handle;     /*!< handle for MQTT events as a callback in legacy mode */
-    esp_event_loop_handle_t event_loop_handle; /*!< handle for MQTT event loop library */
-    const char *host;                       /*!< MQTT server domain (ipv4 as string) */
-    const char *uri;                        /*!< Complete MQTT broker URI */
-    uint32_t port;                          /*!< MQTT server port */
-    bool set_null_client_id;                /*!< Selects a NULL client id */
-    const char *client_id;                  /*!< Set client id.
-                                                 Ignored if set_null_client_id == true
-                                                 If NULL set the default client id.
-                                                 Default client id is ``ESP32_%CHIPID%`` where %CHIPID% are last 3 bytes of MAC address in hex format */
+typedef struct esp_mqtt_client_config_t {
+    const char *uri;                        /*!< Complete MQTT broker URI, have precedence over all broker address configuration */
+    const char *host;                       /*!< MQTT broker domain, to set ipv4 pass it as string) */
+    esp_mqtt_transport_t transport;         /*!< Selects transport, is overrided by URI transport */
+    const char *path;                       /*!< Path in the URI, if seting the fields separately, instead of using uri field
+                                              in a Websocket connection:
+                                              host = "domain.name"
+                                              transport = MQTT_TRANSPORT_OVER_WSS
+                                              path = "/websocket_broker"
+                                            */
+    uint32_t port;                          /*!< MQTT broker port */
+    bool          use_global_ca_store;      /*!< Use a global ca_store, look esp-tls documentation for details. */
+    esp_err_t (*crt_bundle_attach)(void *conf); /*!< Pointer to ESP x509 Certificate Bundle attach function for the usage of certification bundles in mqtts */
+    const char *cert_pem;                   /*!< Pointer to certificate data in PEM or DER format for server verify (with SSL), default is NULL, not required to verify the server. PEM-format must have a terminating NULL-character. DER-format requires the length to be passed in cert_len. */
+    size_t cert_len;                        /*!< Length of the buffer pointed to by cert_pem. May be 0 for null-terminated pem */
+    const struct psk_key_hint *psk_hint_key;     /*!< Pointer to PSK struct defined in esp_tls.h to enable PSK authentication (as alternative to certificate verification). If not NULL and server certificates are NULL, PSK is enabled */
+    bool skip_cert_common_name_check;       /*!< Skip any validation of server certificate CN field, this reduces the security of TLS and makes the mqtt client susceptible to MITM attacks  */
+    const char **alpn_protos;               /*!< NULL-terminated list of supported application protocols to be used for ALPN */
     const char *username;                   /*!< MQTT username */
     const char *password;                   /*!< MQTT password */
+    const char *client_cert_pem;            /*!< Pointer to certificate data in PEM or DER format for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_key_pem` has to be provided. PEM-format must have a terminating NULL-character. DER-format requires the length to be passed in client_cert_len. */
+    size_t client_cert_len;                 /*!< Length of the buffer pointed to by client_cert_pem. May be 0 for null-terminated pem */
+    const char *client_key_pem;             /*!< Pointer to private key data in PEM or DER format for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_cert_pem` has to be provided. PEM-format must have a terminating NULL-character. DER-format requires the length to be passed in client_key_len */
+    size_t client_key_len;                  /*!< Length of the buffer pointed to by client_key_pem. May be 0 for null-terminated pem */
+    const char *clientkey_password;         /*!< Client key decryption password string */
+    int clientkey_password_len;             /*!< String length of the password pointed to by clientkey_password */
+    bool use_secure_element;                /*!< enable secure element for enabling SSL connection */
+    void *ds_data;                          /*!< carrier of handle for digital signature parameters */
+    bool set_null_client_id;                /*!< Selects a NULL client id */
+    const char *client_id;                  /*!< Set client id.
+                                            Ignored if set_null_client_id == true
+                                            If NULL set the default client id.
+                                            Default client id is ``ESP32_%CHIPID%`` where %CHIPID% are last 3 bytes of MAC address in hex format */
+    mqtt_event_callback_t event_handle;     /*!< handle for MQTT events as a callback in legacy mode */
+    esp_event_loop_handle_t event_loop_handle; /*!< handle for MQTT event loop library */
+    int task_prio;                          /*!< MQTT task priority, default is 5, can be changed in ``make menuconfig`` */
+    int task_stack;                         /*!< MQTT task stack size, default is 6144 bytes, can be changed in ``make menuconfig`` */
     const char *lwt_topic;                  /*!< LWT (Last Will and Testament) message topic (NULL by default) */
     const char *lwt_msg;                    /*!< LWT message (NULL by default) */
     int lwt_qos;                            /*!< LWT message qos */
@@ -190,35 +214,16 @@ typedef struct {
     int lwt_msg_len;                        /*!< LWT message length */
     int disable_clean_session;              /*!< mqtt clean session, default clean_session is true */
     int keepalive;                          /*!< mqtt keepalive, default is 120 seconds */
+    bool disable_keepalive;                 /*!< Set disable_keepalive=true to turn off keep-alive mechanism, false by default (keepalive is active by default). Note: setting the config value `keepalive` to `0` doesn't disable keepalive feature, but uses a default keepalive period */
+    esp_mqtt_protocol_ver_t protocol_ver;   /*!< MQTT protocol version used for connection, defaults to value from menuconfig*/
+    int message_retransmit_timeout;         /*!< timeout for retansmit of failded packet */
+    int reconnect_timeout_ms;               /*!< Reconnect to the broker after this value in miliseconds if auto reconnect is not disabled (defaults to 10s) */
+    int network_timeout_ms;                 /*!< Abort network operation if it is not completed after this value, in milliseconds (defaults to 10s) */
+    int refresh_connection_after_ms;        /*!< Refresh connection after this value (in milliseconds) */
     bool disable_auto_reconnect;            /*!< this mqtt client will reconnect to server (when errors/disconnect). Set disable_auto_reconnect=true to disable */
     void *user_context;                     /*!< pass user context to this option, then can receive that context in ``event->user_context`` */
-    int task_prio;                          /*!< MQTT task priority, default is 5, can be changed in ``make menuconfig`` */
-    int task_stack;                         /*!< MQTT task stack size, default is 6144 bytes, can be changed in ``make menuconfig`` */
     int buffer_size;                        /*!< size of MQTT send/receive buffer, default is 1024 (only receive buffer size if ``out_buffer_size`` defined) */
-    const char *cert_pem;                   /*!< Pointer to certificate data in PEM or DER format for server verify (with SSL), default is NULL, not required to verify the server. PEM-format must have a terminating NULL-character. DER-format requires the length to be passed in cert_len. */
-    size_t cert_len;                        /*!< Length of the buffer pointed to by cert_pem. May be 0 for null-terminated pem */
-    const char *client_cert_pem;            /*!< Pointer to certificate data in PEM or DER format for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_key_pem` has to be provided. PEM-format must have a terminating NULL-character. DER-format requires the length to be passed in client_cert_len. */
-    size_t client_cert_len;                 /*!< Length of the buffer pointed to by client_cert_pem. May be 0 for null-terminated pem */
-    const char *client_key_pem;             /*!< Pointer to private key data in PEM or DER format for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_cert_pem` has to be provided. PEM-format must have a terminating NULL-character. DER-format requires the length to be passed in client_key_len */
-    size_t client_key_len;                  /*!< Length of the buffer pointed to by client_key_pem. May be 0 for null-terminated pem */
-    esp_mqtt_transport_t transport;         /*!< overrides URI transport */
-    int refresh_connection_after_ms;        /*!< Refresh connection after this value (in milliseconds) */
-    const struct psk_key_hint *psk_hint_key;     /*!< Pointer to PSK struct defined in esp_tls.h to enable PSK authentication (as alternative to certificate verification). If not NULL and server/client certificates are NULL, PSK is enabled */
-    bool          use_global_ca_store;      /*!< Use a global ca_store for all the connections in which this bool is set. */
-    esp_err_t (*crt_bundle_attach)(void *conf); /*!< Pointer to ESP x509 Certificate Bundle attach function for the usage of certification bundles in mqtts */
-    int reconnect_timeout_ms;               /*!< Reconnect to the broker after this value in miliseconds if auto reconnect is not disabled (defaults to 10s) */
-    const char **alpn_protos;               /*!< NULL-terminated list of supported application protocols to be used for ALPN */
-    const char *clientkey_password;         /*!< Client key decryption password string */
-    int clientkey_password_len;             /*!< String length of the password pointed to by clientkey_password */
-    esp_mqtt_protocol_ver_t protocol_ver;   /*!< MQTT protocol version used for connection, defaults to value from menuconfig*/
     int out_buffer_size;                    /*!< size of MQTT output buffer. If not defined, both output and input buffers have the same size defined as ``buffer_size`` */
-    bool skip_cert_common_name_check;       /*!< Skip any validation of server certificate CN field, this reduces the security of TLS and makes the mqtt client susceptible to MITM attacks  */
-    bool use_secure_element;                /*!< enable secure element for enabling SSL connection */
-    void *ds_data;                          /*!< carrier of handle for digital signature parameters */
-    int network_timeout_ms;                 /*!< Abort network operation if it is not completed after this value, in milliseconds (defaults to 10s) */
-    bool disable_keepalive;                 /*!< Set disable_keepalive=true to turn off keep-alive mechanism, false by default (keepalive is active by default). Note: setting the config value `keepalive` to `0` doesn't disable keepalive feature, but uses a default keepalive period */
-    const char *path;                       /*!< Path in the URI*/
-    int message_retransmit_timeout;         /*!< timeout for retansmit of failded packet */
 } esp_mqtt_client_config_t;
 
 /**
