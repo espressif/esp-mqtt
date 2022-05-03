@@ -71,7 +71,6 @@ typedef struct {
     char *scheme;
     int port;
     bool auto_reconnect;
-    void *user_context;
     int network_timeout_ms;
     int refresh_connection_after_ms;
     int reconnect_timeout_ms;
