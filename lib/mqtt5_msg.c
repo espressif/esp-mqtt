@@ -679,7 +679,7 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
             continue;
         case MQTT5_PROPERTY_SERVER_KEEP_ALIVE:
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(connection_info->keepalive, property[property_offset ++], property[property_offset ++])
-            ESP_LOGD(TAG, "MQTT5_PROPERTY_SERVER_KEEP_ALIVE %d", connection_info->keepalive);
+            ESP_LOGD(TAG, "MQTT5_PROPERTY_SERVER_KEEP_ALIVE %lld", connection_info->keepalive);
             continue;
         case MQTT5_PROPERTY_RESP_INFO:
             if (resp_property->response_info) {

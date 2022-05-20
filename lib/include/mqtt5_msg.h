@@ -2,7 +2,7 @@
 #define MQTT5_MSG_H
 #include <stdint.h>
 #include <stdbool.h>
-
+#include "sys/queue.h"
 #include "mqtt_config.h"
 #include "mqtt_msg.h"
 #include "mqtt_client.h"
