@@ -1900,6 +1900,16 @@ int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic, 
         ESP_LOGE(TAG, "Client was not initialized");
         return -1;
     }
+
+    /* Acceptable publish messages:
+        data == NULL, len == 0: publish null message
+        data valid,   len == 0: publish all data, payload len is determined from string length
+        data valid,   len >  0: publish data with defined length
+     */
+    if (len <= 0 && data != NULL) {
+        len = strlen(data);
+    }
+
     MQTT_API_LOCK(client);
     int ret = mqtt_client_enqueue_priv(client, topic, data, len, qos, retain, store);
     MQTT_API_UNLOCK(client);
