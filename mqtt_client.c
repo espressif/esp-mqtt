@@ -595,14 +595,18 @@ void esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
     client->config = NULL;
 }
 
+static inline bool has_timed_out(uint64_t last_tick, uint64_t timeout) {
+  uint64_t next = last_tick + timeout;
+  return (int64_t)(next - platform_tick_get_ms()) <= 0;
+}
+
 static esp_err_t process_keepalive(esp_mqtt_client_handle_t client)
 {
     if (client->connect_info.keepalive > 0) {
-        const int64_t time_since_last_keepalive = platform_tick_get_ms() - client->keepalive_tick;
-        const int64_t keepalive_ms = client->connect_info.keepalive * 1000;
+        const uint64_t keepalive_ms = client->connect_info.keepalive * 1000;
 
         if (client->wait_for_ping_resp == true ) {
-            if ( time_since_last_keepalive > keepalive_ms) {
+            if (has_timed_out(client->keepalive_tick, keepalive_ms)) {
                 ESP_LOGE(TAG, "No PING_RESP, disconnected");
                 esp_mqtt_abort_connection(client);
                 client->wait_for_ping_resp = false;
@@ -611,7 +615,7 @@ static esp_err_t process_keepalive(esp_mqtt_client_handle_t client)
             return ESP_OK;
         }
 
-        if (time_since_last_keepalive > keepalive_ms / 2) {
+        if (has_timed_out(client->keepalive_tick, keepalive_ms/2)) {
             if (esp_mqtt_client_ping(client) == ESP_FAIL) {
                 ESP_LOGE(TAG, "Can't send ping, disconnected");
                 esp_mqtt_abort_connection(client);
@@ -649,15 +653,8 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
 {
     int read_len, connect_rsp_code = 0;
     client->wait_for_ping_resp = false;
-    if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
-#ifdef MQTT_PROTOCOL_5
-        client->mqtt_state.outbound_message = mqtt5_msg_connect(&client->mqtt_state.mqtt_connection,
-                                          &client->connect_info, &client->mqtt5_config->connect_property_info, &client->mqtt5_config->will_property_info);
-#endif
-    } else {
-        client->mqtt_state.outbound_message = mqtt_msg_connect(&client->mqtt_state.mqtt_connection,
+    client->mqtt_state.outbound_message = mqtt_msg_connect(&client->mqtt_state.mqtt_connection,
                                           &client->connect_info);
-    }
     if (client->mqtt_state.outbound_message->length == 0) {
         ESP_LOGE(TAG, "Connect message cannot be created");
         return ESP_FAIL;
@@ -1513,6 +1510,7 @@ static void esp_mqtt_task(void *pv)
             client->state = MQTT_STATE_CONNECTED;
             esp_mqtt_dispatch_event_with_msgid(client);
             client->refresh_connection_tick = platform_tick_get_ms();
+            client->keepalive_tick = platform_tick_get_ms();
 
             break;
         case MQTT_STATE_CONNECTED:
@@ -1538,7 +1536,7 @@ static void esp_mqtt_task(void *pv)
                     outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED);
                 }
                 // resend other "transmitted" messages after 1s
-            } else if (platform_tick_get_ms() - last_retransmit > client->config->message_retransmit_timeout) {
+            } else if (has_timed_out(last_retransmit, client->config->message_retransmit_timeout)) {
                 last_retransmit = platform_tick_get_ms();
                 item = outbox_dequeue(client->outbox, TRANSMITTED, &msg_tick);
                 if (item && (last_retransmit - msg_tick > client->config->message_retransmit_timeout))  {
@@ -1551,7 +1549,7 @@ static void esp_mqtt_task(void *pv)
             }
 
             if (client->config->refresh_connection_after_ms &&
-                    platform_tick_get_ms() - client->refresh_connection_tick > client->config->refresh_connection_after_ms) {
+                has_timed_out(client->refresh_connection_tick, client->config->refresh_connection_after_ms)) {
                 ESP_LOGD(TAG, "Refreshing the connection...");
                 esp_mqtt_abort_connection(client);
                 client->state = MQTT_STATE_INIT;
@@ -1872,6 +1870,7 @@ static inline int mqtt_client_enqueue_priv(esp_mqtt_client_handle_t client, cons
         return -1;
     }
     /* We have to set as pending all the qos>0 messages */
+    //client->mqtt_state.outbound_message = publish_msg;
     if (qos > 0 || store) {
         client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
         client->mqtt_state.pending_msg_id = pending_msg_id;
@@ -2094,4 +2093,3 @@ int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client)
 
     return outbox_size;
 }
-

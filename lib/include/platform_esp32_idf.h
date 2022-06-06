@@ -14,8 +14,7 @@
 
 char *platform_create_id_string(void);
 int platform_random(int max);
-int64_t platform_tick_get_ms(void);
-void ms_to_timeval(int timeout_ms, struct timeval *tv);
+uint64_t platform_tick_get_ms(void);
 
 #define ESP_MEM_CHECK(TAG, a, action) if (!(a)) {                                                      \
         ESP_LOGE(TAG,"%s(%d): %s",  __FUNCTION__, __LINE__, "Memory exhausted"); \
