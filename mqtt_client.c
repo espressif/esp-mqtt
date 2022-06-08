@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "esp_err.h"
 #include "platform.h"
 
