@@ -12,6 +12,9 @@
 #include <string.h>
 #include "esp_err.h"
 #include "esp_event.h"
+#include "mqtt_reason_codes.h"
+#include "mqtt_properties.h"
+#include "mqtt_msg.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -75,18 +78,6 @@ typedef enum esp_mqtt_event_id_t {
 /**
  * MQTT connection error codes propagated via ERROR event
  */
-typedef enum esp_mqtt_connect_return_code_t {
-    MQTT_CONNECTION_ACCEPTED = 0,                   /*!< Connection accepted  */
-    MQTT_CONNECTION_REFUSE_PROTOCOL,                /*!< MQTT connection refused reason: Wrong protocol */
-    MQTT_CONNECTION_REFUSE_ID_REJECTED,             /*!< MQTT connection refused reason: ID rejected */
-    MQTT_CONNECTION_REFUSE_SERVER_UNAVAILABLE,      /*!< MQTT connection refused reason: Server unavailable */
-    MQTT_CONNECTION_REFUSE_BAD_USERNAME,            /*!< MQTT connection refused reason: Wrong user */
-    MQTT_CONNECTION_REFUSE_NOT_AUTHORIZED           /*!< MQTT connection refused reason: Wrong username or password */
-} esp_mqtt_connect_return_code_t;
-
-/**
- * MQTT connection error codes propagated via ERROR event
- */
 typedef enum esp_mqtt_error_type_t {
     MQTT_ERROR_TYPE_NONE = 0,
     MQTT_ERROR_TYPE_TCP_TRANSPORT,
@@ -109,15 +100,6 @@ typedef enum esp_mqtt_transport_t {
 } esp_mqtt_transport_t;
 
 /**
- *  MQTT protocol version used for connection
- */
-typedef enum esp_mqtt_protocol_ver_t {
-    MQTT_PROTOCOL_UNDEFINED = 0,
-    MQTT_PROTOCOL_V_3_1,
-    MQTT_PROTOCOL_V_3_1_1
-} esp_mqtt_protocol_ver_t;
-
-/**
  * @brief MQTT error code structure to be passed as a contextual information into ERROR event
  *
  * Important: This structure extends `esp_tls_last_error` error structure and is backward compatible with it
@@ -136,7 +118,6 @@ typedef struct esp_mqtt_error_codes {
     int       esp_tls_cert_verify_flags;         /*!< tls flags reported from underlying tls stack during certificate verification */
     /* esp-mqtt specific structure extension */
     esp_mqtt_error_type_t error_type;            /*!< error type referring to the source of the error */
-    esp_mqtt_connect_return_code_t connect_return_code; /*!< connection refused error code reported from MQTT broker on connection */
     /* tcp_transport extension */
     int       esp_transport_sock_errno;         /*!< errno from the underlying socket */
 
@@ -149,18 +130,81 @@ typedef struct esp_mqtt_event_t {
     esp_mqtt_event_id_t event_id;       /*!< MQTT event type */
     esp_mqtt_client_handle_t client;    /*!< MQTT client handle for this event */
     void *user_context;                 /*!< User context passed from MQTT client config */
-    char *data;                         /*!< Data associated with this event */
-    int data_len;                       /*!< Length of the data for this event */
-    int total_data_len;                 /*!< Total length of the data (longer data are supplied with multiple events) */
-    int current_data_offset;            /*!< Actual offset for the data associated with this event */
-    char *topic;                        /*!< Topic associated with this event */
-    int topic_len;                      /*!< Length of the topic for this event associated with this event */
     int msg_id;                         /*!< MQTT messaged id of message */
-    int session_present;                /*!< MQTT session_present flag for connection event */
-    esp_mqtt_error_codes_t *error_handle; /*!< esp-mqtt error handle including esp-tls errors as well as internal mqtt errors */
-    bool retain;                        /*!< Retained flag of the message associated with this event */
-    int qos;                            /*!< qos of the messages associated with this event */
     bool dup;                           /*!< dup flag of the message associated with this event */
+    mqtt_reason_code_t reason_code;     /*!< Returned MQTT code on error */
+#ifdef CONFIG_MQTT_PROTOCOL_50
+    const char* reason_string;
+    int reason_string_len;
+    struct {
+        char *key;
+        int key_len;
+        char *value;
+        int value_len;
+    } user_props[CONFIG_MQTT_PROPERTIES_MAX];
+    int user_props_count;
+#endif
+    // MQTT_EVENT_ERROR
+    esp_mqtt_error_codes_t error_handle;/*!< esp-mqtt error handle including esp-tls errors as well as internal mqtt errors */
+    struct {
+        int qos;       /*!< qos of the messages associated with this event */
+        bool retain;   /*!< Retained flag of the message associated with this event */
+        char *topic;   /*!< Topic associated with this event */
+        int topic_len; /*!< Length of the topic for this event associated with this event */
+        char *data;    /*!< Data associated with this event */
+        int data_len;  /*!< Length of the data for this event */
+        int total_data_len;      /*!< Total length of the data (longer data are supplied with multiple events) */
+        int current_data_offset; /*!< Actual offset for the data associated with this event */
+#ifdef CONFIG_MQTT_PROTOCOL_50
+        int payload_format_indicator;
+        int message_expiry_interval;
+        uint16_t topic_alias;
+        const char* response_topic;
+        int response_topic_len;
+        uint8_t* correlation_data;
+        int correlation_data_len;
+        // user props
+        int subscription_ids[CONFIG_MQTT_PROPERTIES_MAX];
+        int subscription_ids_count;
+        const char* content_type;
+        int content_type_len;
+#endif
+    } publish_data; // MQTT_EVENT_DATA
+    struct {
+        int session_present;                /*!< MQTT session_present flag for connection event */
+#ifdef CONFIG_MQTT_PROTOCOL_50
+        int session_expiring_interval;
+        uint16_t server_receive_max;
+        int qos_max;                        /*!< Maximum QOS. Restrict client to send up QOS up to 0 or 1 */
+        bool has_retain;
+        int packet_size_max;
+        const char* assigned_client_id;
+        int assigned_client_id_len;
+        int topic_alias_max;
+        // user props
+        bool has_wildcard_subscription;
+        bool has_subscription_identifier;
+        bool has_shared_subscription;
+        int server_keep_alive;
+        const char* response_information;
+        int response_information_len;
+        const char* server_reference;
+        int server_reference_len;
+        const char* authentication_method;
+        int authentication_method_len;
+        uint8_t* authentication_data;
+        int authentication_data_len;
+#endif
+    } connected; // MQTT_EVENT_CONNECTED
+    struct {
+#ifdef CONFIG_MQTT_PROTOCOL_50
+        int reason_codes_count;
+        int reason_codes_list[CONFIG_MQTT_SIMUL_TOPICS_MAX]; /*!< Used by subscribe/unsubscribe */
+#else
+        int qos_count;
+        int qos_list[CONFIG_MQTT_SIMUL_TOPICS_MAX];
+#endif
+    } subunsubscribed; // MQTT_EVENT_SUBSCRIBED //MQTT_EVENT_UNSUBSCRIBED
 } esp_mqtt_event_t;
 
 typedef esp_mqtt_event_t *esp_mqtt_event_handle_t;
@@ -188,8 +232,6 @@ typedef struct esp_mqtt_client_config_t {
     const struct psk_key_hint *psk_hint_key;     /*!< Pointer to PSK struct defined in esp_tls.h to enable PSK authentication (as alternative to certificate verification). If not NULL and server certificates are NULL, PSK is enabled */
     bool skip_cert_common_name_check;       /*!< Skip any validation of server certificate CN field, this reduces the security of TLS and makes the mqtt client susceptible to MITM attacks  */
     const char **alpn_protos;               /*!< NULL-terminated list of supported application protocols to be used for ALPN */
-    const char *username;                   /*!< MQTT username */
-    const char *password;                   /*!< MQTT password */
     const char *client_cert_pem;            /*!< Pointer to certificate data in PEM or DER format for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_key_pem` has to be provided. PEM-format must have a terminating NULL-character. DER-format requires the length to be passed in client_cert_len. */
     size_t client_cert_len;                 /*!< Length of the buffer pointed to by client_cert_pem. May be 0 for null-terminated pem */
     const char *client_key_pem;             /*!< Pointer to private key data in PEM or DER format for SSL mutual authentication, default is NULL, not required if mutual authentication is not needed. If it is not NULL, also `client_cert_pem` has to be provided. PEM-format must have a terminating NULL-character. DER-format requires the length to be passed in client_key_len */
@@ -198,24 +240,15 @@ typedef struct esp_mqtt_client_config_t {
     int clientkey_password_len;             /*!< String length of the password pointed to by clientkey_password */
     bool use_secure_element;                /*!< enable secure element for enabling SSL connection */
     void *ds_data;                          /*!< carrier of handle for digital signature parameters */
-    bool set_null_client_id;                /*!< Selects a NULL client id */
-    const char *client_id;                  /*!< Set client id.
-                                            Ignored if set_null_client_id == true
-                                            If NULL set the default client id.
-                                            Default client id is ``ESP32_%CHIPID%`` where %CHIPID% are last 3 bytes of MAC address in hex format */
+
     mqtt_event_callback_t event_handle;     /*!< handle for MQTT events as a callback in legacy mode */
     esp_event_loop_handle_t event_loop_handle; /*!< handle for MQTT event loop library */
     int task_prio;                          /*!< MQTT task priority, default is 5, can be changed in ``make menuconfig`` */
     int task_stack;                         /*!< MQTT task stack size, default is 6144 bytes, can be changed in ``make menuconfig`` */
-    const char *lwt_topic;                  /*!< LWT (Last Will and Testament) message topic (NULL by default) */
-    const char *lwt_msg;                    /*!< LWT message (NULL by default) */
-    int lwt_qos;                            /*!< LWT message qos */
-    int lwt_retain;                         /*!< LWT retained message flag */
-    int lwt_msg_len;                        /*!< LWT message length */
+
+    bool set_null_client_id;                /*!< Selects a NULL client id */
     int disable_clean_session;              /*!< mqtt clean session, default clean_session is true */
-    int keepalive;                          /*!< mqtt keepalive, default is 120 seconds */
     bool disable_keepalive;                 /*!< Set disable_keepalive=true to turn off keep-alive mechanism, false by default (keepalive is active by default). Note: setting the config value `keepalive` to `0` doesn't disable keepalive feature, but uses a default keepalive period */
-    esp_mqtt_protocol_ver_t protocol_ver;   /*!< MQTT protocol version used for connection, defaults to value from menuconfig*/
     int message_retransmit_timeout;         /*!< timeout for retansmit of failded packet */
     int reconnect_timeout_ms;               /*!< Reconnect to the broker after this value in miliseconds if auto reconnect is not disabled (defaults to 10s) */
     int network_timeout_ms;                 /*!< Abort network operation if it is not completed after this value, in milliseconds (defaults to 10s) */
@@ -224,6 +257,10 @@ typedef struct esp_mqtt_client_config_t {
     void *user_context;                     /*!< pass user context to this option, then can receive that context in ``event->user_context`` */
     int buffer_size;                        /*!< size of MQTT send/receive buffer, default is 1024 (only receive buffer size if ``out_buffer_size`` defined) */
     int out_buffer_size;                    /*!< size of MQTT output buffer. If not defined, both output and input buffers have the same size defined as ``buffer_size`` */
+    mqtt_connect_info_t connect;
+#ifdef CONFIG_MQTT_PROTOCOL_50
+    bool send_will_on_disconnect;
+#endif
 } esp_mqtt_client_config_t;
 
 /**
@@ -309,7 +346,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
  * @return message_id of the subscribe message on success
  *         -1 on failure
  */
-int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic, int qos);
+int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, mqtt_subscribe_info_t* info);
 
 /**
  * @brief Unsubscribe the client from defined topic
@@ -324,7 +361,7 @@ int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic
  * @return message_id of the subscribe message on success
  *         -1 on failure
  */
-int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *topic);
+int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, mqtt_unsubscribe_info_t* info);
 
 /**
  * @brief Client to send a publish message to the broker
@@ -349,7 +386,7 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
  * @return message_id of the publish message (for QoS 0 message_id will always be zero) on success.
  *         -1 on failure.
  */
-int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain);
+int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, mqtt_publish_info_t* info);
 
 /**
  * @brief Enqueue a message to the outbox, to be sent later. Typically used for messages with qos>0, but could
@@ -370,7 +407,7 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
  *
  * @return message_id if queued successfully, -1 otherwise
  */
-int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain, bool store);
+int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, mqtt_publish_info_t* info, bool store);
 
 /**
  * @brief Destroys the client handle

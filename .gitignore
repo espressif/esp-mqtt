@@ -34,3 +34,5 @@
 build
 examples/**/build
 examples/**/sdkconfig*
+
+.vs/

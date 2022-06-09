@@ -8,8 +8,22 @@
 
 #include "sdkconfig.h"
 
-#ifdef CONFIG_MQTT_PROTOCOL_311
-#define MQTT_PROTOCOL_311
+#if defined(CONFIG_MQTT_PROTOCOL_31)
+#define MQTT_PROTOCOL_VERSION 3
+#define MQTT_VARIABLE_HEADER_SIZE 12
+#define MQTT_PROTOCOL_NAME "MQIsdp"
+#else
+    // Default defines
+    #define MQTT_VARIABLE_HEADER_SIZE 10
+    #define MQTT_PROTOCOL_NAME "MQTT"
+    #if defined(CONFIG_MQTT_PROTOCOL_311)
+    // Specific defines
+    #define MQTT_PROTOCOL_VERSION 4
+    #elif defined(CONFIG_MQTT_PROTOCOL_50)
+    #define MQTT_PROTOCOL_VERSION 5
+    #else
+    #error "No valid protocol selected"
+    #endif
 #endif
 
 #define MQTT_RECON_DEFAULT_MS       (10*1000)
