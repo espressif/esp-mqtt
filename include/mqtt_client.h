@@ -187,6 +187,7 @@ typedef struct esp_mqtt_client_config_t {
     size_t cert_len;                        /*!< Length of the buffer pointed to by cert_pem. May be 0 for null-terminated pem */
     const struct psk_key_hint *psk_hint_key;     /*!< Pointer to PSK struct defined in esp_tls.h to enable PSK authentication (as alternative to certificate verification). If not NULL and server certificates are NULL, PSK is enabled */
     bool skip_cert_common_name_check;       /*!< Skip any validation of server certificate CN field, this reduces the security of TLS and makes the mqtt client susceptible to MITM attacks  */
+    bool skip_server_verification;          /*!< Skip server verification completely. Should only be used for debugging */
     const char **alpn_protos;               /*!< NULL-terminated list of supported application protocols to be used for ALPN */
     const char *username;                   /*!< MQTT username */
     const char *password;                   /*!< MQTT password */

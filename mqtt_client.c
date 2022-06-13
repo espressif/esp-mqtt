@@ -228,6 +228,8 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
 
     if (cfg->use_global_ca_store == true) {
         esp_transport_ssl_enable_global_ca_store(ssl);
+    } else if (cfg->skip_server_verification == true) {
+        esp_transport_ssl_skip_server_verification(ssl);
     } else if (cfg->crt_bundle_attach != NULL) {
 #ifdef MQTT_SUPPORTED_FEATURE_CERTIFICATE_BUNDLE
 #ifdef CONFIG_MBEDTLS_CERTIFICATE_BUNDLE
