@@ -12,6 +12,9 @@
 #include <string.h>
 #include "esp_err.h"
 #include "esp_event.h"
+#ifdef CONFIG_MQTT_PROTOCOL_5
+#include "mqtt5_client.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -114,7 +117,8 @@ typedef enum esp_mqtt_transport_t {
 typedef enum esp_mqtt_protocol_ver_t {
     MQTT_PROTOCOL_UNDEFINED = 0,
     MQTT_PROTOCOL_V_3_1,
-    MQTT_PROTOCOL_V_3_1_1
+    MQTT_PROTOCOL_V_3_1_1,
+    MQTT_PROTOCOL_V_5,
 } esp_mqtt_protocol_ver_t;
 
 /**
@@ -161,6 +165,10 @@ typedef struct esp_mqtt_event_t {
     bool retain;                        /*!< Retained flag of the message associated with this event */
     int qos;                            /*!< qos of the messages associated with this event */
     bool dup;                           /*!< dup flag of the message associated with this event */
+    esp_mqtt_protocol_ver_t protocol_ver;   /*!< MQTT protocol version used for connection, defaults to value from menuconfig*/
+#ifdef CONFIG_MQTT_PROTOCOL_5
+    esp_mqtt5_event_property_t *property; /*!< MQTT 5 property associated with this event */
+#endif
 } esp_mqtt_event_t;
 
 typedef esp_mqtt_event_t *esp_mqtt_event_handle_t;
@@ -420,7 +428,6 @@ esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mq
  *         0 on wrong initialization
  */
 int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client);
-
 #ifdef __cplusplus
 }
 #endif //__cplusplus
