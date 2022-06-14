@@ -141,14 +141,6 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
 static void esp_mqtt_client_dispatch_transport_error(esp_mqtt_client_handle_t client);
 static esp_err_t send_disconnect_msg(esp_mqtt_client_handle_t client);
 
-#if MQTT_ENABLE_SSL
-enum esp_mqtt_ssl_cert_key_api {
-    MQTT_SSL_DATA_API_CA_CERT,
-    MQTT_SSL_DATA_API_CLIENT_CERT,
-    MQTT_SSL_DATA_API_CLIENT_KEY,
-    MQTT_SSL_DATA_API_MAX,
-};
-
 static int esp_mqtt_handle_transport_read_error(int err, esp_mqtt_client_handle_t client)
 {
     if (err == ERR_TCP_TRANSPORT_CONNECTION_CLOSED_BY_FIN) {
@@ -165,6 +157,14 @@ static int esp_mqtt_handle_transport_read_error(int err, esp_mqtt_client_handle_
     esp_mqtt_client_dispatch_transport_error(client);
     return -1;
 }
+
+#if MQTT_ENABLE_SSL
+enum esp_mqtt_ssl_cert_key_api {
+    MQTT_SSL_DATA_API_CA_CERT,
+    MQTT_SSL_DATA_API_CLIENT_CERT,
+    MQTT_SSL_DATA_API_CLIENT_KEY,
+    MQTT_SSL_DATA_API_MAX,
+};
 
 static esp_err_t esp_mqtt_set_cert_key_data(esp_transport_handle_t ssl, enum esp_mqtt_ssl_cert_key_api what, const char *cert_key_data, int cert_key_len)
 {
