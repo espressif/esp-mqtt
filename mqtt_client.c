@@ -2056,6 +2056,23 @@ esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mq
 #endif
 }
 
+esp_err_t esp_mqtt_client_unregister_event(esp_mqtt_client_handle_t client, esp_mqtt_event_id_t event, esp_event_handler_t event_handler)
+{
+    if (client == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
+    if (client->config->event_handle) {
+        ESP_LOGW(TAG, "Unregistering event loop while event callback is not null, clearing callback");
+        client->config->event_handle = NULL;
+    }
+
+    return esp_event_handler_unregister_with(client->config->event_loop_handle, MQTT_EVENTS, event, event_handler);
+#else
+    ESP_LOGE(TAG, "Unregistering event handler while event loop not available in IDF version %s", IDF_VER);
+    return ESP_FAIL;
+#endif
+}
 
 static void esp_mqtt_client_dispatch_transport_error(esp_mqtt_client_handle_t client)
 {
