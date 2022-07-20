@@ -138,6 +138,43 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
                      goto esp_mqtt_set_transport_failed);
 
     }
+    if (cfg->psk_hint_key) {
+#if defined(MQTT_SUPPORTED_FEATURE_PSK_AUTHENTICATION) && MQTT_ENABLE_SSL
+#ifdef CONFIG_ESP_TLS_PSK_VERIFICATION
+        esp_transport_ssl_set_psk_key_hint(ssl, cfg->psk_hint_key);
+#else
+        ESP_LOGE(TAG, "PSK authentication configured but not enabled in menuconfig: Please enable ESP_TLS_PSK_VERIFICATION option");
+        goto esp_mqtt_set_transport_failed;
+#endif
+#else
+        ESP_LOGE(TAG, "PSK authentication is not available in IDF version %s", IDF_VER);
+        goto esp_mqtt_set_transport_failed;
+#endif
+    }
+
+    if (cfg->alpn_protos) {
+#if defined(MQTT_SUPPORTED_FEATURE_ALPN) && MQTT_ENABLE_SSL
+#if defined(CONFIG_MBEDTLS_SSL_ALPN) || defined(CONFIG_WOLFSSL_HAVE_ALPN)
+        esp_transport_ssl_set_alpn_protocol(ssl, (const char **)cfg->alpn_protos);
+#else
+        ESP_LOGE(TAG, "APLN configured but not enabled in menuconfig: Please enable MBEDTLS_SSL_ALPN or WOLFSSL_HAVE_ALPN option");
+        goto esp_mqtt_set_transport_failed;
+#endif
+#else
+        ESP_LOGE(TAG, "APLN is not available in IDF version %s", IDF_VER);
+        goto esp_mqtt_set_transport_failed;
+#endif
+    }
+
+
+    if (cfg->skip_cert_common_name_check) {
+#if defined(MQTT_SUPPORTED_FEATURE_SKIP_CRT_CMN_NAME_CHECK) && MQTT_ENABLE_SSL
+        esp_transport_ssl_skip_common_name_check(ssl);
+#else
+        ESP_LOGE(TAG, "Skip certificate common name check is not available in IDF version %s", IDF_VER);
+        goto esp_mqtt_set_transport_failed;
+#endif
+    }
 
     if (cfg->use_secure_element) {
 #ifdef MQTT_SUPPORTED_FEATURE_SECURE_ELEMENT
@@ -182,43 +219,6 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
 #endif
     }
 
-    if (cfg->psk_hint_key) {
-#if defined(MQTT_SUPPORTED_FEATURE_PSK_AUTHENTICATION) && MQTT_ENABLE_SSL
-#ifdef CONFIG_ESP_TLS_PSK_VERIFICATION
-        esp_transport_ssl_set_psk_key_hint(ssl, cfg->psk_hint_key);
-#else
-        ESP_LOGE(TAG, "PSK authentication configured but not enabled in menuconfig: Please enable ESP_TLS_PSK_VERIFICATION option");
-        goto esp_mqtt_set_transport_failed;
-#endif
-#else
-        ESP_LOGE(TAG, "PSK authentication is not available in IDF version %s", IDF_VER);
-        goto esp_mqtt_set_transport_failed;
-#endif
-    }
-
-    if (cfg->alpn_protos) {
-#if defined(MQTT_SUPPORTED_FEATURE_ALPN) && MQTT_ENABLE_SSL
-#if defined(CONFIG_MBEDTLS_SSL_ALPN) || defined(CONFIG_WOLFSSL_HAVE_ALPN)
-        esp_transport_ssl_set_alpn_protocol(ssl, (const char **)cfg->alpn_protos);
-#else
-        ESP_LOGE(TAG, "APLN configured but not enabled in menuconfig: Please enable MBEDTLS_SSL_ALPN or WOLFSSL_HAVE_ALPN option");
-        goto esp_mqtt_set_transport_failed;
-#endif
-#else
-        ESP_LOGE(TAG, "APLN is not available in IDF version %s", IDF_VER);
-        goto esp_mqtt_set_transport_failed;
-#endif
-    }
-
-
-    if (cfg->skip_cert_common_name_check) {
-#if defined(MQTT_SUPPORTED_FEATURE_SKIP_CRT_CMN_NAME_CHECK) && MQTT_ENABLE_SSL
-        esp_transport_ssl_skip_common_name_check(ssl);
-#else
-        ESP_LOGE(TAG, "Skip certificate common name check is not available in IDF version %s", IDF_VER);
-        goto esp_mqtt_set_transport_failed;
-#endif
-    }
 
     return ESP_OK;
 
@@ -242,13 +242,13 @@ static esp_err_t esp_mqtt_check_cfg_conflict(const mqtt_config_storage_t *cfg, c
         if (cfg->uri) {
             ESP_LOGW(TAG, "SSL related configs set, but the URI scheme specifies a non-SSL scheme, scheme = %s", cfg->scheme);
         } else {
-            ESP_LOGW(TAG, "SSL related configs set, but the transport protocol is a non-SSL scheme, transport = %d", user_cfg->transport);
+            ESP_LOGW(TAG, "SSL related configs set, but the transport protocol is a non-SSL scheme, transport = %d", user_cfg->broker.address.transport);
         }
         ret = ESP_ERR_INVALID_ARG;
     }
 
-    if (cfg->uri && user_cfg->transport) {
-        ESP_LOGW(TAG, "Transport config set, but overridden by scheme from URI: transport = %d, uri scheme = %s", user_cfg->transport, cfg->scheme);
+    if (cfg->uri && user_cfg->broker.address.transport) {
+        ESP_LOGW(TAG, "Transport config set, but overridden by scheme from URI: transport = %d, uri scheme = %s", user_cfg->broker.address.transport, cfg->scheme);
         ret = ESP_ERR_INVALID_ARG;
     }
 
@@ -355,34 +355,34 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
         });
     }
 
-    client->config->message_retransmit_timeout = config->message_retransmit_timeout;
-    if (config->message_retransmit_timeout <= 0) {
+    client->config->message_retransmit_timeout = config->session.message_retransmit_timeout;
+    if (config->session.message_retransmit_timeout <= 0) {
         client->config->message_retransmit_timeout = 1000;
     }
 
-    client->config->task_prio = config->task_prio;
+    client->config->task_prio = config->task.priority;
     if (client->config->task_prio <= 0) {
         client->config->task_prio = MQTT_TASK_PRIORITY;
     }
 
-    client->config->task_stack = config->task_stack;
+    client->config->task_stack = config->task.stack_size;
     if (client->config->task_stack <= 0) {
         client->config->task_stack = MQTT_TASK_STACK;
     }
 
-    if (config->port) {
-        client->config->port = config->port;
+    if (config->broker.address.port) {
+        client->config->port = config->broker.address.port;
     }
 
     err = ESP_ERR_NO_MEM;
-    ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->host, &client->config->host), goto _mqtt_set_config_failed);
-    ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->path, &client->config->path), goto _mqtt_set_config_failed);
-    ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->username, &client->connect_info.username), goto _mqtt_set_config_failed);
-    ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->password, &client->connect_info.password), goto _mqtt_set_config_failed);
+    ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->broker.address.hostname, &client->config->host), goto _mqtt_set_config_failed);
+    ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->broker.address.path, &client->config->path), goto _mqtt_set_config_failed);
+    ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->credentials.username, &client->connect_info.username), goto _mqtt_set_config_failed);
+    ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->credentials.authentication.password, &client->connect_info.password), goto _mqtt_set_config_failed);
 
-    if (!config->set_null_client_id) {
-        if (config->client_id) {
-            ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->client_id, &client->connect_info.client_id), goto _mqtt_set_config_failed);
+    if (!config->credentials.set_null_client_id) {
+        if (config->credentials.client_id) {
+            ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->credentials.client_id, &client->connect_info.client_id), goto _mqtt_set_config_failed);
         } else if (client->connect_info.client_id == NULL) {
             client->connect_info.client_id = platform_create_id_string();
         }
@@ -390,49 +390,49 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
         ESP_LOGD(TAG, "MQTT client_id=%s", client->connect_info.client_id);
     }
 
-    ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->uri, &client->config->uri), goto _mqtt_set_config_failed);
-    ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->lwt_topic, &client->connect_info.will_topic), goto _mqtt_set_config_failed);
+    ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->broker.address.uri, &client->config->uri), goto _mqtt_set_config_failed);
+    ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->session.last_will.topic, &client->connect_info.will_topic), goto _mqtt_set_config_failed);
 
-    if (config->lwt_msg_len && config->lwt_msg) {
+    if (config->session.last_will.msg_len && config->session.last_will.msg) {
         free(client->connect_info.will_message);
-        client->connect_info.will_message = malloc(config->lwt_msg_len);
+        client->connect_info.will_message = malloc(config->session.last_will.msg_len);
         ESP_MEM_CHECK(TAG, client->connect_info.will_message, goto _mqtt_set_config_failed);
-        memcpy(client->connect_info.will_message, config->lwt_msg, config->lwt_msg_len);
-        client->connect_info.will_length = config->lwt_msg_len;
-    } else if (config->lwt_msg) {
+        memcpy(client->connect_info.will_message, config->session.last_will.msg, config->session.last_will.msg_len);
+        client->connect_info.will_length = config->session.last_will.msg_len;
+    } else if (config->session.last_will.msg) {
         free(client->connect_info.will_message);
-        client->connect_info.will_message = strdup(config->lwt_msg);
+        client->connect_info.will_message = strdup(config->session.last_will.msg);
         ESP_MEM_CHECK(TAG, client->connect_info.will_message, goto _mqtt_set_config_failed);
-        client->connect_info.will_length = strlen(config->lwt_msg);
+        client->connect_info.will_length = strlen(config->session.last_will.msg);
     }
-    if (config->lwt_qos) {
-        client->connect_info.will_qos = config->lwt_qos;
+    if (config->session.last_will.qos) {
+        client->connect_info.will_qos = config->session.last_will.qos;
     }
-    if (config->lwt_retain) {
-        client->connect_info.will_retain = config->lwt_retain;
+    if (config->session.last_will.retain) {
+        client->connect_info.will_retain = config->session.last_will.retain;
     }
 
-    if (config->disable_clean_session == client->connect_info.clean_session) {
-        client->connect_info.clean_session = !config->disable_clean_session;
-        if (!client->connect_info.clean_session && config->set_null_client_id) {
+    if (config->session.disable_clean_session == client->connect_info.clean_session) {
+        client->connect_info.clean_session = !config->session.disable_clean_session;
+        if (!client->connect_info.clean_session && config->credentials.set_null_client_id) {
             ESP_LOGE(TAG, "Clean Session flag must be true if client has a null id");
         }
     }
-    if (config->keepalive) {
-        client->connect_info.keepalive = config->keepalive;
+    if (config->session.keepalive) {
+        client->connect_info.keepalive = config->session.keepalive;
     }
     if (client->connect_info.keepalive == 0) {
         client->connect_info.keepalive = MQTT_KEEPALIVE_TICK;
     }
-    if (config->disable_keepalive) {
+    if (config->session.disable_keepalive) {
         // internal `keepalive` value (in connect_info) is in line with 3.1.2.10 Keep Alive from mqtt spec:
         //      * keepalive=0: Keep alive mechanism disabled (server not to disconnect the client on its inactivity)
         //      * period in seconds to send a Control packet if inactive
         client->connect_info.keepalive = 0;
     }
 
-    if (config->protocol_ver) {
-        client->connect_info.protocol_ver = config->protocol_ver;
+    if (config->session.protocol_ver) {
+        client->connect_info.protocol_ver = config->session.protocol_ver;
     }
     if (client->connect_info.protocol_ver == MQTT_PROTOCOL_UNDEFINED) {
 #ifdef MQTT_PROTOCOL_311
@@ -447,35 +447,27 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
 #endif
     }
 
-    client->config->network_timeout_ms = config->network_timeout_ms;
+    client->config->network_timeout_ms = config->network.timeout_ms;
     if (client->config->network_timeout_ms <= 0) {
         client->config->network_timeout_ms = MQTT_NETWORK_TIMEOUT_MS;
     }
 
-    if (config->user_context) {
-        client->config->user_context = config->user_context;
-    }
-
-    if (config->event_handle) {
-        client->config->event_handle = config->event_handle;
-    }
-
-    if (config->refresh_connection_after_ms) {
-        client->config->refresh_connection_after_ms = config->refresh_connection_after_ms;
+    if (config->network.refresh_connection_after_ms) {
+        client->config->refresh_connection_after_ms = config->network.refresh_connection_after_ms;
     }
 
     client->config->auto_reconnect = true;
-    if (config->disable_auto_reconnect == client->config->auto_reconnect) {
-        client->config->auto_reconnect = !config->disable_auto_reconnect;
+    if (config->network.disable_auto_reconnect == client->config->auto_reconnect) {
+        client->config->auto_reconnect = !config->network.disable_auto_reconnect;
     }
 
-    if (config->reconnect_timeout_ms) {
-        client->config->reconnect_timeout_ms = config->reconnect_timeout_ms;
+    if (config->network.reconnect_timeout_ms) {
+        client->config->reconnect_timeout_ms = config->network.reconnect_timeout_ms;
     } else {
         client->config->reconnect_timeout_ms = MQTT_RECON_DEFAULT_MS;
     }
 
-    if (config->alpn_protos) {
+    if (config->broker.verification.alpn_protos) {
         for (int i = 0; i < client->config->num_alpn_protos; i++) {
             free(client->config->alpn_protos[i]);
         }
@@ -484,60 +476,60 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
 
         const char **p;
 
-        for (p = config->alpn_protos; *p != NULL; p++ ) {
+        for (p = config->broker.verification.alpn_protos; *p != NULL; p++ ) {
             client->config->num_alpn_protos++;
         }
         // mbedTLS expects the list to be null-terminated
-        client->config->alpn_protos = calloc(client->config->num_alpn_protos + 1, sizeof(config->alpn_protos));
+        client->config->alpn_protos = calloc(client->config->num_alpn_protos + 1, sizeof(config->broker.verification.alpn_protos));
         ESP_MEM_CHECK(TAG, client->config->alpn_protos, goto _mqtt_set_config_failed);
 
         for (int i = 0; i < client->config->num_alpn_protos; i++) {
-            client->config->alpn_protos[i] = strdup(config->alpn_protos[i]);
+            client->config->alpn_protos[i] = strdup(config->broker.verification.alpn_protos[i]);
             ESP_MEM_CHECK(TAG, client->config->alpn_protos[i], goto _mqtt_set_config_failed);
         }
     }
 
     // configure ssl related parameters
-    client->config->use_global_ca_store = config->use_global_ca_store;
-    client->config->cacert_buf = config->cert_pem;
-    client->config->cacert_bytes = config->cert_len;
-    client->config->clientcert_buf = config->client_cert_pem;
-    client->config->clientcert_bytes = config->client_cert_len;
-    client->config->clientkey_buf = config->client_key_pem;
-    client->config->clientkey_bytes = config->client_key_len;
-    client->config->psk_hint_key = config->psk_hint_key;
-    client->config->skip_cert_common_name_check = config->skip_cert_common_name_check;
-    client->config->use_secure_element = config->use_secure_element;
-    client->config->crt_bundle_attach = config->crt_bundle_attach;
-    client->config->ds_data = config->ds_data;
+    client->config->use_global_ca_store = config->broker.verification.use_global_ca_store;
+    client->config->cacert_buf = config->broker.verification.certificate;
+    client->config->cacert_bytes = config->broker.verification.certificate_len;
+    client->config->psk_hint_key = config->broker.verification.psk_hint_key;
+    client->config->crt_bundle_attach = config->broker.verification.crt_bundle_attach;
+    client->config->clientcert_buf = config->credentials.authentication.certificate;
+    client->config->clientcert_bytes = config->credentials.authentication.certificate_len;
+    client->config->clientkey_buf = config->credentials.authentication.key;
+    client->config->clientkey_bytes = config->credentials.authentication.key_len;
+    client->config->skip_cert_common_name_check = config->broker.verification.skip_cert_common_name_check;
+    client->config->use_secure_element = config->credentials.authentication.use_secure_element;
+    client->config->ds_data = config->credentials.authentication.ds_data;
 
-    if (config->clientkey_password && config->clientkey_password_len) {
-        client->config->clientkey_password_len = config->clientkey_password_len;
+    if (config->credentials.authentication.key_password && config->credentials.authentication.key_password_len) {
+        client->config->clientkey_password_len = config->credentials.authentication.key_password_len;
         client->config->clientkey_password = malloc(client->config->clientkey_password_len);
         ESP_MEM_CHECK(TAG, client->config->clientkey_password, goto _mqtt_set_config_failed);
-        memcpy(client->config->clientkey_password, config->clientkey_password, client->config->clientkey_password_len);
+        memcpy(client->config->clientkey_password, config->credentials.authentication.key_password, client->config->clientkey_password_len);
     }
 
-    if (config->transport) {
+    if (config->broker.address.transport) {
         free(client->config->scheme);
-        if (config->transport == MQTT_TRANSPORT_OVER_TCP) {
+        if (config->broker.address.transport == MQTT_TRANSPORT_OVER_TCP) {
             client->config->scheme = create_string(MQTT_OVER_TCP_SCHEME, strlen(MQTT_OVER_TCP_SCHEME));
             ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
         }
 #if MQTT_ENABLE_WS
-        else if (config->transport == MQTT_TRANSPORT_OVER_WS) {
+        else if (config->broker.address.transport == MQTT_TRANSPORT_OVER_WS) {
             client->config->scheme = create_string(MQTT_OVER_WS_SCHEME, strlen(MQTT_OVER_WS_SCHEME));
             ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
         }
 #endif
 #if MQTT_ENABLE_SSL
-        else if (config->transport == MQTT_TRANSPORT_OVER_SSL) {
+        else if (config->broker.address.transport == MQTT_TRANSPORT_OVER_SSL) {
             client->config->scheme = create_string(MQTT_OVER_SSL_SCHEME, strlen(MQTT_OVER_SSL_SCHEME));
             ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
         }
 #endif
 #if MQTT_ENABLE_WSS
-        else if (config->transport == MQTT_TRANSPORT_OVER_WSS) {
+        else if (config->broker.address.transport == MQTT_TRANSPORT_OVER_WSS) {
             client->config->scheme = create_string(MQTT_OVER_WSS_SCHEME, strlen(MQTT_OVER_WSS_SCHEME));
             ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
         }
@@ -545,7 +537,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     }
 
     // Set uri at the end of config to override separately configured uri elements
-    if (config->uri) {
+    if (config->broker.address.uri) {
         if (esp_mqtt_client_set_uri(client, client->config->uri) != ESP_OK) {
             err = ESP_FAIL;
             goto _mqtt_set_config_failed;
@@ -653,8 +645,15 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
 {
     int read_len, connect_rsp_code = 0;
     client->wait_for_ping_resp = false;
-    client->mqtt_state.outbound_message = mqtt_msg_connect(&client->mqtt_state.mqtt_connection,
+    if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
+#ifdef MQTT_PROTOCOL_5
+        client->mqtt_state.outbound_message = mqtt5_msg_connect(&client->mqtt_state.mqtt_connection,
+                                          &client->connect_info, &client->mqtt5_config->connect_property_info, &client->mqtt5_config->will_property_info);
+#endif
+    } else {
+        client->mqtt_state.outbound_message = mqtt_msg_connect(&client->mqtt_state.mqtt_connection,
                                           &client->connect_info);
+    }
     if (client->mqtt_state.outbound_message->length == 0) {
         ESP_LOGE(TAG, "Connect message cannot be created");
         return ESP_FAIL;
@@ -787,12 +786,12 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     client->reconnect_tick = platform_tick_get_ms();
     client->refresh_connection_tick = platform_tick_get_ms();
     client->wait_for_ping_resp = false;
-    int buffer_size = config->buffer_size;
+    int buffer_size = config->buffer.size;
     if (buffer_size <= 0) {
         buffer_size = MQTT_BUFFER_SIZE_BYTE;
     }
     // use separate value for output buffer size if configured
-    int out_buffer_size = config->out_buffer_size > 0 ? config->out_buffer_size : buffer_size;
+    int out_buffer_size = config->buffer.out_size > 0 ? config->buffer.out_size : buffer_size;
 
     client->mqtt_state.in_buffer = (uint8_t *)malloc(buffer_size);
     ESP_MEM_CHECK(TAG, client->mqtt_state.in_buffer, goto _mqtt_init_failed);
@@ -942,7 +941,6 @@ static esp_err_t esp_mqtt_dispatch_event_with_msgid(esp_mqtt_client_handle_t cli
 
 static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
 {
-    client->event.user_context = client->config->user_context;
     client->event.client = client;
     client->event.protocol_ver = client->connect_info.protocol_ver;
     esp_err_t ret = ESP_FAIL;
@@ -1870,7 +1868,7 @@ static inline int mqtt_client_enqueue_priv(esp_mqtt_client_handle_t client, cons
         return -1;
     }
     /* We have to set as pending all the qos>0 messages */
-    //client->mqtt_state.outbound_message = publish_msg;
+    //TODO: client->mqtt_state.outbound_message = publish_msg;
     if (qos > 0 || store) {
         client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
         client->mqtt_state.pending_msg_id = pending_msg_id;
