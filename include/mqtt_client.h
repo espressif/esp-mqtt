@@ -82,6 +82,10 @@ typedef enum esp_mqtt_event_id_t {
                                   - Additional context: msg_id (id of the deleted
                                 message).
                                   */
+    MQTT_USER_EVENT,            /*!< Custom event used to queue tasks into mqtt event handler
+                                 All fields from the esp_mqtt_event_t type could be used to pass
+                                 an additional context data to the handler.
+                                 */
 } esp_mqtt_event_id_t;
 
 /**
@@ -568,6 +572,16 @@ esp_err_t esp_mqtt_client_unregister_event(esp_mqtt_client_handle_t client, esp_
  *         0 on wrong initialization
  */
 int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client);
+
+/**
+ * @brief Dispatch user event to the mqtt internal event loop
+ *
+ * @param client            *MQTT* client handle
+ * @param event             *MQTT* event handle structure
+ * @return ESP_OK on success
+ *         ESP_ERR_TIMEOUT if the event couldn't be queued (ref also CONFIG_MQTT_EVENT_QUEUE_SIZE)
+ */
+esp_err_t esp_mqtt_dispatch_custom_event(esp_mqtt_client_handle_t client, esp_mqtt_event_t *event);
 
 #ifdef __cplusplus
 }
