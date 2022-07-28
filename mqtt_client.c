@@ -41,17 +41,29 @@ static esp_err_t send_disconnect_msg(esp_mqtt_client_handle_t client);
 
 static int esp_mqtt_handle_transport_read_error(int err, esp_mqtt_client_handle_t client)
 {
+    // ESP-IDF >= v5 defines ESP errors for connection closure and timeout.
+    // (Only check these if they exist to allow compiling with older versions.)
+#if ERR_TCP_TRANSPORT_CONNECTION_CLOSED_BY_FIN
     if (err == ERR_TCP_TRANSPORT_CONNECTION_CLOSED_BY_FIN) {
         ESP_LOGD(TAG, "%s: transport_read(): EOF", __func__);
         return 0;
     }
+#endif
 
+#if ERR_TCP_TRANSPORT_CONNECTION_TIMEOUT
     if (err == ERR_TCP_TRANSPORT_CONNECTION_TIMEOUT) {
         ESP_LOGD(TAG, "%s: transport_read(): call timed out before data was ready!", __func__);
         return 0;
     }
+#endif
 
-    ESP_LOGE(TAG, "%s: transport_read() error: errno=%d", __func__, errno);
+    // ESP-IDF <= v4 uses EOF (0) for connection closure and timeout.
+    if (err == 0) {
+        ESP_LOGD(TAG, "%s: transport_read(): no data (timeout or connection closed)", __func__);
+        return 0;
+    }
+
+    ESP_LOGE(TAG, "%s: transport_read()=%d (errno=%d)", __func__, err, errno);
     esp_mqtt_client_dispatch_transport_error(client);
     return -1;
 }
