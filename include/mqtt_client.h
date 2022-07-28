@@ -548,6 +548,19 @@ esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client,
         void *event_handler_arg);
 
 /**
+ * @brief Unregisters mqtt event
+ *
+ * @param client            mqtt client handle
+ * @param event             event ID
+ * @param event_handler     handler to unregister
+ *
+ * @return ESP_ERR_NO_MEM if failed to allocate
+ *         ESP_ERR_INVALID_ARG on invalid event ID
+ *         ESP_OK on success
+ */
+esp_err_t esp_mqtt_client_unregister_event(esp_mqtt_client_handle_t client, esp_mqtt_event_id_t event, esp_event_handler_t event_handler);
+
+/**
  * @brief Get outbox size
  *
  * @param client            *MQTT* client handle
