@@ -39,35 +39,6 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
 static void esp_mqtt_client_dispatch_transport_error(esp_mqtt_client_handle_t client);
 static esp_err_t send_disconnect_msg(esp_mqtt_client_handle_t client);
 
-static int esp_mqtt_handle_transport_read_error(int err, esp_mqtt_client_handle_t client)
-{
-    // ESP-IDF >= v5 defines ESP errors for connection closure and timeout.
-    // (Only check these if they exist to allow compiling with older versions.)
-#if ERR_TCP_TRANSPORT_CONNECTION_CLOSED_BY_FIN
-    if (err == ERR_TCP_TRANSPORT_CONNECTION_CLOSED_BY_FIN) {
-        ESP_LOGD(TAG, "%s: transport_read(): EOF", __func__);
-        return 0;
-    }
-#endif
-
-#if ERR_TCP_TRANSPORT_CONNECTION_TIMEOUT
-    if (err == ERR_TCP_TRANSPORT_CONNECTION_TIMEOUT) {
-        ESP_LOGD(TAG, "%s: transport_read(): call timed out before data was ready!", __func__);
-        return 0;
-    }
-#endif
-
-    // ESP-IDF <= v4 uses EOF (0) for connection closure and timeout.
-    if (err == 0) {
-        ESP_LOGD(TAG, "%s: transport_read(): no data (timeout or connection closed)", __func__);
-        return 0;
-    }
-
-    ESP_LOGE(TAG, "%s: transport_read()=%d (errno=%d)", __func__, err, errno);
-    esp_mqtt_client_dispatch_transport_error(client);
-    return -1;
-}
-
 #if MQTT_ENABLE_SSL
 enum esp_mqtt_ssl_cert_key_api {
     MQTT_SSL_DATA_API_CA_CERT,
@@ -1074,7 +1045,8 @@ post_data_event:
                                      msg_total_len - msg_read_len > buf_len ? buf_len : msg_total_len - msg_read_len,
                                      client->config->network_timeout_ms);
         if (ret <= 0) {
-            return esp_mqtt_handle_transport_read_error(ret, client) == 0 ? ESP_OK : ESP_FAIL;
+            esp_mqtt_client_dispatch_transport_error(client);
+            return ESP_FAIL;  // Mid-message timeout or connection close are errors.
         }
 
         msg_data_len = ret;
@@ -1191,9 +1163,17 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
          * type and flags.
          */
         read_len = esp_transport_read(t, (char *)buf, 1, read_poll_timeout_ms);
-        if (read_len <= 0) {
-            return esp_mqtt_handle_transport_read_error(read_len, client);
+        if (read_len == 0) {
+            // On ESP-IDF v5+ and v4.4, esp_transport_read()=0 means timeout.
+            ESP_LOGD(TAG, "mqtt_message_receive(): no message (read timeout)");
+            return 0;
         }
+        if (read_len < 0) {
+            // On ESP-IDF v5+ and v4.4, esp_transport_read()<0 on close or error.
+            esp_mqtt_client_dispatch_transport_error(client);
+            return -1;
+        }
+
         ESP_LOGD(TAG, "%s: first byte: 0x%x", __func__, *buf);
         /*
          * Verify the flags and act according to MQTT protocol: close connection
@@ -1218,7 +1198,8 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
              */
             read_len = esp_transport_read(t, (char *)buf, 1, read_poll_timeout_ms);
             if (read_len <= 0) {
-                return esp_mqtt_handle_transport_read_error(read_len, client);
+                esp_mqtt_client_dispatch_transport_error(client);
+                return -1;  // Mid-message timeout or connection-close are errors.
             }
             ESP_LOGD(TAG, "%s: read \"remaining length\" byte: 0x%x", __func__, *buf);
             buf++;
@@ -1239,7 +1220,8 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
                 read_len = esp_transport_read(t, (char *)buf, client->mqtt_state.in_buffer_read_len - fixed_header_len + 2, read_poll_timeout_ms);
                 ESP_LOGD(TAG, "%s: read_len=%d", __func__, read_len);
                 if (read_len <= 0) {
-                    return esp_mqtt_handle_transport_read_error(read_len, client);
+                    esp_mqtt_client_dispatch_transport_error(client);
+                    return -1;  // Mid-message timeout or connection-close are errors.
                 }
                 client->mqtt_state.in_buffer_read_len += read_len;
                 buf += read_len;
@@ -1270,7 +1252,8 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
         read_len = esp_transport_read(t, (char *)buf, total_len - client->mqtt_state.in_buffer_read_len, read_poll_timeout_ms);
         ESP_LOGD(TAG, "%s: read_len=%d", __func__, read_len);
         if (read_len <= 0) {
-            return esp_mqtt_handle_transport_read_error(read_len, client);
+            esp_mqtt_client_dispatch_transport_error(client);
+            return -1;  // Mid-message timeout or connection-close are errors.
         }
         client->mqtt_state.in_buffer_read_len += read_len;
         if (client->mqtt_state.in_buffer_read_len < total_len) {
