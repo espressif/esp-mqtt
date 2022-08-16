@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdatomic.h>
 #include "esp_err.h"
 #include "platform.h"
 
@@ -123,6 +124,9 @@ struct esp_mqtt_client {
     EventGroupHandle_t status_bits;
     SemaphoreHandle_t  api_lock;
     TaskHandle_t       task_handle;
+#if MQTT_EVENT_QUEUE_SIZE > 1
+    atomic_int         queued_events;
+#endif
 };
 
 bool esp_mqtt_set_if_config(char const *const new_config, char **old_config);

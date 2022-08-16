@@ -765,7 +765,14 @@ static bool create_client_data(esp_mqtt_client_handle_t client)
 
 esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *config)
 {
-    esp_mqtt_client_handle_t client = calloc(1, sizeof(struct esp_mqtt_client));
+    esp_mqtt_client_handle_t client = heap_caps_calloc(1, sizeof(struct esp_mqtt_client),
+#if MQTT_EVENT_QUEUE_SIZE > 1
+                                        // if supporting multiple queued events, we keep track of them
+                                        // using atomic variable, so need to make sure it won't get allocated in PSRAM
+                                        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+#else
+                                        MALLOC_CAP_DEFAULT);
+#endif
     ESP_MEM_CHECK(TAG, client, return NULL);
     if (!create_client_data(client)) {
         goto _mqtt_init_failed;
@@ -776,10 +783,13 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     }
 #ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
     esp_event_loop_args_t no_task_loop = {
-        .queue_size = 1,
+        .queue_size = MQTT_EVENT_QUEUE_SIZE,
         .task_name = NULL,
     };
     esp_event_loop_create(&no_task_loop, &client->config->event_loop_handle);
+#if MQTT_EVENT_QUEUE_SIZE > 1
+    atomic_init(&client->queued_events, 0);
+#endif
 #endif
 
     client->keepalive_tick = platform_tick_get_ms();
@@ -937,6 +947,17 @@ static esp_err_t esp_mqtt_dispatch_event_with_msgid(esp_mqtt_client_handle_t cli
         client->event.msg_id = mqtt_get_id(client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_length);
     }
     return esp_mqtt_dispatch_event(client);
+}
+
+esp_err_t esp_mqtt_dispatch_custom_event(esp_mqtt_client_handle_t client, esp_mqtt_event_t *event)
+{
+    esp_err_t ret = esp_event_post_to(client->config->event_loop_handle, MQTT_EVENTS, MQTT_USER_EVENT, event, sizeof(*event), 0);
+#if MQTT_EVENT_QUEUE_SIZE > 1
+    if (ret == ESP_OK) {
+        atomic_fetch_add(&client->queued_events, 1);
+    }
+#endif
+    return ret;
 }
 
 static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
@@ -1447,6 +1468,34 @@ static void mqtt_delete_expired_messages(esp_mqtt_client_handle_t client)
     }
 }
 
+/**
+ * @brief When using multiple queued item, we'd like to reduce the poll timeout to proceed with event loop exacution
+ */
+static inline int max_poll_timeout(esp_mqtt_client_handle_t client, int max_timeout)
+{
+    return
+#if MQTT_EVENT_QUEUE_SIZE > 1
+            atomic_load(&client->queued_events) > 0 ? 10: max_timeout;
+#else
+            max_timeout;
+#endif
+}
+
+static inline void run_event_loop(esp_mqtt_client_handle_t client)
+{
+#if MQTT_EVENT_QUEUE_SIZE > 1
+    if (atomic_load(&client->queued_events) > 0) {
+            atomic_fetch_sub(&client->queued_events, 1);
+#else
+    {
+#endif
+        esp_err_t ret = esp_event_loop_run(client->config->event_loop_handle, 0);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Error in running event_loop %d", ret);
+        }
+    }
+}
+
 static void esp_mqtt_task(void *pv)
 {
     esp_mqtt_client_handle_t client = (esp_mqtt_client_handle_t) pv;
@@ -1470,6 +1519,7 @@ static void esp_mqtt_task(void *pv)
     xEventGroupClearBits(client->status_bits, STOPPED_BIT);
     while (client->run) {
         MQTT_API_LOCK(client);
+        run_event_loop(client);
         switch (client->state) {
         case MQTT_STATE_DISCONNECTED:
             break;
@@ -1571,7 +1621,7 @@ static void esp_mqtt_task(void *pv)
             }
             MQTT_API_UNLOCK(client);
             xEventGroupWaitBits(client->status_bits, RECONNECT_BIT, false, true,
-                                client->wait_timeout_ms / 2 / portTICK_PERIOD_MS);
+                                max_poll_timeout(client, client->wait_timeout_ms / 2 / portTICK_PERIOD_MS));
             // continue the while loop instead of break, as the mutex is unlocked
             continue;
         default:
@@ -1580,7 +1630,7 @@ static void esp_mqtt_task(void *pv)
         }
         MQTT_API_UNLOCK(client);
         if (MQTT_STATE_CONNECTED == client->state) {
-            if (esp_transport_poll_read(client->transport, MQTT_POLL_READ_TIMEOUT_MS) < 0) {
+            if (esp_transport_poll_read(client->transport, max_poll_timeout(client, MQTT_POLL_READ_TIMEOUT_MS)) < 0) {
                 ESP_LOGE(TAG, "Poll read error: %d, aborting connection", errno);
                 esp_mqtt_abort_connection(client);
             }
