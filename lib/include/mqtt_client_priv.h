@@ -48,13 +48,10 @@ extern "C" {
 
 typedef struct mqtt_state {
     uint8_t *in_buffer;
-    uint8_t *out_buffer;
     int in_buffer_length;
-    int out_buffer_length;
     size_t message_length;
     size_t in_buffer_read_len;
-    mqtt_message_t *outbound_message;
-    mqtt_connection_t mqtt_connection;
+    mqtt_connection_t connection;
     uint16_t pending_msg_id;
     int pending_msg_type;
     int pending_publish_qos;
@@ -106,7 +103,6 @@ struct esp_mqtt_client {
     esp_transport_handle_t transport;
     mqtt_config_storage_t *config;
     mqtt_state_t  mqtt_state;
-    mqtt_connect_info_t connect_info;
     mqtt_client_state_t state;
     uint64_t refresh_connection_tick;
     int64_t keepalive_tick;

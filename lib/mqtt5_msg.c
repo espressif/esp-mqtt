@@ -69,8 +69,8 @@ static int update_property_len_value(mqtt_connection_t *connection, size_t prope
     generate_variable_len(len, &len_bytes, encoded_lens);
     int offset = len_bytes - 1;
 
-    connection->message.length += offset;
-    if (connection->message.length > connection->buffer_length) {
+    connection->outbound_message.length += offset;
+    if (connection->outbound_message.length > connection->buffer_length) {
         return -1;
     }
 
@@ -89,33 +89,33 @@ static int update_property_len_value(mqtt_connection_t *connection, size_t prope
 
 static int append_property(mqtt_connection_t *connection, uint8_t property_type, uint8_t len_occupy, const char *data, size_t data_len)
 {
-    if ((connection->message.length + len_occupy + (data ? data_len : 0) + (property_type ? 1 : 0)) > connection->buffer_length) {
+    if ((connection->outbound_message.length + len_occupy + (data ? data_len : 0) + (property_type ? 1 : 0)) > connection->buffer_length) {
         return -1;
     }
 
-    size_t origin_message_len = connection->message.length;
+    size_t origin_message_len = connection->outbound_message.length;
     if (property_type) {
-        connection->buffer[connection->message.length ++] = property_type;
+        connection->buffer[connection->outbound_message.length ++] = property_type;
     }
 
     if (len_occupy == 0) {
         uint8_t encoded_lens[4] = {0}, len_bytes = 0;
         generate_variable_len(data_len, &len_bytes, encoded_lens);
         for (int j = 0; j < len_bytes; j ++) {
-            connection->buffer[connection->message.length ++] = encoded_lens[j];
+            connection->buffer[connection->outbound_message.length ++] = encoded_lens[j];
         }
     } else {
         for (int i = 1; i <= len_occupy; i ++) {
-            connection->buffer[connection->message.length ++] = (data_len >> (8 * (len_occupy - i))) & 0xff;
+            connection->buffer[connection->outbound_message.length ++] = (data_len >> (8 * (len_occupy - i))) & 0xff;
         }
     }
 
     if (data) {
-        memcpy(connection->buffer + connection->message.length, data, data_len);
-        connection->message.length += data_len;
+        memcpy(connection->buffer + connection->outbound_message.length, data, data_len);
+        connection->outbound_message.length += data_len;
     }
 
-    return connection->message.length - origin_message_len;
+    return connection->outbound_message.length - origin_message_len;
 }
 
 static uint16_t append_message_id(mqtt_connection_t *connection, uint16_t message_id)
@@ -130,36 +130,36 @@ static uint16_t append_message_id(mqtt_connection_t *connection, uint16_t messag
 #endif
     }
 
-    if (connection->message.length + 2 > connection->buffer_length) {
+    if (connection->outbound_message.length + 2 > connection->buffer_length) {
         return 0;
     }
 
-    MQTT5_CONVERT_TWO_BYTE(connection->buffer[connection->message.length ++], message_id)
+    MQTT5_CONVERT_TWO_BYTE(connection->buffer[connection->outbound_message.length ++], message_id)
 
     return message_id;
 }
 
 static int init_message(mqtt_connection_t *connection)
 {
-    connection->message.length = MQTT5_MAX_FIXED_HEADER_SIZE;
+    connection->outbound_message.length = MQTT5_MAX_FIXED_HEADER_SIZE;
     return MQTT5_MAX_FIXED_HEADER_SIZE;
 }
 
 static mqtt_message_t *fail_message(mqtt_connection_t *connection)
 {
-    connection->message.data = connection->buffer;
-    connection->message.length = 0;
-    return &connection->message;
+    connection->outbound_message.data = connection->buffer;
+    connection->outbound_message.length = 0;
+    return &connection->outbound_message;
 }
 
 static mqtt_message_t *fini_message(mqtt_connection_t *connection, int type, int dup, int qos, int retain)
 {
-    int message_length = connection->message.length - MQTT5_MAX_FIXED_HEADER_SIZE;
+    int message_length = connection->outbound_message.length - MQTT5_MAX_FIXED_HEADER_SIZE;
     int total_length = message_length;
     uint8_t encoded_lens[4] = {0}, len_bytes = 0;
     // Check if we have fragmented message and update total_len
-    if (connection->message.fragmented_msg_total_length) {
-        total_length = connection->message.fragmented_msg_total_length - MQTT5_MAX_FIXED_HEADER_SIZE;
+    if (connection->outbound_message.fragmented_msg_total_length) {
+        total_length = connection->outbound_message.fragmented_msg_total_length - MQTT5_MAX_FIXED_HEADER_SIZE;
     }
 
     // Encode MQTT message length
@@ -171,10 +171,10 @@ static mqtt_message_t *fini_message(mqtt_connection_t *connection, int type, int
     }
 
     // Save the header bytes
-    connection->message.length = message_length + len_bytes + 1; // msg len + encoded_size len + type (1 byte)
+    connection->outbound_message.length = message_length + len_bytes + 1; // msg len + encoded_size len + type (1 byte)
     int offs = MQTT5_MAX_FIXED_HEADER_SIZE - 1 - len_bytes;
-    connection->message.data = connection->buffer + offs;
-    connection->message.fragmented_msg_data_offset -= offs;
+    connection->outbound_message.data = connection->buffer + offs;
+    connection->outbound_message.fragmented_msg_data_offset -= offs;
     // type byte
     connection->buffer[offs ++] =  ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
     // length bytes
@@ -182,7 +182,7 @@ static mqtt_message_t *fini_message(mqtt_connection_t *connection, int type, int
         connection->buffer[offs ++] = encoded_lens[j];
     }
 
-    return &connection->message;
+    return &connection->outbound_message;
 }
 
 static esp_err_t mqtt5_msg_set_user_property(mqtt5_user_property_handle_t *user_property, char *key, size_t key_len, char *value, size_t value_len)
@@ -465,24 +465,24 @@ char *mqtt5_get_puback_data(uint8_t *buffer, size_t *length, mqtt5_user_property
 mqtt_message_t *mqtt5_msg_connect(mqtt_connection_t *connection, mqtt_connect_info_t *info, esp_mqtt5_connection_property_storage_t *property, esp_mqtt5_connection_will_property_storage_t *will_property)
 {
     init_message(connection);
-    connection->buffer[connection->message.length ++] = 0;                         // Variable header length MSB
+    connection->buffer[connection->outbound_message.length ++] = 0;                         // Variable header length MSB
     /* Defaults to protocol version 5 values */
-    connection->buffer[connection->message.length ++] = 4;                         // Variable header length LSB
-    memcpy(&connection->buffer[connection->message.length], "MQTT", 4);           // Protocol name
-    connection->message.length += 4;
-    connection->buffer[connection->message.length ++] = 5;                         // Protocol version
+    connection->buffer[connection->outbound_message.length ++] = 4;                         // Variable header length LSB
+    memcpy(&connection->buffer[connection->outbound_message.length], "MQTT", 4);           // Protocol name
+    connection->outbound_message.length += 4;
+    connection->buffer[connection->outbound_message.length ++] = 5;                         // Protocol version
 
-    int flags_offset = connection->message.length;
-    connection->buffer[connection->message.length ++] = 0;                         // Flags
-    MQTT5_CONVERT_TWO_BYTE(connection->buffer[connection->message.length ++], info->keepalive) // Keep-alive
+    int flags_offset = connection->outbound_message.length;
+    connection->buffer[connection->outbound_message.length ++] = 0;                         // Flags
+    MQTT5_CONVERT_TWO_BYTE(connection->buffer[connection->outbound_message.length ++], info->keepalive) // Keep-alive
 
     if (info->clean_session) {
         connection->buffer[flags_offset] |= MQTT5_CONNECT_FLAG_CLEAN_SESSION;
     }
 
     //Add properties
-    int properties_offset = connection->message.length;
-    connection->message.length ++;
+    int properties_offset = connection->outbound_message.length;
+    connection->outbound_message.length ++;
     if (property->session_expiry_interval) {
         APPEND_CHECK(append_property(connection, MQTT5_PROPERTY_SESSION_EXPIRY_INTERVAL, 4, NULL, property->session_expiry_interval), fail_message(connection));
     }
@@ -508,7 +508,7 @@ mqtt_message_t *mqtt5_msg_connect(mqtt_connection_t *connection, mqtt_connect_in
             APPEND_CHECK(append_property(connection, 0, 2, item->value, strlen(item->value)), fail_message(connection));
         }
     }
-    APPEND_CHECK(update_property_len_value(connection, connection->message.length - properties_offset - 1, properties_offset), fail_message(connection));
+    APPEND_CHECK(update_property_len_value(connection, connection->outbound_message.length - properties_offset - 1, properties_offset), fail_message(connection));
 
     if (info->client_id != NULL && info->client_id[0] != '\0') {
         APPEND_CHECK(append_property(connection, 0, 2, info->client_id, strlen(info->client_id)), fail_message(connection));
@@ -518,8 +518,8 @@ mqtt_message_t *mqtt5_msg_connect(mqtt_connection_t *connection, mqtt_connect_in
 
     //Add will properties
     if (info->will_topic != NULL && info->will_topic[0] != '\0') {
-        properties_offset = connection->message.length;
-        connection->message.length ++;
+        properties_offset = connection->outbound_message.length;
+        connection->outbound_message.length ++;
         if (will_property->will_delay_interval) {
             APPEND_CHECK(append_property(connection, MQTT5_PROPERTY_WILL_DELAY_INTERVAL, 4, NULL, will_property->will_delay_interval), fail_message(connection));
         }
@@ -545,7 +545,7 @@ mqtt_message_t *mqtt5_msg_connect(mqtt_connection_t *connection, mqtt_connect_in
                 APPEND_CHECK(append_property(connection, 0, 2, item->value, strlen(item->value)), fail_message(connection));
             }
         }
-        APPEND_CHECK(update_property_len_value(connection, connection->message.length - properties_offset - 1, properties_offset), fail_message(connection));
+        APPEND_CHECK(update_property_len_value(connection, connection->outbound_message.length - properties_offset - 1, properties_offset), fail_message(connection));
 
         APPEND_CHECK(append_property(connection, 0, 2, info->will_topic, strlen(info->will_topic)), fail_message(connection));
         APPEND_CHECK(append_property(connection, 0, 2, info->will_message, info->will_length), fail_message(connection));
@@ -742,8 +742,8 @@ mqtt_message_t *mqtt5_msg_publish(mqtt_connection_t *connection, const char *top
         *message_id = 0;
     }
 
-    int properties_offset = connection->message.length;
-    connection->message.length ++;
+    int properties_offset = connection->outbound_message.length;
+    connection->outbound_message.length ++;
 
     if (property) {
         if (property->payload_format_indicator) {
@@ -788,20 +788,20 @@ mqtt_message_t *mqtt5_msg_publish(mqtt_connection_t *connection, const char *top
             APPEND_CHECK(append_property(connection, MQTT5_PROPERTY_CONTENT_TYPE, 2, property->content_type, strlen(property->content_type)), fail_message(connection));
         }
     }
-    APPEND_CHECK(update_property_len_value(connection, connection->message.length - properties_offset - 1, properties_offset), fail_message(connection));
+    APPEND_CHECK(update_property_len_value(connection, connection->outbound_message.length - properties_offset - 1, properties_offset), fail_message(connection));
 
-    if (connection->message.length + data_length > connection->buffer_length) {
+    if (connection->outbound_message.length + data_length > connection->buffer_length) {
         // Not enough size in buffer -> fragment this message
-        connection->message.fragmented_msg_data_offset = connection->message.length;
-        memcpy(connection->buffer + connection->message.length, data, connection->buffer_length - connection->message.length);
-        connection->message.length = connection->buffer_length;
-        connection->message.fragmented_msg_total_length = data_length + connection->message.fragmented_msg_data_offset;
+        connection->outbound_message.fragmented_msg_data_offset = connection->outbound_message.length;
+        memcpy(connection->buffer + connection->outbound_message.length, data, connection->buffer_length - connection->outbound_message.length);
+        connection->outbound_message.length = connection->buffer_length;
+        connection->outbound_message.fragmented_msg_total_length = data_length + connection->outbound_message.fragmented_msg_data_offset;
     } else {
         if (data != NULL) {
-            memcpy(connection->buffer + connection->message.length, data, data_length);
-            connection->message.length += data_length;
+            memcpy(connection->buffer + connection->outbound_message.length, data, data_length);
+            connection->outbound_message.length += data_length;
         }
-        connection->message.fragmented_msg_total_length = 0;
+        connection->outbound_message.fragmented_msg_total_length = 0;
     }
     return fini_message(connection, MQTT_MSG_TYPE_PUBLISH, 0, qos, retain);
 }
@@ -858,8 +858,8 @@ mqtt_message_t *mqtt5_msg_subscribe(mqtt_connection_t *connection, const esp_mqt
         return fail_message(connection);
     }
 
-    int properties_offset = connection->message.length;
-    connection->message.length ++;
+    int properties_offset = connection->outbound_message.length;
+    connection->outbound_message.length ++;
 
     if (property) {
         if (property->subscribe_id) {
@@ -873,7 +873,7 @@ mqtt_message_t *mqtt5_msg_subscribe(mqtt_connection_t *connection, const esp_mqt
             }
         }
     }
-    APPEND_CHECK(update_property_len_value(connection, connection->message.length - properties_offset - 1, properties_offset), fail_message(connection));
+    APPEND_CHECK(update_property_len_value(connection, connection->outbound_message.length - properties_offset - 1, properties_offset), fail_message(connection));
 
     for (int topic_number = 0; topic_number < size; ++topic_number) {
         if (topic_list[topic_number].filter[0] == '\0') {
@@ -897,23 +897,23 @@ mqtt_message_t *mqtt5_msg_subscribe(mqtt_connection_t *connection, const esp_mqt
             APPEND_CHECK(append_property(connection, 0, 2, topic_list[topic_number].filter, strlen(topic_list[topic_number].filter)), fail_message(connection));
         }
 
-        if (connection->message.length + 1 > connection->buffer_length) {
+        if (connection->outbound_message.length + 1 > connection->buffer_length) {
             return fail_message(connection);
         }
-        connection->buffer[connection->message.length] = 0;
+        connection->buffer[connection->outbound_message.length] = 0;
         if (property) {
             if (property->retain_handle > 0 && property->retain_handle < 3) {
-                connection->buffer[connection->message.length] |= (property->retain_handle & 3) << 4;
+                connection->buffer[connection->outbound_message.length] |= (property->retain_handle & 3) << 4;
             }
             if (property->no_local_flag) {
-                connection->buffer[connection->message.length] |= (property->no_local_flag << 2);
+                connection->buffer[connection->outbound_message.length] |= (property->no_local_flag << 2);
             }
             if (property->retain_as_published_flag) {
-                connection->buffer[connection->message.length] |= (property->retain_as_published_flag << 3);
+                connection->buffer[connection->outbound_message.length] |= (property->retain_as_published_flag << 3);
             }
         }
-        connection->buffer[connection->message.length] |= (topic_list[topic_number].qos & 3);
-        connection->message.length ++;
+        connection->buffer[connection->outbound_message.length] |= (topic_list[topic_number].qos & 3);
+        connection->outbound_message.length ++;
     }
     return fini_message(connection, MQTT_MSG_TYPE_SUBSCRIBE, 0, 1, 0);
 }
@@ -921,10 +921,10 @@ mqtt_message_t *mqtt5_msg_subscribe(mqtt_connection_t *connection, const esp_mqt
 mqtt_message_t *mqtt5_msg_disconnect(mqtt_connection_t *connection, esp_mqtt5_disconnect_property_config_t *disconnect_property_info)
 {
     init_message(connection);
-    int reason_offset = connection->message.length;
-    connection->buffer[connection->message.length ++] = 0;
-    int properties_offset = connection->message.length;
-    connection->message.length ++;
+    int reason_offset = connection->outbound_message.length;
+    connection->buffer[connection->outbound_message.length ++] = 0;
+    int properties_offset = connection->outbound_message.length;
+    connection->outbound_message.length ++;
     if (disconnect_property_info) {
         if (disconnect_property_info->session_expiry_interval) {
             APPEND_CHECK(append_property(connection, MQTT5_PROPERTY_SESSION_EXPIRY_INTERVAL, 4, NULL, disconnect_property_info->session_expiry_interval), fail_message(connection));
@@ -940,7 +940,7 @@ mqtt_message_t *mqtt5_msg_disconnect(mqtt_connection_t *connection, esp_mqtt5_di
             connection->buffer[reason_offset] = disconnect_property_info->disconnect_reason;
         }
     }
-    APPEND_CHECK(update_property_len_value(connection, connection->message.length - properties_offset - 1, properties_offset), fail_message(connection));
+    APPEND_CHECK(update_property_len_value(connection, connection->outbound_message.length - properties_offset - 1, properties_offset), fail_message(connection));
     return fini_message(connection, MQTT_MSG_TYPE_DISCONNECT, 0, 0, 0);
 }
 
@@ -956,8 +956,8 @@ mqtt_message_t *mqtt5_msg_unsubscribe(mqtt_connection_t *connection, const char 
         return fail_message(connection);
     }
 
-    int properties_offset = connection->message.length;
-    connection->message.length ++;
+    int properties_offset = connection->outbound_message.length;
+    connection->outbound_message.length ++;
     if (property) {
         if (property->user_property) {
             mqtt5_user_property_item_t item;
@@ -968,7 +968,7 @@ mqtt_message_t *mqtt5_msg_unsubscribe(mqtt_connection_t *connection, const char 
         }
     }
 
-    APPEND_CHECK(update_property_len_value(connection, connection->message.length - properties_offset - 1, properties_offset), fail_message(connection));
+    APPEND_CHECK(update_property_len_value(connection, connection->outbound_message.length - properties_offset - 1, properties_offset), fail_message(connection));
     if (property && property->is_share_subscribe) {
         uint16_t shared_topic_size = strlen(topic) + strlen(MQTT5_SHARED_SUB) + strlen(property->share_name);
         char *shared_topic = calloc(1, shared_topic_size);
@@ -996,10 +996,10 @@ mqtt_message_t *mqtt5_msg_puback(mqtt_connection_t *connection, uint16_t message
     if (append_message_id(connection, message_id) == 0) {
         return fail_message(connection);
     }
-    connection->buffer[connection->message.length ++] = 0; // Regard it is success
-    int properties_offset = connection->message.length;
-    connection->message.length ++;
-    APPEND_CHECK(update_property_len_value(connection, connection->message.length - properties_offset - 1, properties_offset), fail_message(connection));
+    connection->buffer[connection->outbound_message.length ++] = 0; // Regard it is success
+    int properties_offset = connection->outbound_message.length;
+    connection->outbound_message.length ++;
+    APPEND_CHECK(update_property_len_value(connection, connection->outbound_message.length - properties_offset - 1, properties_offset), fail_message(connection));
     return fini_message(connection, MQTT_MSG_TYPE_PUBACK, 0, 0, 0);
 }
 
@@ -1009,10 +1009,10 @@ mqtt_message_t *mqtt5_msg_pubrec(mqtt_connection_t *connection, uint16_t message
     if (append_message_id(connection, message_id) == 0) {
         return fail_message(connection);
     }
-    connection->buffer[connection->message.length ++] = 0; // Regard it is success
-    int properties_offset = connection->message.length;
-    connection->message.length ++;
-    APPEND_CHECK(update_property_len_value(connection, connection->message.length - properties_offset - 1, properties_offset), fail_message(connection));
+    connection->buffer[connection->outbound_message.length ++] = 0; // Regard it is success
+    int properties_offset = connection->outbound_message.length;
+    connection->outbound_message.length ++;
+    APPEND_CHECK(update_property_len_value(connection, connection->outbound_message.length - properties_offset - 1, properties_offset), fail_message(connection));
     return fini_message(connection, MQTT_MSG_TYPE_PUBREC, 0, 0, 0);
 }
 
@@ -1022,10 +1022,10 @@ mqtt_message_t *mqtt5_msg_pubrel(mqtt_connection_t *connection, uint16_t message
     if (append_message_id(connection, message_id) == 0) {
         return fail_message(connection);
     }
-    connection->buffer[connection->message.length ++] = 0; // Regard it is success
-    int properties_offset = connection->message.length;
-    connection->message.length ++;
-    APPEND_CHECK(update_property_len_value(connection, connection->message.length - properties_offset - 1, properties_offset), fail_message(connection));
+    connection->buffer[connection->outbound_message.length ++] = 0; // Regard it is success
+    int properties_offset = connection->outbound_message.length;
+    connection->outbound_message.length ++;
+    APPEND_CHECK(update_property_len_value(connection, connection->outbound_message.length - properties_offset - 1, properties_offset), fail_message(connection));
     return fini_message(connection, MQTT_MSG_TYPE_PUBREL, 0, 1, 0);
 }
 
@@ -1035,9 +1035,9 @@ mqtt_message_t *mqtt5_msg_pubcomp(mqtt_connection_t *connection, uint16_t messag
     if (append_message_id(connection, message_id) == 0) {
         return fail_message(connection);
     }
-    connection->buffer[connection->message.length ++] = 0; // Regard it is success
-    int properties_offset = connection->message.length;
-    connection->message.length ++;
-    APPEND_CHECK(update_property_len_value(connection, connection->message.length - properties_offset - 1, properties_offset), fail_message(connection));
+    connection->buffer[connection->outbound_message.length ++] = 0; // Regard it is success
+    int properties_offset = connection->outbound_message.length;
+    connection->outbound_message.length ++;
+    APPEND_CHECK(update_property_len_value(connection, connection->outbound_message.length - properties_offset - 1, properties_offset), fail_message(connection));
     return fini_message(connection, MQTT_MSG_TYPE_PUBCOMP, 0, 0, 0);
 }
