@@ -1515,6 +1515,12 @@ static void esp_mqtt_task(void *pv)
         client->config->port = esp_transport_get_default_port(client->transport);
     }
 
+
+    // add the watch dog timer to the task
+#ifdef MQTT_ENABLE_TASK_WDT
+    esp_task_wdt_add(NULL);
+#endif
+
     client->state = MQTT_STATE_INIT;
     xEventGroupClearBits(client->status_bits, STOPPED_BIT);
     while (client->run) {
@@ -1636,6 +1642,9 @@ static void esp_mqtt_task(void *pv)
             }
         }
 
+#ifdef MQTT_ENABLE_TASK_WDT
+        esp_task_wdt_reset();
+#endif
     }
     esp_transport_close(client->transport);
     outbox_delete_all_items(client->outbox);
