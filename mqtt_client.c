@@ -1,3 +1,4 @@
+#include "esp_log.h"
 #include "mqtt_client_priv.h"
 
 _Static_assert(sizeof(uint64_t) == sizeof(outbox_tick_t), "mqtt-client tick type size different from outbox tick type");
@@ -1424,6 +1425,7 @@ static esp_err_t mqtt_resend_queued(esp_mqtt_client_handle_t client, outbox_item
     // set duplicate flag for QoS-1 and QoS-2 messages
     if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH && client->mqtt_state.pending_publish_qos > 0 && (outbox_item_get_pending(item) == TRANSMITTED)) {
         mqtt_set_dup(client->mqtt_state.outbound_message->data);
+        ESP_LOGD(TAG,"Sending Duplicated QoS%d message with id=%d", client->mqtt_state.pending_publish_qos, client->mqtt_state.pending_msg_id);
     }
 
     // try to resend the data
