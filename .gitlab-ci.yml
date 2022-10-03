@@ -25,70 +25,42 @@ before_script:
   - chmod 600 ~/.ssh/id_rsa
   - echo -e "Host gitlab.espressif.cn\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
   - PATH=$CI_PROJECT_DIR/esp-idf/tools:$PATH
-  - export IDF_PATH=$CI_PROJECT_DIR/esp-idf
   - export MQTT_PATH=$CI_PROJECT_DIR
 
-build_with_idf_v3:
+.build_template:
   stage: build
-  image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
   tags:
     - build
-  dependencies: []
+    - internet
   script:
-    - git clone "${IDF_REPO}"
-    # build with IDFv3.2
-    - $MQTT_PATH/ci/set_idf.sh release/v3.2
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh make
-    # simple build with IDFv3.1 (buiding directly in mqtt repo)
-    - $MQTT_PATH/ci/set_idf.sh release/v3.1
-    - cd $MQTT_PATH && ./ci/modify_for_legacy_idf.sh ${RECENT_IDF} || true
-    - cd $MQTT_PATH/examples/tcp && rm -rf build && make defconfig && make
+    # Replace the IDF's default esp-mqtt with this version
+    - rm -rf $IDF_PATH/components/mqtt/esp-mqtt && cp -r $MQTT_PATH $IDF_PATH/components/mqtt/
+    # Build the examples
+    - $MQTT_PATH/ci/build_examples.sh
 
-build_with_idf_v4:
-  stage: build
-  image: ${CI_DOCKER_REGISTRY}/esp-env:v4.4-1
-  tags:
-    - build
-  dependencies: []
-  variables:
-    PYTHON_VER: 3.6.13
-  script:
-    - git clone "${IDF_REPO}"
-    - source /opt/pyenv/activate && pyenv global $PYTHON_VER
-    # enable pedantic flags for compilation
-    - export PEDANTIC_CFLAGS="-Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
-    - export EXTRA_CFLAGS=${PEDANTIC_CFLAGS} && export EXTRA_CXXFLAGS=${EXTRA_CFLAGS}
-    # rebuild with IDFv4.4
-    - $MQTT_PATH/ci/set_idf.sh release/v4.4
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh
-    # rebuild with IDFv4.3
-    - $MQTT_PATH/ci/set_idf.sh release/v4.3
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh
-    # rebuild with IDFv4.2
-    - $MQTT_PATH/ci/set_idf.sh release/v4.2
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh
-    # rebuild with IDFv4.1
-    - $MQTT_PATH/ci/set_idf.sh release/v4.1
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh
-    # rebuild with IDFv4.0
-    - $MQTT_PATH/ci/set_idf.sh release/v4.0
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh
-    # build with IDFv3.3
-    - $MQTT_PATH/ci/set_idf.sh release/v3.3
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    - $MQTT_PATH/ci/build_examples.sh make
+build_idf_v3.3:
+  extends: .build_template
+  image: espressif/idf:release-v3.3
+
+build_idf_v4.0:
+  extends: .build_template
+  image: espressif/idf:release-v4.0
+
+build_idf_v4.1:
+  extends: .build_template
+  image: espressif/idf:release-v4.1
+
+build_idf_v4.2:
+  extends: .build_template
+  image: espressif/idf:release-v4.2
+
+build_idf_v4.3:
+  extends: .build_template
+  image: espressif/idf:release-v4.3
+
+build_idf_v4.4:
+  extends: .build_template
+  image: espressif/idf:release-v4.4
 
 build_and_test_qemu:
   stage: build
@@ -98,6 +70,7 @@ build_and_test_qemu:
     - shiny
   dependencies: []
   script:
+    - export IDF_PATH=$CI_PROJECT_DIR/esp-idf
     - git clone "${IDF_REPO}"
     # switch to IDF and setup the tools
     - $MQTT_PATH/ci/set_idf.sh release/v4.4
