@@ -1,0 +1,5 @@
+version: "1.0.0"
+description: esp-mqtt
+dependencies:
+  idf:
+    version: ">=5.0"
