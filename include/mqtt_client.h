@@ -46,12 +46,12 @@ typedef enum esp_mqtt_event_id_t {
     MQTT_EVENT_DISCONNECTED, /*!< disconnected event */
     MQTT_EVENT_SUBSCRIBED,   /*!< subscribed event, additional context:
                                 - msg_id               message id
-                                - data                 pointer to the received
-                              data
+                                - error_handle         `error_type` in case subscribing failed
+                                - data                 pointer to broker response, check for errors.
                                 - data_len             length of the data for this
                               event
                                 */
-    MQTT_EVENT_UNSUBSCRIBED, /*!< unsubscribed event */
+    MQTT_EVENT_UNSUBSCRIBED, /*!< unsubscribed event, additional context:  msg_id */
     MQTT_EVENT_PUBLISHED,    /*!< published event, additional context:  msg_id */
     MQTT_EVENT_DATA,         /*!< data event, additional context:
                                 - msg_id               message id
@@ -112,6 +112,7 @@ typedef enum esp_mqtt_error_type_t {
     MQTT_ERROR_TYPE_NONE = 0,
     MQTT_ERROR_TYPE_TCP_TRANSPORT,
     MQTT_ERROR_TYPE_CONNECTION_REFUSED,
+    MQTT_ERROR_TYPE_SUBSCRIBE_FAILED
 } esp_mqtt_error_type_t;
 
 /**
