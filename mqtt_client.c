@@ -1546,6 +1546,7 @@ static void esp_mqtt_task(void *pv)
     esp_transport_close(client->transport);
     outbox_delete_all_items(client->outbox);
     xEventGroupSetBits(client->status_bits, STOPPED_BIT);
+    client->state = MQTT_STATE_DISCONNECTED;
 
     vTaskDelete(NULL);
 }
