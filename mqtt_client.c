@@ -601,6 +601,39 @@ static void esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
     client->config = NULL;
 }
 
+static inline bool has_timed_out(uint64_t last_tick, uint64_t timeout) {
+  uint64_t next = last_tick + timeout;
+  return (int64_t)(next - platform_tick_get_ms()) <= 0;
+}
+
+static esp_err_t process_keepalive(esp_mqtt_client_handle_t client)
+{
+    if (client->connect_info.keepalive > 0) {
+        const uint64_t keepalive_ms = client->connect_info.keepalive * 1000;
+
+        if (client->wait_for_ping_resp == true ) {
+            if (has_timed_out(client->keepalive_tick, keepalive_ms)) {
+                ESP_LOGE(TAG, "No PING_RESP, disconnected");
+                esp_mqtt_abort_connection(client);
+                client->wait_for_ping_resp = false;
+                return ESP_FAIL;
+            }
+            return ESP_OK;
+        }
+
+        if (has_timed_out(client->keepalive_tick, keepalive_ms/2)) {
+            if (esp_mqtt_client_ping(client) == ESP_FAIL) {
+                ESP_LOGE(TAG, "Can't send ping, disconnected");
+                esp_mqtt_abort_connection(client);
+                return ESP_FAIL;
+            }
+            client->wait_for_ping_resp = true;
+            return ESP_OK;
+        }
+    }
+    return ESP_OK;
+}
+
 static inline esp_err_t esp_mqtt_write(esp_mqtt_client_handle_t client)
 {
     int wlen = 0, widx = 0, len = client->mqtt_state.outbound_message->length;
@@ -1332,6 +1365,12 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
     case MQTT_MSG_TYPE_PINGRESP:
         ESP_LOGD(TAG, "MQTT_MSG_TYPE_PINGRESP");
         client->wait_for_ping_resp = false;
+        /* It is the responsibility of the Client to ensure that the interval between Control Packets
+         * being sent does not exceed the Keep Alive value. In the absence of sending any other Control
+         * Packets, the Client MUST send a PINGREQ Packet [MQTT-3.1.2-23].
+         * [MQTT-3.1.2-23]
+         */
+        client->keepalive_tick = platform_tick_get_ms();
         break;
     }
 
@@ -1450,6 +1489,7 @@ static void esp_mqtt_task(void *pv)
             client->state = MQTT_STATE_CONNECTED;
             esp_mqtt_dispatch_event_with_msgid(client);
             client->refresh_connection_tick = platform_tick_get_ms();
+            client->keepalive_tick = platform_tick_get_ms();
 
             break;
         case MQTT_STATE_CONNECTED:
@@ -1475,7 +1515,7 @@ static void esp_mqtt_task(void *pv)
                     outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED);
                 }
                 // resend other "transmitted" messages after 1s
-            } else if (platform_tick_get_ms() - last_retransmit > client->config->message_retransmit_timeout) {
+            } else if (has_timed_out(last_retransmit, client->config->message_retransmit_timeout)) {
                 last_retransmit = platform_tick_get_ms();
                 item = outbox_dequeue(client->outbox, TRANSMITTED, &msg_tick);
                 if (item && (last_retransmit - msg_tick > client->config->message_retransmit_timeout))  {
@@ -1483,27 +1523,12 @@ static void esp_mqtt_task(void *pv)
                 }
             }
 
-            if (client->connect_info.keepalive &&       // connect_info.keepalive=0 means that the keepslive is disabled
-                    platform_tick_get_ms() - client->keepalive_tick > client->connect_info.keepalive * 1000 / 2) {
-                //No ping resp from last ping => Disconnected
-                if (client->wait_for_ping_resp) {
-                    ESP_LOGE(TAG, "No PING_RESP, disconnected");
-                    esp_mqtt_abort_connection(client);
-                    client->wait_for_ping_resp = false;
-                    break;
-                }
-                if (esp_mqtt_client_ping(client) == ESP_FAIL) {
-                    ESP_LOGE(TAG, "Can't send ping, disconnected");
-                    esp_mqtt_abort_connection(client);
-                    break;
-                } else {
-                    client->wait_for_ping_resp = true;
-                }
-                ESP_LOGD(TAG, "PING sent");
+            if (process_keepalive(client) != ESP_OK) {
+                break;
             }
 
             if (client->config->refresh_connection_after_ms &&
-                    platform_tick_get_ms() - client->refresh_connection_tick > client->config->refresh_connection_after_ms) {
+                has_timed_out(client->refresh_connection_tick, client->config->refresh_connection_after_ms)) {
                 ESP_LOGD(TAG, "Refreshing the connection...");
                 esp_mqtt_abort_connection(client);
                 client->state = MQTT_STATE_INIT;
