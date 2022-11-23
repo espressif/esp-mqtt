@@ -99,7 +99,7 @@
 #ifdef CONFIG_MQTT_EVENT_QUEUE_SIZE
 #define MQTT_EVENT_QUEUE_SIZE       CONFIG_MQTT_EVENT_QUEUE_SIZE
 #else
-#define MQTT_EVENT_QUEUE_SIZE       10
+#define MQTT_EVENT_QUEUE_SIZE       1
 #endif
 
 #define OUTBOX_MAX_SIZE             (4*1024)
