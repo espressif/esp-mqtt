@@ -1101,8 +1101,11 @@ static esp_err_t deliver_suback(esp_mqtt_client_handle_t client)
     client->event.error_handle->error_type = MQTT_ERROR_TYPE_NONE;
     client->event.error_handle->connect_return_code = MQTT_CONNECTION_ACCEPTED;
     // post data event
-    if ((uint8_t)*msg_data == 0x80) {
-        client->event.error_handle->error_type = MQTT_ERROR_TYPE_SUBSCRIBE_FAILED;
+    for (int topic = 0; topic < msg_data_len; ++topic) {
+        if ((uint8_t)msg_data[topic] == 0x80) {
+            client->event.error_handle->error_type = MQTT_ERROR_TYPE_SUBSCRIBE_FAILED;
+            break;
+        }
     }
     client->event.data_len = msg_data_len;
     client->event.total_data_len = msg_data_len;
@@ -1114,7 +1117,9 @@ static esp_err_t deliver_suback(esp_mqtt_client_handle_t client)
     return ESP_OK;
 }
 
-static bool is_valid_mqtt_msg(esp_mqtt_client_handle_t client, int msg_type, int msg_id)
+// Deletes the initial message in MQTT communication protocol
+// Return false when message is not found, making the received counterpart invalid.
+static bool remove_initiator_message(esp_mqtt_client_handle_t client, int msg_type, int msg_id)
 {
     ESP_LOGD(TAG, "pending_id=%d, pending_msg_count = %d", client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_count);
     if (client->mqtt_state.pending_msg_count == 0) {
@@ -1311,7 +1316,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
 
     switch (msg_type) {
     case MQTT_MSG_TYPE_SUBACK:
-        if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_SUBSCRIBE, msg_id)) {
+        if (remove_initiator_message(client, MQTT_MSG_TYPE_SUBSCRIBE, msg_id)) {
 #ifdef MQTT_PROTOCOL_5
             esp_mqtt5_parse_suback(client);
 #endif
@@ -1323,7 +1328,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
         }
         break;
     case MQTT_MSG_TYPE_UNSUBACK:
-        if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_UNSUBSCRIBE, msg_id)) {
+        if (remove_initiator_message(client, MQTT_MSG_TYPE_UNSUBSCRIBE, msg_id)) {
 #ifdef MQTT_PROTOCOL_5
             esp_mqtt5_parse_unsuback(client);
 #endif
@@ -1375,7 +1380,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             esp_mqtt5_decrement_packet_counter(client);
         }
 #endif
-        if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
+        if (remove_initiator_message(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
             ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBACK, finish QoS1 publish");
 #ifdef MQTT_PROTOCOL_5
             esp_mqtt5_parse_puback(client);
@@ -1426,7 +1431,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             esp_mqtt5_decrement_packet_counter(client);
         }
 #endif
-        if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
+        if (remove_initiator_message(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
             ESP_LOGD(TAG, "Receive MQTT_MSG_TYPE_PUBCOMP, finish QoS2 publish");
 #ifdef MQTT_PROTOCOL_5
             esp_mqtt5_parse_pubcomp(client);
@@ -1820,7 +1825,8 @@ static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client)
     return ESP_OK;
 }
 
-int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic, int qos)
+int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
+                                       const esp_mqtt_topic_t *topic_list, int size)
 {
     if (!client) {
         ESP_LOGE(TAG, "Client was not initialized");
@@ -1834,13 +1840,19 @@ int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic
     }
     if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
-        if (esp_mqtt5_client_subscribe_check(client, qos) != ESP_OK) {
-            ESP_LOGI(TAG, "MQTT5 subscribe check fail");
+        int max_qos = topic_list[0].qos;
+        for (int topic_number = 0; topic_number < size; ++topic_number) {
+            if (topic_list[topic_number].qos > max_qos) {
+                max_qos = topic_list[topic_number].qos;
+            }
+        }
+        if (esp_mqtt5_client_subscribe_check(client, max_qos) != ESP_OK) {
+            ESP_LOGI(TAG, "MQTT5 subscribe check fail: QoS %d not accepted by broker ", max_qos);
             MQTT_API_UNLOCK(client);
             return -1;
         }
         client->mqtt_state.outbound_message = mqtt5_msg_subscribe(&client->mqtt_state.mqtt_connection,
-                                              topic, qos,
+                                              topic_list, size,
                                               &client->mqtt_state.pending_msg_id, client->mqtt5_config->subscribe_property_info);
         if (client->mqtt_state.outbound_message->length) {
             client->mqtt5_config->subscribe_property_info = NULL;
@@ -1848,7 +1860,7 @@ int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic
 #endif
     } else {
         client->mqtt_state.outbound_message = mqtt_msg_subscribe(&client->mqtt_state.mqtt_connection,
-                                              topic, qos,
+                                              topic_list, size,
                                               &client->mqtt_state.pending_msg_id);
     }
     if (client->mqtt_state.outbound_message->length == 0) {
@@ -1867,14 +1879,20 @@ int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char *topic
     outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED);// handle error
 
     if (mqtt_write_data(client) != ESP_OK) {
-        ESP_LOGE(TAG, "Error to subscribe topic=%s, qos=%d", topic, qos);
+        ESP_LOGE(TAG, "Error to send subscribe message, first topic: %s, qos: %d", topic_list[0].filter, topic_list[0].qos);
         MQTT_API_UNLOCK(client);
         return -1;
     }
 
-    ESP_LOGD(TAG, "Sent subscribe topic=%s, id: %d, type=%d successful", topic, client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
+    ESP_LOGD(TAG, "Sent subscribe, first topic=%s, id: %d", topic_list[0].filter, client->mqtt_state.pending_msg_id);
     MQTT_API_UNLOCK(client);
     return client->mqtt_state.pending_msg_id;
+
+}
+int esp_mqtt_client_subscribe_single(esp_mqtt_client_handle_t client, const char *topic, int qos)
+{
+    esp_mqtt_topic_t user_topic = {.filter = topic, .qos = qos};
+    return esp_mqtt_client_subscribe_multiple(client, &user_topic, 1);
 }
 
 int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *topic)
