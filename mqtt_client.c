@@ -1090,7 +1090,7 @@ static esp_err_t deliver_suback(esp_mqtt_client_handle_t client)
     client->event.error_handle->error_type = MQTT_ERROR_TYPE_NONE;
     client->event.error_handle->connect_return_code = MQTT_CONNECTION_ACCEPTED;
     // post data event
-    if ((uint8_t)*msg_data >= 0x80) {
+    if ((uint8_t)*msg_data == 0x80) {
         client->event.error_handle->error_type = MQTT_ERROR_TYPE_SUBSCRIBE_FAILED;
     }
     client->event.data_len = msg_data_len;
