@@ -235,6 +235,10 @@ esp_mqtt_set_transport_failed:
 /* Checks if the user supplied config values are internally consistent */
 static esp_err_t esp_mqtt_check_cfg_conflict(const mqtt_config_storage_t *cfg, const esp_mqtt_client_config_t *user_cfg)
 {
+    if(cfg == NULL || user_cfg == NULL) {
+      ESP_LOGE(TAG, "Invalid configuration");
+      return ESP_ERR_INVALID_ARG;
+    }
     esp_err_t ret = ESP_OK;
 
     bool ssl_cfg_enabled = cfg->use_global_ca_store || cfg->cacert_buf || cfg->clientcert_buf || cfg->psk_hint_key || cfg->alpn_protos;
@@ -517,6 +521,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
 
     if (config->broker.address.transport) {
         free(client->config->scheme);
+        client->config->scheme = NULL;
         if (config->broker.address.transport == MQTT_TRANSPORT_OVER_TCP) {
             client->config->scheme = create_string(MQTT_OVER_TCP_SCHEME, strlen(MQTT_OVER_TCP_SCHEME));
             ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
