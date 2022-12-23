@@ -1181,7 +1181,7 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
          */
         read_len = esp_transport_read(t, (char *)buf, 1, read_poll_timeout_ms);
         if (read_len <= 0) {
-            if (err == ERR_TCP_TRANSPORT_CONNECTION_TIMEOUT) {
+            if (read_len == ERR_TCP_TRANSPORT_CONNECTION_TIMEOUT) {
                 ESP_LOGD(TAG, "No data received in %dms (all is quiet)", read_poll_timeout_ms);
                 return 0;
             } else {
