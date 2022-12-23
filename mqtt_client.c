@@ -1144,7 +1144,7 @@ static outbox_item_handle_t mqtt_enqueue(esp_mqtt_client_handle_t client)
 
 /*
  * Returns:
- *     -1 in case of failure
+ *      -1 for failure or connection timeout/close in the middle of a message
  *      0 if no message has been received
  *      1 if a message has been received and placed to client->mqtt_state:
  *           message length:  client->mqtt_state.message_length
