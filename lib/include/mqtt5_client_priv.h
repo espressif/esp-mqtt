@@ -36,7 +36,8 @@ typedef struct {
     mqtt5_topic_alias_handle_t peer_topic_alias;
 } mqtt5_config_storage_t;
 
-void esp_mqtt5_flow_control(esp_mqtt5_client_handle_t client);
+void esp_mqtt5_increment_packet_counter(esp_mqtt5_client_handle_t client);
+void esp_mqtt5_decrement_packet_counter(esp_mqtt5_client_handle_t client);
 void esp_mqtt5_parse_pubcomp(esp_mqtt5_client_handle_t client);
 void esp_mqtt5_parse_puback(esp_mqtt5_client_handle_t client);
 void esp_mqtt5_parse_unsuback(esp_mqtt5_client_handle_t client);
