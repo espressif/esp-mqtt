@@ -244,7 +244,7 @@ static esp_err_t esp_mqtt_check_cfg_conflict(const mqtt_config_storage_t *cfg, c
     bool ssl_cfg_enabled = cfg->use_global_ca_store || cfg->cacert_buf || cfg->clientcert_buf || cfg->psk_hint_key || cfg->alpn_protos;
     bool is_ssl_scheme = false;
     if (cfg->scheme) {
-        is_ssl_scheme = (strcasecmp(cfg->scheme, MQTT_OVER_SSL_SCHEME) == 0) || (strcasecmp(cfg->scheme, MQTT_OVER_WSS_SCHEME) == 0);
+        is_ssl_scheme = (strncasecmp(cfg->scheme, MQTT_OVER_SSL_SCHEME, sizeof(MQTT_OVER_SSL_SCHEME)) == 0) || (strncasecmp(cfg->scheme, MQTT_OVER_WSS_SCHEME, sizeof(MQTT_OVER_WSS_SCHEME)) == 0);
     }
 
     if (!is_ssl_scheme && ssl_cfg_enabled) {
@@ -287,12 +287,12 @@ static esp_err_t esp_mqtt_client_create_transport(esp_mqtt_client_handle_t clien
         client->transport_list = esp_transport_list_init();
         ESP_MEM_CHECK(TAG, client->transport_list, return ESP_ERR_NO_MEM);
 
-        if ((strcasecmp(client->config->scheme, MQTT_OVER_TCP_SCHEME) == 0) || (strcasecmp(client->config->scheme, MQTT_OVER_WS_SCHEME) == 0)) {
+        if ((strncasecmp(client->config->scheme, MQTT_OVER_TCP_SCHEME, sizeof(MQTT_OVER_TCP_SCHEME)) == 0) || (strncasecmp(client->config->scheme, MQTT_OVER_WS_SCHEME, sizeof(MQTT_OVER_WS_SCHEME)) == 0)) {
             esp_transport_handle_t tcp = esp_transport_tcp_init();
             ESP_MEM_CHECK(TAG, tcp, return ESP_ERR_NO_MEM);
             esp_transport_set_default_port(tcp, MQTT_TCP_DEFAULT_PORT);
             esp_transport_list_add(client->transport_list, tcp, MQTT_OVER_TCP_SCHEME);
-            if (strcasecmp(client->config->scheme, MQTT_OVER_WS_SCHEME) == 0) {
+            if (strncasecmp(client->config->scheme, MQTT_OVER_WS_SCHEME, sizeof(MQTT_OVER_WS_SCHEME)) == 0) {
 #if MQTT_ENABLE_WS
                 esp_transport_handle_t ws = esp_transport_ws_init(tcp);
                 ESP_MEM_CHECK(TAG, ws, return ESP_ERR_NO_MEM);
@@ -309,13 +309,13 @@ static esp_err_t esp_mqtt_client_create_transport(esp_mqtt_client_handle_t clien
                 ret = ESP_FAIL;
 #endif
             }
-        } else if ((strcasecmp(client->config->scheme, MQTT_OVER_SSL_SCHEME) == 0) || (strcasecmp(client->config->scheme, MQTT_OVER_WSS_SCHEME) == 0)) {
+        } else if ((strncasecmp(client->config->scheme, MQTT_OVER_SSL_SCHEME, sizeof(MQTT_OVER_SSL_SCHEME)) == 0) || (strncasecmp(client->config->scheme, MQTT_OVER_WSS_SCHEME, sizeof(MQTT_OVER_WSS_SCHEME)) == 0)) {
 #if MQTT_ENABLE_SSL
             esp_transport_handle_t ssl = esp_transport_ssl_init();
             ESP_MEM_CHECK(TAG, ssl, return ESP_ERR_NO_MEM);
             esp_transport_set_default_port(ssl, MQTT_SSL_DEFAULT_PORT);
             esp_transport_list_add(client->transport_list, ssl, MQTT_OVER_SSL_SCHEME);
-            if (strcasecmp(client->config->scheme, MQTT_OVER_WSS_SCHEME) == 0) {
+            if (strncasecmp(client->config->scheme, MQTT_OVER_WSS_SCHEME, sizeof(MQTT_OVER_WSS_SCHEME)) == 0) {
 #if MQTT_ENABLE_WS
                 esp_transport_handle_t wss = esp_transport_ws_init(ssl);
                 ESP_MEM_CHECK(TAG, wss, return ESP_ERR_NO_MEM);
@@ -489,7 +489,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
             client->config->num_alpn_protos++;
         }
         // mbedTLS expects the list to be null-terminated
-        client->config->alpn_protos = calloc(client->config->num_alpn_protos + 1, sizeof(config->broker.verification.alpn_protos));
+        client->config->alpn_protos = calloc(client->config->num_alpn_protos + 1, sizeof(*config->broker.verification.alpn_protos));
         ESP_MEM_CHECK(TAG, client->config->alpn_protos, goto _mqtt_set_config_failed);
 
         for (int i = 0; i < client->config->num_alpn_protos; i++) {
@@ -1081,6 +1081,9 @@ static esp_err_t deliver_suback(esp_mqtt_client_handle_t client)
     if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
         msg_data = mqtt5_get_suback_data(msg_buf, &msg_data_len, &client->event.property->user_property);
+#else
+        // SUBACK Using MQTT5 received but MQTT5 is disabled, This is unlikely to happen.
+        return ESP_FAIL;
 #endif
     } else {
         msg_data = mqtt_get_suback_data(msg_buf, &msg_data_len);

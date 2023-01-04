@@ -466,18 +466,18 @@ mqtt_message_t *mqtt_msg_publish(mqtt_connection_t *connection, const char *topi
         *message_id = 0;
     }
 
-    if (connection->message.length + data_length > connection->buffer_length) {
-        // Not enough size in buffer -> fragment this message
-        connection->message.fragmented_msg_data_offset = connection->message.length;
-        memcpy(connection->buffer + connection->message.length, data, connection->buffer_length - connection->message.length);
-        connection->message.length = connection->buffer_length;
-        connection->message.fragmented_msg_total_length = data_length + connection->message.fragmented_msg_data_offset;
-    } else {
-        if (data != NULL) {
+    if (data != NULL) {
+        if (connection->message.length + data_length > connection->buffer_length) {
+            // Not enough size in buffer -> fragment this message
+            connection->message.fragmented_msg_data_offset = connection->message.length;
+            memcpy(connection->buffer + connection->message.length, data, connection->buffer_length - connection->message.length);
+            connection->message.length = connection->buffer_length;
+            connection->message.fragmented_msg_total_length = data_length + connection->message.fragmented_msg_data_offset;
+        } else {
             memcpy(connection->buffer + connection->message.length, data, data_length);
             connection->message.length += data_length;
+            connection->message.fragmented_msg_total_length = 0;
         }
-        connection->message.fragmented_msg_total_length = 0;
     }
     return fini_message(connection, MQTT_MSG_TYPE_PUBLISH, 0, qos, retain);
 }
