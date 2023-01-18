@@ -709,6 +709,7 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
     if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
         if (esp_mqtt5_parse_connack(client, &connect_rsp_code) == ESP_OK) {
+            client->send_publish_packet_count = 0;
             return ESP_OK;
         }
 #endif
@@ -943,7 +944,9 @@ static esp_err_t mqtt_write_data(esp_mqtt_client_handle_t client)
         return ESP_FAIL;
     }
 #ifdef MQTT_PROTOCOL_5
-    esp_mqtt5_flow_control(client);
+    if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
+        esp_mqtt5_increment_packet_counter(client);
+    }
 #endif
     return ESP_OK;
 }
@@ -1367,6 +1370,11 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
         }
         break;
     case MQTT_MSG_TYPE_PUBACK:
+#ifdef MQTT_PROTOCOL_5
+        if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
+            esp_mqtt5_decrement_packet_counter(client);
+        }
+#endif
         if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
             ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBACK, finish QoS1 publish");
 #ifdef MQTT_PROTOCOL_5
@@ -1413,6 +1421,11 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
         break;
     case MQTT_MSG_TYPE_PUBCOMP:
         ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBCOMP");
+#ifdef MQTT_PROTOCOL_5
+        if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
+            esp_mqtt5_decrement_packet_counter(client);
+        }
+#endif
         if (is_valid_mqtt_msg(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
             ESP_LOGD(TAG, "Receive MQTT_MSG_TYPE_PUBCOMP, finish QoS2 publish");
 #ifdef MQTT_PROTOCOL_5
