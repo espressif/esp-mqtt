@@ -124,6 +124,13 @@ menu "ESP-MQTT Configurations"
         help
             MQTT task priority. Higher number denotes higher priority.
 
+    config MQTT_POLL_READ_TIMEOUT_MS
+        int "MQTT transport poll read timeut"
+        default 1000
+        depends on MQTT_USE_CUSTOM_CONFIG
+        help
+            Timeout when polling underlying transport for read.
+
     config MQTT_EVENT_QUEUE_SIZE
         int "Number of queued events."
         default 1
