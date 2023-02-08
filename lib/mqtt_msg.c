@@ -29,6 +29,7 @@
 *
 */
 #include <string.h>
+#include "mqtt_client.h"
 #include "mqtt_msg.h"
 #include "mqtt_config.h"
 #include "platform.h"
@@ -518,26 +519,29 @@ mqtt_message_t *mqtt_msg_pubcomp(mqtt_connection_t *connection, uint16_t message
     return fini_message(connection, MQTT_MSG_TYPE_PUBCOMP, 0, 0, 0);
 }
 
-mqtt_message_t *mqtt_msg_subscribe(mqtt_connection_t *connection, const char *topic, int qos, uint16_t *message_id)
+mqtt_message_t *mqtt_msg_subscribe(mqtt_connection_t *connection, const esp_mqtt_topic_t topic_list[], int size, uint16_t *message_id)
 {
     init_message(connection);
-
-    if (topic == NULL || topic[0] == '\0') {
-        return fail_message(connection);
-    }
 
     if ((*message_id = append_message_id(connection, 0)) == 0) {
         return fail_message(connection);
     }
 
-    if (append_string(connection, topic, strlen(topic)) < 0) {
-        return fail_message(connection);
-    }
+    for (int topic_number = 0; topic_number < size; ++topic_number) {
+        if (topic_list[topic_number].filter[0] == '\0') {
+            return fail_message(connection);
+        }
 
-    if (connection->message.length + 1 > connection->buffer_length) {
-        return fail_message(connection);
+        if (append_string(connection, topic_list[topic_number].filter, strlen(topic_list[topic_number].filter)) < 0) {
+            return fail_message(connection);
+        }
+
+        if (connection->message.length + 1 > connection->buffer_length) {
+            return fail_message(connection);
+        }
+        connection->buffer[connection->message.length] = topic_list[topic_number].qos;
+        connection->message.length ++;
     }
-    connection->buffer[connection->message.length++] = qos;
 
     return fini_message(connection, MQTT_MSG_TYPE_SUBSCRIBE, 0, 1, 0);
 }
