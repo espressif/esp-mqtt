@@ -134,6 +134,7 @@ esp_err_t esp_mqtt5_get_publish_data(esp_mqtt5_client_handle_t client, uint8_t *
     client->event.property->correlation_data_len = property.correlation_data_len;
     client->event.property->content_type = property.content_type;
     client->event.property->content_type_len = property.content_type_len;
+    client->event.property->subscribe_id = property.subscribe_id;
     return ESP_OK;
 }
 
