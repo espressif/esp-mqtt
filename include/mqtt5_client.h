@@ -138,6 +138,7 @@ typedef struct {
     uint16_t correlation_data_len;      /*!< Correlation data length of the message */
     char *content_type;                 /*!< Content type of the message */
     int content_type_len;               /*!< Content type length of the message */
+    uint16_t subscribe_id;              /*!< Subscription identifier of the message */
     mqtt5_user_property_handle_t user_property;  /*!< The handle for user property, call function esp_mqtt5_client_delete_user_property to free the memory */
 } esp_mqtt5_event_property_t;
 

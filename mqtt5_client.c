@@ -101,7 +101,7 @@ esp_err_t esp_mqtt5_get_publish_data(esp_mqtt5_client_handle_t client, uint8_t *
     uint16_t property_len = 0;
     esp_mqtt5_publish_resp_property_t property = {0};
     *msg_data = mqtt5_get_publish_property_payload(msg_buf, msg_read_len, msg_topic, msg_topic_len, &property, &property_len, msg_data_len, &client->event.property->user_property);
-     if (*msg_data_len == 0 || *msg_data == NULL) {
+     if (*msg_data == NULL) {
         ESP_LOGE(TAG, "%s: mqtt5_get_publish_property_payload() failed", __func__);
         return ESP_FAIL;
     }
@@ -134,6 +134,7 @@ esp_err_t esp_mqtt5_get_publish_data(esp_mqtt5_client_handle_t client, uint8_t *
     client->event.property->correlation_data_len = property.correlation_data_len;
     client->event.property->content_type = property.content_type;
     client->event.property->content_type_len = property.content_type_len;
+    client->event.property->subscribe_id = property.subscribe_id;
     return ESP_OK;
 }
 
