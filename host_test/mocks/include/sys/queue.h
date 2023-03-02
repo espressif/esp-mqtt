@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 1991-1993 The Regents of the University of California
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 #pragma once
 
 /* Implementation from BSD headers*/
