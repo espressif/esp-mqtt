@@ -260,6 +260,10 @@ typedef struct esp_mqtt_client_config_t {
             bool skip_cert_common_name_check; /*!< Skip any validation of server certificate CN field, this reduces the
                                       security of TLS and makes the *MQTT* client susceptible to MITM attacks  */
             const char **alpn_protos;        /*!< NULL-terminated list of supported application protocols to be used for ALPN */
+			const char *common_name;         /*!< Pointer to the string containing server certificate common name.
+                                                               If non-NULL, server certificate CN must match this name,
+                                                               If NULL, server certificate CN must match hostname.
+                                                               This is ignored if skip_cert_common_name_check=true. */
         } verification; /*!< Security verification of the broker */
     } broker; /*!< Broker address and security verification */
     /**

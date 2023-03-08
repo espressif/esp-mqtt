@@ -181,6 +181,15 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
 #endif
     }
 
+    if (cfg->common_name) {
+#if defined(MQTT_SUPPORTED_FEATURE_CRT_CMN_NAME) && MQTT_ENABLE_SSL
+        esp_transport_ssl_set_common_name(ssl, cfg->common_name);
+#else
+        ESP_LOGE(TAG, "Setting expected certificate common name is not available in IDF version %s", IDF_VER);
+        goto esp_mqtt_set_transport_failed;
+#endif
+    }
+
     if (cfg->use_secure_element) {
 #ifdef MQTT_SUPPORTED_FEATURE_SECURE_ELEMENT
 #ifdef CONFIG_ESP_TLS_USE_SECURE_ELEMENT
@@ -509,6 +518,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     client->config->clientkey_buf = config->credentials.authentication.key;
     client->config->clientkey_bytes = config->credentials.authentication.key_len;
     client->config->skip_cert_common_name_check = config->broker.verification.skip_cert_common_name_check;
+    client->config->common_name = config->broker.verification.common_name;
     client->config->use_secure_element = config->credentials.authentication.use_secure_element;
     client->config->ds_data = config->credentials.authentication.ds_data;
 

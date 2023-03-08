@@ -89,6 +89,7 @@ typedef struct {
     size_t clientkey_bytes;
     const struct psk_key_hint *psk_hint_key;
     bool skip_cert_common_name_check;
+    const char *common_name;
     bool use_secure_element;
     void *ds_data;
     int message_retransmit_timeout;
