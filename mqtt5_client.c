@@ -19,8 +19,7 @@ static esp_err_t esp_mqtt5_user_property_copy(mqtt5_user_property_handle_t user_
 void esp_mqtt5_increment_packet_counter(esp_mqtt5_client_handle_t client)
 {
     bool msg_dup = mqtt5_get_dup(client->mqtt_state.outbound_message->data);
-    int msg_qos = mqtt5_get_qos(client->mqtt_state.outbound_message->data);
-    if ((msg_dup == false) && (msg_qos > 0)) {
+    if (msg_dup == false) {
         client->send_publish_packet_count ++;
         ESP_LOGD(TAG, "Sent (%d) qos > 0 publish packet without ack", client->send_publish_packet_count);
     }

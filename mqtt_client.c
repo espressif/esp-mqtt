@@ -943,11 +943,6 @@ static esp_err_t mqtt_write_data(esp_mqtt_client_handle_t client)
         esp_mqtt_client_dispatch_transport_error(client);
         return ESP_FAIL;
     }
-#ifdef MQTT_PROTOCOL_5
-    if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
-        esp_mqtt5_increment_packet_counter(client);
-    }
-#endif
     return ESP_OK;
 }
 
@@ -1475,10 +1470,18 @@ static esp_err_t mqtt_resend_queued(esp_mqtt_client_handle_t client, outbox_item
     }
 
     // check if it was QoS-0 publish message
-    if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH && client->mqtt_state.pending_publish_qos == 0) {
-        // delete all qos0 publish messages once we process them
-        if (outbox_delete_item(client->outbox, item) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to remove queued qos0 message from the outbox");
+    if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH) {
+        if (client->mqtt_state.pending_publish_qos == 0) {
+            // delete all qos0 publish messages once we process them
+            if (outbox_delete_item(client->outbox, item) != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to remove queued qos0 message from the outbox");
+            }
+        } else if (client->mqtt_state.pending_publish_qos > 0) {
+#ifdef MQTT_PROTOCOL_5
+            if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
+                esp_mqtt5_increment_packet_counter(client);
+            }
+#endif
         }
     }
     return ESP_OK;
@@ -2090,6 +2093,11 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
     }
 
     if (qos > 0) {
+#ifdef MQTT_PROTOCOL_5
+        if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
+            esp_mqtt5_increment_packet_counter(client);
+        }
+#endif
         //Tick is set after transmit to avoid retransmitting too early due slow network speed / big messages
         outbox_set_tick(client->outbox, pending_msg_id, platform_tick_get_ms());
         outbox_set_pending(client->outbox, pending_msg_id, TRANSMITTED);
