@@ -121,19 +121,7 @@ esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type)
     }
     return ESP_FAIL;
 }
-esp_err_t outbox_delete_msgid(outbox_handle_t outbox, int msg_id)
-{
-    outbox_item_handle_t item, tmp;
-    STAILQ_FOREACH_SAFE(item, outbox, next, tmp) {
-        if (item->msg_id == msg_id) {
-            STAILQ_REMOVE(outbox, item, outbox_item, next);
-            free(item->buffer);
-            free(item);
-        }
 
-    }
-    return ESP_OK;
-}
 esp_err_t outbox_set_pending(outbox_handle_t outbox, int msg_id, pending_state_t pending)
 {
     outbox_item_handle_t item = outbox_get(outbox, msg_id);
@@ -162,19 +150,6 @@ esp_err_t outbox_set_tick(outbox_handle_t outbox, int msg_id, outbox_tick_t tick
     return ESP_FAIL;
 }
 
-esp_err_t outbox_delete_msgtype(outbox_handle_t outbox, int msg_type)
-{
-    outbox_item_handle_t item, tmp;
-    STAILQ_FOREACH_SAFE(item, outbox, next, tmp) {
-        if (item->msg_type == msg_type) {
-            STAILQ_REMOVE(outbox, item, outbox_item, next);
-            free(item->buffer);
-            free(item);
-        }
-
-    }
-    return ESP_OK;
-}
 int outbox_delete_single_expired(outbox_handle_t outbox, outbox_tick_t current_tick, outbox_tick_t timeout)
 {
     int msg_id = -1;
