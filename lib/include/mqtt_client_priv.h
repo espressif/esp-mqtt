@@ -7,6 +7,7 @@
 #ifndef _MQTT_CLIENT_PRIV_H_
 #define _MQTT_CLIENT_PRIV_H_
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdatomic.h>
@@ -88,6 +89,7 @@ typedef struct {
     bool use_secure_element;
     void *ds_data;
     int message_retransmit_timeout;
+    uint64_t outbox_limit;
     esp_transport_handle_t transport;
 } mqtt_config_storage_t;
 

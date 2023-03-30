@@ -11,7 +11,6 @@ list(APPEND EXTRA_COMPONENT_DIRS
                                  "$ENV{IDF_PATH}/tools/mocks/lwip/"
                                  "$ENV{IDF_PATH}/tools/mocks/esp-tls/"
                                  "$ENV{IDF_PATH}/tools/mocks/http_parser/"
-                                 "$ENV{IDF_PATH}/tools/mocks/tcp_transport/"
-                                 )
+                                 "$ENV{IDF_PATH}/tools/mocks/tcp_transport/")
 
 project(host_mqtt_client_test)

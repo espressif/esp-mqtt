@@ -616,7 +616,7 @@ int mqtt_has_valid_msg_hdr(uint8_t *buffer, size_t length)
     }
 }
 
-esp_err_t mqtt_connection_init(mqtt_connection_t *connection, int buffer_size)
+esp_err_t mqtt_msg_buffer_init(mqtt_connection_t *connection, int buffer_size)
 {
     memset(connection, 0, sizeof(mqtt_connection_t));
     connection->buffer = (uint8_t *)calloc(0, buffer_size);
@@ -627,7 +627,7 @@ esp_err_t mqtt_connection_init(mqtt_connection_t *connection, int buffer_size)
     return ESP_OK;
 }
 
-void mqtt_connection_destroy(mqtt_connection_t *connection)
+void mqtt_msg_buffer_destroy(mqtt_connection_t *connection)
 {
     if (connection) {
         free(connection->buffer);
