@@ -152,6 +152,13 @@ menu "ESP-MQTT Configurations"
             bool "Core 1"
     endchoice
 
+    config MQTT_OUTBOX_DATA_ON_EXTERNAL_MEMORY
+        bool "Use external memory for outbox data"
+        default n
+        depends on MQTT_USE_CUSTOM_CONFIG
+        help
+            Set to true to use external memory for outbox data.
+
     config MQTT_CUSTOM_OUTBOX
         bool "Enable custom outbox implementation"
         default n
