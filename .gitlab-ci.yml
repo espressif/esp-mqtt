@@ -74,7 +74,7 @@ build_and_test_qemu:
     - export MQTT_PUBLISH_MSG_len_1=2   MQTT_PUBLISH_MSG_repeat_1=50
     - export MQTT_PUBLISH_MSG_len_2=128 MQTT_PUBLISH_MSG_repeat_2=2
     - export MQTT_PUBLISH_MSG_len_3=20  MQTT_PUBLISH_MSG_repeat_3=20
-    - python Runner.py $TEST_PATH -c $TEST_PATH/publish_connect_mqtt_qemu.yml -e $TEST_PATH/env.yml
+    - python Runner.py $TEST_PATH -c $MQTT_PATH/ci/publish_connect_mqtt_qemu.yml -e $TEST_PATH/env.yml
 
 push_master_to_github:
   stage: deploy
