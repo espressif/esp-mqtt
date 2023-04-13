@@ -1,7 +1,9 @@
 #include "mqtt_outbox.h"
 #include <stdlib.h>
 #include <string.h>
+#include "mqtt_config.h"
 #include "sys/queue.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 
 #ifndef CONFIG_MQTT_CUSTOM_OUTBOX
@@ -31,7 +33,7 @@ outbox_handle_t outbox_init(void)
 
 outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, outbox_message_handle_t message, outbox_tick_t tick)
 {
-    outbox_item_handle_t item = calloc(1, sizeof(outbox_item_t));
+    outbox_item_handle_t item = heap_caps_calloc(1, sizeof(outbox_item_t), MQTT_OUTBOX_MEMORY);
     ESP_MEM_CHECK(TAG, item, return NULL);
     item->msg_id = message->msg_id;
     item->msg_type = message->msg_type;
