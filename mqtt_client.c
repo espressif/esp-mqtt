@@ -641,8 +641,11 @@ static inline esp_err_t esp_mqtt_write(esp_mqtt_client_handle_t client)
                                    client->config->network_timeout_ms);
         if (wlen < 0) {
             ESP_LOGE(TAG, "Writing failed: errno=%d", errno);
+            esp_mqtt_client_dispatch_transport_error(client);
             return ESP_FAIL;
-        } else if (wlen == 0) {
+        }
+
+        if (wlen == 0) {
             ESP_LOGE(TAG, "Writing didn't complete in specified timeout: errno=%d", errno);
             return ESP_ERR_TIMEOUT;
         }
@@ -937,14 +940,6 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
     return ESP_OK;
 }
 
-static esp_err_t mqtt_write_data(esp_mqtt_client_handle_t client)
-{
-    if (esp_mqtt_write(client) != ESP_OK) {
-        esp_mqtt_client_dispatch_transport_error(client);
-        return ESP_FAIL;
-    }
-    return ESP_OK;
-}
 
 static esp_err_t esp_mqtt_dispatch_event_with_msgid(esp_mqtt_client_handle_t client)
 {
@@ -1344,7 +1339,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
         if (msg_qos == 1 || msg_qos == 2) {
             ESP_LOGD(TAG, "Queue response QoS: %d", msg_qos);
 
-            if (mqtt_write_data(client) != ESP_OK) {
+            if (esp_mqtt_write(client) != ESP_OK) {
                 ESP_LOGE(TAG, "Error write qos msg repsonse, qos = %d", msg_qos);
                 return ESP_FAIL;
             }
@@ -1381,7 +1376,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
         }
 
         outbox_set_pending(client->outbox, msg_id, ACKNOWLEDGED);
-        mqtt_write_data(client);
+        esp_mqtt_write(client);
         break;
     case MQTT_MSG_TYPE_PUBREL:
         ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBREL");
@@ -1398,7 +1393,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             return ESP_FAIL;
         }
 
-        mqtt_write_data(client);
+        esp_mqtt_write(client);
         break;
     case MQTT_MSG_TYPE_PUBCOMP:
         ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBCOMP");
@@ -1444,7 +1439,7 @@ static esp_err_t mqtt_resend_queued(esp_mqtt_client_handle_t client, outbox_item
     }
 
     // try to resend the data
-    if (mqtt_write_data(client) != ESP_OK) {
+    if (esp_mqtt_write(client) != ESP_OK) {
         ESP_LOGE(TAG, "Error to resend data ");
         esp_mqtt_abort_connection(client);
         return ESP_FAIL;
@@ -1751,7 +1746,7 @@ static esp_err_t send_disconnect_msg(esp_mqtt_client_handle_t client)
         ESP_LOGE(TAG, "Disconnect message cannot be created");
         return ESP_FAIL;
     }
-    if (mqtt_write_data(client) != ESP_OK) {
+    if (esp_mqtt_write(client) != ESP_OK) {
         ESP_LOGE(TAG, "Error sending disconnect message");
     }
     return ESP_OK;
@@ -1801,7 +1796,7 @@ static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client)
         return ESP_FAIL;
     }
 
-    if (mqtt_write_data(client) != ESP_OK) {
+    if (esp_mqtt_write(client) != ESP_OK) {
         ESP_LOGE(TAG, "Error sending ping");
         return ESP_FAIL;
     }
@@ -1862,7 +1857,7 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
     }
     outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED);// handle error
 
-    if (mqtt_write_data(client) != ESP_OK) {
+    if (esp_mqtt_write(client) != ESP_OK) {
         ESP_LOGE(TAG, "Error to send subscribe message, first topic: %s, qos: %d", topic_list[0].filter, topic_list[0].qos);
         MQTT_API_UNLOCK(client);
         return -1;
@@ -1920,7 +1915,7 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
     }
     outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED); //handle error
 
-    if (mqtt_write_data(client) != ESP_OK) {
+    if (esp_mqtt_write(client) != ESP_OK) {
         ESP_LOGE(TAG, "Error to unsubscribe topic=%s", topic);
         MQTT_API_UNLOCK(client);
         return -1;
@@ -2040,7 +2035,7 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
 
     while (sending)  {
 
-        if (mqtt_write_data(client) != ESP_OK) {
+        if (esp_mqtt_write(client) != ESP_OK) {
             esp_mqtt_abort_connection(client);
             ret = -1;
             goto cannot_publish;
