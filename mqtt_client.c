@@ -1111,15 +1111,12 @@ static esp_err_t deliver_suback(esp_mqtt_client_handle_t client)
 // Return false when message is not found, making the received counterpart invalid.
 static bool remove_initiator_message(esp_mqtt_client_handle_t client, int msg_type, int msg_id)
 {
-    ESP_LOGD(TAG, "pending_id=%d, pending_msg_count = %d", client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_count);
-    if (client->mqtt_state.pending_msg_count == 0) {
-        return false;
-    }
     if (outbox_delete(client->outbox, msg_id, msg_type) == ESP_OK) {
-        client->mqtt_state.pending_msg_count --;
+        ESP_LOGD(TAG, "Removed pending_id=%d", client->mqtt_state.pending_msg_id);
         return true;
     }
 
+    ESP_LOGD(TAG, "Failed to remove pending_id=%d", client->mqtt_state.pending_msg_id);
     return false;
 }
 
@@ -1468,7 +1465,6 @@ static void mqtt_delete_expired_messages(esp_mqtt_client_handle_t client)
     // Delete message after OUTBOX_EXPIRED_TIMEOUT_MS milliseconds
 #if MQTT_REPORT_DELETED_MESSAGES
     // also report the deleted items as MQTT_EVENT_DELETED events if enabled
-    int deleted_items = 0;
     int msg_id = 0;
     while ((msg_id = outbox_delete_single_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS)) > 0) {
         client->event.event_id = MQTT_EVENT_DELETED;
@@ -1476,16 +1472,10 @@ static void mqtt_delete_expired_messages(esp_mqtt_client_handle_t client)
         if (esp_mqtt_dispatch_event(client) != ESP_OK) {
             ESP_LOGE(TAG, "Failed to post event on deleting message id=%d", msg_id);
         }
-        deleted_items ++;
     }
 #else
-    int deleted_items = outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
+    outbox_delete_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS);
 #endif
-    client->mqtt_state.pending_msg_count -= deleted_items;
-
-    if (client->mqtt_state.pending_msg_count < 0) {
-        client->mqtt_state.pending_msg_count = 0;
-    }
 }
 
 /**
@@ -1849,7 +1839,6 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
     }
 
     client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
-    client->mqtt_state.pending_msg_count ++;
     //move pending msg to outbox (if have)
     if (!mqtt_enqueue(client, NULL, 0)) {
         MQTT_API_UNLOCK(client);
@@ -1908,7 +1897,6 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
     ESP_LOGD(TAG, "unsubscribe, topic\"%s\", id: %d", topic, client->mqtt_state.pending_msg_id);
 
     client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
-    client->mqtt_state.pending_msg_count ++;
     if (!mqtt_enqueue(client, NULL, 0)) {
         MQTT_API_UNLOCK(client);
         return -1;
@@ -1957,7 +1945,6 @@ static inline int mqtt_client_enqueue_priv(esp_mqtt_client_handle_t client, cons
         client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
         client->mqtt_state.pending_msg_id = pending_msg_id;
         client->mqtt_state.pending_publish_qos = qos;
-        client->mqtt_state.pending_msg_count ++;
         // by default store as QUEUED (not transmitted yet) only for messages which would fit outbound buffer
         if (client->mqtt_state.mqtt_connection.message.fragmented_msg_total_length == 0) {
             if (!mqtt_enqueue(client, NULL, 0)) {
