@@ -58,7 +58,6 @@ typedef struct mqtt_state {
     uint16_t pending_msg_id;
     int pending_msg_type;
     int pending_publish_qos;
-    int pending_msg_count;
 } mqtt_state_t;
 
 typedef struct {
