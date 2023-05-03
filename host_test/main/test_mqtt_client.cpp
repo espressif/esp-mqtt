@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include "esp_transport.h"
 #define CATCH_CONFIG_MAIN  // This tells the catch header to generate a main
 #include "catch.hpp"
 
@@ -60,6 +61,7 @@ struct ClientInitializedFixture {
         esp_read_mac_IgnoreAndReturn(ESP_OK);
         esp_read_mac_ReturnThruPtr_mac(mac);
         esp_transport_list_destroy_IgnoreAndReturn(ESP_OK);
+        esp_transport_destroy_IgnoreAndReturn(ESP_OK);
         vEventGroupDelete_Ignore();
         vQueueDelete_Ignore();
 
