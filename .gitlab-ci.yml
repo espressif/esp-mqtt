@@ -40,6 +40,10 @@ build_idf_v5.0:
   extends: .build_template
   image: espressif/idf:release-v5.0
 
+build_idf_v5.1:
+  extends: .build_template
+  image: espressif/idf:release-v5.1
+
 build_idf_latest:
   extends: .build_template
   image: espressif/idf:latest
@@ -55,7 +59,7 @@ build_and_test_qemu:
     - export IDF_PATH=$CI_PROJECT_DIR/esp-idf
     - git clone "${IDF_REPO}"
     # switch to IDF and setup the tools
-    - $MQTT_PATH/ci/set_idf.sh master
+    - $MQTT_PATH/ci/set_idf.sh release/v5.1
     - $IDF_PATH/tools/idf_tools.py install-python-env
     - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
     # Remove `debug_backend` and Add `paho-mqtt` to the required packages
