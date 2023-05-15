@@ -13,6 +13,3 @@ idf_component_register(SRCS "${srcs}"
                     KCONFIG ${CMAKE_CURRENT_LIST_DIR}/Kconfig
                     )
 target_compile_options(${COMPONENT_LIB} PRIVATE "-Wno-format")
-
-
-
