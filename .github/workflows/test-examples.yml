@@ -1,0 +1,66 @@
+name: "Build example apps"
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+jobs:
+    cpp-compatibility:
+        name: Cpp compatibility
+        strategy:
+            matrix:
+                idf_version: ["release-v5.0", "release-v5.1", "latest"]
+                target: ["esp32"]
+                example: [{name: cpp_compatibility, path: "build_test"}]
+        uses: "./.github/workflows/build-app.yml"
+        with:
+            idf_version: ${{matrix.idf_version}}
+            target: ${{matrix.target}}
+            app_name: ${{matrix.example.name}}
+            app_path: $IDF_PATH/tools/test_apps/protocols/mqtt/${{matrix.example.path}}
+            upload_artifacts: false
+    build-only-example:
+        name: Build Only Apps
+        strategy:
+            matrix:
+                idf_version: ["release-v5.0", "release-v5.1", "latest"]
+                target: ["esp32s2", "esp32c3", "esp32s3"]
+                example: [{name: ssl_psk, path: "mqtt/ssl_psk"}]
+        uses: "./.github/workflows/build-app.yml"
+        with:
+            idf_version: ${{matrix.idf_version}}
+            target: ${{matrix.target}}
+            app_name: ${{matrix.example.name}}
+            app_path: $IDF_PATH/examples/protocols/${{matrix.example.path}}
+
+    build-only-ds-example:
+        name: Build Only Apps
+        strategy:
+            matrix:
+                idf_version: ["release-v5.0", "release-v5.1", "latest"]
+                target: ["esp32s2", "esp32c3", "esp32s3"]
+                example: [{name: ssl_ds, path: "mqtt/ssl_ds"}, {name: ssl_psk, path: "mqtt/ssl_psk"}]
+        uses: "./.github/workflows/build-app.yml"
+        with:
+            idf_version: ${{matrix.idf_version}}
+            target: ${{matrix.target}}
+            app_name: ${{matrix.example.name}}
+            app_path: $IDF_PATH/examples/protocols/${{matrix.example.path}}
+
+    build-examples:
+        name: Build and Run on target
+        strategy:
+            matrix:
+                idf_version: ["release-v5.0", "release-v5.1", "latest"]
+                target: ["esp32"]
+                example: [{name: tcp, path: "mqtt/tcp"}, {name: ssl, path: "mqtt/ssl"},{name: ssl_mutual_auth, path: "mqtt/ssl_mutual_auth"},{name: ws, path: "mqtt/ws"},{name: wss, path: "mqtt/wss"}]
+        uses: "./.github/workflows/build-and-target-test.yml"
+        with:
+            idf_version: ${{matrix.idf_version}}
+            target: ${{matrix.target}}
+            app_name: ${{matrix.example.name}}
+            app_path: $IDF_PATH/examples/protocols/${{matrix.example.path}}
+

@@ -1,0 +1,64 @@
+name: Run on target
+
+on:
+    workflow_call:
+        inputs:
+            idf_version:
+                required: true
+                type: string
+            target:
+                required: true
+                type: string
+            app_name:
+                type: string
+                required: true
+            app_path:
+                type: string
+                required: true
+
+jobs:
+    target-test:
+        if: github.repository == 'espressif/esp-mqtt'
+        name: Run App on target
+        env:
+            IDF_PATH: idf
+        runs-on: [self-hosted, ESP32-ETHERNET-KIT]
+        steps:
+          - name: Select idf ref
+            id: detect_version
+            run: |
+                 if echo "${{inputs.idf_version}}" | grep "latest" -> /dev/null ; then
+                        echo ref="master" >> "$GITHUB_OUTPUT"
+                 else
+                     echo ref="`echo ${{matrix.idf_version}} | sed -s "s/-/\//"`" >> "$GITHUB_OUTPUT"
+                 fi
+          - name: IP discovery
+            id: detect_ip
+            run: |
+                apt-get update && apt-get install -y iproute2
+                ip route
+                echo runner_ip ="`ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'`" >> "$GITHUB_OUTPUT"
+          - name: Checkout IDF ${{inputs.idf_version}}
+            uses: actions/checkout@v3
+            with:
+                repository: espressif/esp-idf
+                path: ${{env.IDF_PATH}}
+                ref: ${{steps.detect_version.outputs.ref}}
+          - name: Install Python packages
+            env:
+              PIP_EXTRA_INDEX_URL: "https://dl.espressif.com/pypi/"
+            run: |
+                pip install --only-binary cryptography -r ${{env.IDF_PATH}}/tools/requirements/requirements.pytest.txt
+          - uses: actions/download-artifact@v3
+            with:
+              name: mqtt_bin_${{inputs.target}}_${{ inputs.idf_version }}_${{ inputs.app_name }}
+              path: build
+
+          - name: Run ${{inputs.app_name}} application on ${{inputs.target}}
+            run: |
+                python -m pytest ${{inputs.app_path}} --log-cli-level DEBUG --app-path . --junit-xml=./results_${{inputs.app_name}}_${{inputs.idf_version}}.xml --target=${{inputs.target}}
+          - uses: actions/upload-artifact@v3
+            if: always()
+            with:
+                name: results_${{inputs.app_name}}_${{inputs.idf_version}}.xml
+                path: build/*.xml

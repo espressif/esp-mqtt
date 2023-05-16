@@ -1,0 +1,59 @@
+name: Build app
+
+on:
+    workflow_call:
+        inputs:
+            idf_version:
+                required: true
+                type: string
+            target:
+                required: true
+                type: string
+            app_name:
+                type: string
+                required: true
+            app_path:
+                type: string
+                required: true
+            upload_artifacts:
+                type: boolean
+                default: true
+
+jobs:
+    build:
+        name: Build App
+        runs-on: ubuntu-20.04
+        container: espressif/idf:${{inputs.idf_version}}
+        steps:
+          - if: ${{ env.ACT }}
+            name: Add node for local tests
+            run: |
+                curl -fsSL https://deb.nodesource.com/setup_14.x | bash -
+                apt-get install -y nodejs
+          - name: Checkout esp-mqtt
+            uses: actions/checkout@v3
+          - name: ccache
+            uses: hendrikmuhs/ccache-action@v1.2
+            with:
+                key: ${{inputs.idf_version}}-${{inputs.target}}
+          - name: Build ${{ inputs.app_name }} with IDF-${{ inputs.idf_version }}
+            shell: bash
+            run: |
+              ${IDF_PATH}/install.sh --enable-pytest
+              . ${IDF_PATH}/export.sh
+              python -m pip install idf-build-apps
+              rm -rf $IDF_PATH/components/mqtt/esp-mqtt
+              cp -r . $IDF_PATH/components/mqtt/esp-mqtt
+              IDF_CCACHE_ENABLE=1 idf-build-apps build --config-file ci/idf_build_apps.toml -p ${{inputs.app_path}} -t ${{inputs.target}}
+          - name: Upload files to artifacts for run-target job
+            uses: actions/upload-artifact@v3
+            if: ${{inputs.upload_artifacts}}
+            with:
+              name: mqtt_bin_${{inputs.target}}_${{ inputs.idf_version }}_${{ inputs.app_name }}
+              path: |
+                    build_${{inputs.target}}_${{inputs.app_name}}/bootloader/bootloader.bin
+                    build_${{inputs.target}}_${{inputs.app_name}}/partition_table/partition-table.bin
+                    build_${{inputs.target}}_${{inputs.app_name}}/*.bin
+                    build_${{inputs.target}}_${{inputs.app_name}}/*.elf
+                    build_${{inputs.target}}_${{inputs.app_name}}/flasher_args.json
+              if-no-files-found: error
