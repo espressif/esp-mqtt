@@ -288,7 +288,14 @@ static esp_err_t esp_mqtt_client_create_transport(esp_mqtt_client_handle_t clien
         ESP_MEM_CHECK(TAG, client->transport_list, return ESP_ERR_NO_MEM);
 
         if ((strncasecmp(client->config->scheme, MQTT_OVER_TCP_SCHEME, sizeof(MQTT_OVER_TCP_SCHEME)) == 0) || (strncasecmp(client->config->scheme, MQTT_OVER_WS_SCHEME, sizeof(MQTT_OVER_WS_SCHEME)) == 0)) {
-            esp_transport_handle_t tcp = esp_transport_tcp_init();
+            esp_transport_handle_t tcp = NULL;
+            if (client->config->ext_transport != NULL) {
+                ESP_LOGD(TAG, "Using external transport: %p", client->config->ext_transport);
+                tcp = client->config->ext_transport;
+            } else {
+                tcp = esp_transport_tcp_init();
+            }
+
             ESP_MEM_CHECK(TAG, tcp, return ESP_ERR_NO_MEM);
             esp_transport_set_default_port(tcp, MQTT_TCP_DEFAULT_PORT);
             esp_transport_list_add(client->transport_list, tcp, MQTT_OVER_TCP_SCHEME);
@@ -311,7 +318,14 @@ static esp_err_t esp_mqtt_client_create_transport(esp_mqtt_client_handle_t clien
             }
         } else if ((strncasecmp(client->config->scheme, MQTT_OVER_SSL_SCHEME, sizeof(MQTT_OVER_SSL_SCHEME)) == 0) || (strncasecmp(client->config->scheme, MQTT_OVER_WSS_SCHEME, sizeof(MQTT_OVER_WSS_SCHEME)) == 0)) {
 #if MQTT_ENABLE_SSL
-            esp_transport_handle_t ssl = esp_transport_ssl_init();
+            esp_transport_handle_t ssl = NULL;
+            if (client->config->ext_transport != NULL) {
+                ESP_LOGD(TAG, "Using external transport: %p", client->config->ext_transport);
+                ssl = client->config->ext_transport;
+            } else {
+                ssl = esp_transport_ssl_init();
+            }
+
             ESP_MEM_CHECK(TAG, ssl, return ESP_ERR_NO_MEM);
             esp_transport_set_default_port(ssl, MQTT_SSL_DEFAULT_PORT);
             esp_transport_list_add(client->transport_list, ssl, MQTT_OVER_SSL_SCHEME);
@@ -544,6 +558,12 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
             ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
         }
 #endif
+    }
+
+    if (config->ext_transport) {
+        client->config->ext_transport = config->ext_transport;
+    } else {
+        client->config->ext_transport = NULL;
     }
 
     // Set uri at the end of config to override separately configured uri elements

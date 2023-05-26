@@ -91,6 +91,7 @@ typedef struct {
     bool use_secure_element;
     void *ds_data;
     int message_retransmit_timeout;
+    esp_transport_handle_t ext_transport;
 } mqtt_config_storage_t;
 
 typedef enum {

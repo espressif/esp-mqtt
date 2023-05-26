@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <esp_transport.h>
 #include "esp_err.h"
 #include "esp_event.h"
 #ifdef CONFIG_MQTT_PROTOCOL_5
@@ -347,6 +348,7 @@ typedef struct esp_mqtt_client_config_t {
         int out_size; /*!< size of *MQTT* output buffer. If not defined, defaults to the size defined by
               ``buffer_size`` */
     } buffer; /*!< Buffer size configuration.*/
+    esp_transport_handle_t ext_transport; /*!< External tcp_transport handle to the client, e.g. proxy; or if null, the client will create its own transport handle. */
 } esp_mqtt_client_config_t;
 
 /**
