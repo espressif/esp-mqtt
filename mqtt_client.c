@@ -235,9 +235,9 @@ esp_mqtt_set_transport_failed:
 /* Checks if the user supplied config values are internally consistent */
 static esp_err_t esp_mqtt_check_cfg_conflict(const mqtt_config_storage_t *cfg, const esp_mqtt_client_config_t *user_cfg)
 {
-    if(cfg == NULL || user_cfg == NULL) {
-      ESP_LOGE(TAG, "Invalid configuration");
-      return ESP_ERR_INVALID_ARG;
+    if (cfg == NULL || user_cfg == NULL) {
+        ESP_LOGE(TAG, "Invalid configuration");
+        return ESP_ERR_INVALID_ARG;
     }
     esp_err_t ret = ESP_OK;
 
@@ -1124,16 +1124,16 @@ static outbox_item_handle_t mqtt_enqueue(esp_mqtt_client_handle_t client, uint8_
 {
     ESP_LOGD(TAG, "mqtt_enqueue id: %d, type=%d successful",
              client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
-        outbox_message_t msg = { 0 };
-        msg.data = client->mqtt_state.outbound_message->data;
-        msg.len =  client->mqtt_state.outbound_message->length;
-        msg.msg_id = client->mqtt_state.pending_msg_id;
-        msg.msg_type = client->mqtt_state.pending_msg_type;
-        msg.msg_qos = client->mqtt_state.pending_publish_qos;
-        msg.remaining_data = remaining_data;
-        msg.remaining_len = remaining_len;
-        //Copy to queue buffer
-        return outbox_enqueue(client->outbox, &msg, platform_tick_get_ms());
+    outbox_message_t msg = { 0 };
+    msg.data = client->mqtt_state.outbound_message->data;
+    msg.len =  client->mqtt_state.outbound_message->length;
+    msg.msg_id = client->mqtt_state.pending_msg_id;
+    msg.msg_type = client->mqtt_state.pending_msg_type;
+    msg.msg_qos = client->mqtt_state.pending_publish_qos;
+    msg.remaining_data = remaining_data;
+    msg.remaining_len = remaining_len;
+    //Copy to queue buffer
+    return outbox_enqueue(client->outbox, &msg, platform_tick_get_ms());
 }
 
 
@@ -2007,6 +2007,8 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         ESP_LOGD(TAG, "Publish: client is not connected");
         if (qos > 0) {
             ret = pending_msg_id;
+        } else {
+            ret = -1;
         }
 
         // delete long pending messages
