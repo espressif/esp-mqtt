@@ -426,6 +426,11 @@ esp_err_t esp_mqtt_client_disconnect(esp_mqtt_client_handle_t client);
 esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
 
 
+#ifdef __cplusplus
+
+#define esp_mqtt_client_subscribe esp_mqtt_client_subscribe_single
+
+#else
 /**
  * @brief Convenience macro to select subscribe function to use.
  *
@@ -445,6 +450,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
       esp_mqtt_topic_t*: esp_mqtt_client_subscribe_multiple \
     )(client_handle, topic_type, qos_or_size)
 
+#endif /* __cplusplus*/
 /**
  * @brief Subscribe the client to defined topic with defined qos
  *
