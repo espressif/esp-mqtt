@@ -1,5 +1,6 @@
 stages:
   - build
+  - test
   - deploy
 
 
@@ -79,6 +80,15 @@ build_and_test_qemu:
     - export MQTT_PUBLISH_MSG_len_2=128 MQTT_PUBLISH_MSG_repeat_2=2
     - export MQTT_PUBLISH_MSG_len_3=20  MQTT_PUBLISH_MSG_repeat_3=20
     - python Runner.py $TEST_PATH -c $MQTT_PATH/ci/publish_connect_mqtt_qemu.yml -e $TEST_PATH/env.yml
+
+check_remotes_sync:
+  stage: test
+  when: on_success
+  script:
+    - *add_gh_key_remote
+    - git fetch --depth=1 origin master
+    - git fetch --depth=1 github master
+    - test "$(git rev-parse origin/master)" == "$(git rev-parse github/master)"
 
 push_master_to_github:
   stage: deploy
