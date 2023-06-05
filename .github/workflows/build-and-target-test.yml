@@ -1,0 +1,37 @@
+name: Build app an run on target
+
+on:
+    workflow_call:
+        inputs:
+            idf_version:
+                required: true
+                type: string
+            target:
+                required: true
+                type: string
+            app_name:
+                type: string
+                required: true
+            app_path:
+                type: string
+                required: true
+
+
+jobs:
+    build-app:
+        uses: "./.github/workflows/build-app.yml"
+        with:
+             idf_version: ${{inputs.idf_version}}
+             target: ${{inputs.target}}
+             app_name: ${{inputs.app_name}}
+             app_path: ${{inputs.app_path}}
+
+    # run-on-target:
+    #     needs: build-app
+    #     uses: "./.github/workflows/run-on-target.yml"
+    #     with:
+    #          idf_version: ${{inputs.idf_version}}
+    #          target: ${{inputs.target}}
+    #          app_name: ${{inputs.app_name}}
+    #          app_path: ${{inputs.app_path}}
+

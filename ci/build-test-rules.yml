@@ -1,0 +1,11 @@
+# Documentation: .gitlab/ci/README.md#manifest-file-to-control-the-buildtest-apps
+
+examples/protocols:
+  enable:
+    - if: IDF_TARGET in ["esp32"]
+
+examples/protocols/mqtt/ssl_ds:
+  disable:
+    - if: SOC_DIG_SIGN_SUPPORTED != 1
+      temporary: false
+      reason: DS not present
