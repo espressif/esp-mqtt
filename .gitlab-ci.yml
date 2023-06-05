@@ -83,7 +83,9 @@ build_and_test_qemu:
 
 check_remotes_sync:
   stage: test
-  when: on_success
+  except:
+    - master
+    - idf
   script:
     - *add_gh_key_remote
     - git fetch --depth=1 origin master
