@@ -980,16 +980,12 @@ static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
     client->event.protocol_ver = client->connect_info.protocol_ver;
     esp_err_t ret = ESP_FAIL;
 
-    if (client->config->event_handle) {
-        ret = client->config->event_handle(&client->event);
-    } else {
 #ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
         esp_event_post_to(client->config->event_loop_handle, MQTT_EVENTS, client->event.event_id, &client->event, sizeof(client->event), portMAX_DELAY);
         ret = esp_event_loop_run(client->config->event_loop_handle, 0);
 #else
         return ESP_FAIL;
 #endif
-    }
     if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
         esp_mqtt5_client_delete_user_property(client->event.property->user_property);
@@ -2132,10 +2128,6 @@ esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mq
         return ESP_ERR_INVALID_ARG;
     }
 #ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
-    if (client->config->event_handle) {
-        ESP_LOGW(TAG, "Registering event loop while event callback is not null, clearing callback");
-        client->config->event_handle = NULL;
-    }
 
     return esp_event_handler_register_with(client->config->event_loop_handle, MQTT_EVENTS, event, event_handler, event_handler_arg);
 #else
@@ -2150,10 +2142,6 @@ esp_err_t esp_mqtt_client_unregister_event(esp_mqtt_client_handle_t client, esp_
         return ESP_ERR_INVALID_ARG;
     }
 #ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
-    if (client->config->event_handle) {
-        ESP_LOGW(TAG, "Unregistering event loop while event callback is not null, clearing callback");
-        client->config->event_handle = NULL;
-    }
 
     return esp_event_handler_unregister_with(client->config->event_loop_handle, MQTT_EVENTS, event, event_handler);
 #else
