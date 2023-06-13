@@ -1,4 +1,5 @@
 #include "mqtt_client.h"
+#include "esp_transport.h"
 #include "mqtt_client_priv.h"
 #include "esp_log.h"
 #include <stdint.h>
@@ -484,6 +485,9 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     } else {
         client->config->reconnect_timeout_ms = MQTT_RECON_DEFAULT_MS;
     }
+    if (config->network.transport) {
+        client->config->transport = config->network.transport;
+    }
 
     if (config->broker.verification.alpn_protos) {
         for (int i = 0; i < client->config->num_alpn_protos; i++) {
@@ -602,6 +606,7 @@ void esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
         esp_event_loop_delete(client->config->event_loop_handle);
     }
 #endif
+    esp_transport_destroy(client->config->transport);
     memset(client->config, 0, sizeof(mqtt_config_storage_t));
     free(client->config);
     client->config = NULL;
@@ -1519,18 +1524,6 @@ static void esp_mqtt_task(void *pv)
     outbox_tick_t msg_tick = 0;
     client->run = true;
 
-    //get transport by scheme
-    client->transport = esp_transport_list_get_transport(client->transport_list, client->config->scheme);
-
-    if (client->transport == NULL) {
-        ESP_LOGE(TAG, "There are no transports valid, stop mqtt client, config scheme = %s", client->config->scheme);
-        client->run = false;
-    }
-    //default port
-    if (client->config->port == 0) {
-        client->config->port = esp_transport_get_default_port(client->transport);
-    }
-
     client->state = MQTT_STATE_INIT;
     xEventGroupClearBits(client->status_bits, STOPPED_BIT);
     while (client->run) {
@@ -1544,10 +1537,29 @@ static void esp_mqtt_task(void *pv)
             client->event.event_id = MQTT_EVENT_BEFORE_CONNECT;
             esp_mqtt_dispatch_event_with_msgid(client);
 
-            if (client->transport == NULL) {
-                ESP_LOGE(TAG, "There is no transport");
-                client->run = false;
+
+            client->transport = client->config->transport;
+            if (!client->transport) {
+
+                if (esp_mqtt_client_create_transport(client) != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to create transport list");
+                    client->run = false;
+                    break;
+                }
+                //get transport by scheme
+                client->transport = esp_transport_list_get_transport(client->transport_list, client->config->scheme);
+
+                if (client->transport == NULL) {
+                    ESP_LOGE(TAG, "There are no transports valid, stop mqtt client, config scheme = %s", client->config->scheme);
+                    client->run = false;
+                    break;
+                }
             }
+            //default port
+            if (client->config->port == 0) {
+                client->config->port = esp_transport_get_default_port(client->transport);
+            }
+
 #if MQTT_ENABLE_SSL
             esp_mqtt_set_ssl_transport_properties(client->transport_list, client->config);
 #endif
@@ -1670,11 +1682,6 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
     MQTT_API_LOCK(client);
     if (client->state != MQTT_STATE_INIT && client->state != MQTT_STATE_DISCONNECTED) {
         ESP_LOGE(TAG, "Client has started");
-        MQTT_API_UNLOCK(client);
-        return ESP_FAIL;
-    }
-    if (esp_mqtt_client_create_transport(client) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to create transport list");
         MQTT_API_UNLOCK(client);
         return ESP_FAIL;
     }

@@ -12,6 +12,7 @@
 #include <string.h>
 #include "esp_err.h"
 #include "esp_event.h"
+#include "esp_transport.h"
 #ifdef CONFIG_MQTT_PROTOCOL_5
 #include "mqtt5_client.h"
 #endif
@@ -332,6 +333,7 @@ typedef struct esp_mqtt_client_config_t {
         int refresh_connection_after_ms; /*!< Refresh connection after this value (in milliseconds) */
         bool disable_auto_reconnect;     /*!< Client will reconnect to server (when errors/disconnect). Set
                                  `disable_auto_reconnect=true` to disable */
+        esp_transport_handle_t transport; /*!< Custom transport handle to use. Warning: The transport should be valid during the client lifetime and is destroyed when esp_mqtt_client_destroy is called. */
     } network; /*!< Network configuration */
     /**
      * Client task configuration
