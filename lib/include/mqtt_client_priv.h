@@ -91,6 +91,7 @@ typedef struct {
     int message_retransmit_timeout;
     uint64_t outbox_limit;
     esp_transport_handle_t transport;
+    struct ifreq * if_name;
 } mqtt_config_storage_t;
 
 typedef enum {

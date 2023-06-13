@@ -334,6 +334,7 @@ typedef struct esp_mqtt_client_config_t {
         bool disable_auto_reconnect;     /*!< Client will reconnect to server (when errors/disconnect). Set
                                  `disable_auto_reconnect=true` to disable */
         esp_transport_handle_t transport; /*!< Custom transport handle to use. Warning: The transport should be valid during the client lifetime and is destroyed when esp_mqtt_client_destroy is called. */
+        struct ifreq * if_name; /*!< The name of interface for data to go through. Use the default interface without setting */    
     } network; /*!< Network configuration */
     /**
      * Client task configuration
