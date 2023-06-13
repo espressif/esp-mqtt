@@ -61,7 +61,6 @@ typedef struct mqtt_state {
 } mqtt_state_t;
 
 typedef struct {
-    mqtt_event_callback_t event_handle;
     esp_event_loop_handle_t event_loop_handle;
     int task_stack;
     int task_prio;

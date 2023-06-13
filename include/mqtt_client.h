@@ -213,7 +213,6 @@ typedef struct esp_mqtt_event_t {
 
 typedef esp_mqtt_event_t *esp_mqtt_event_handle_t;
 
-typedef esp_err_t (*mqtt_event_callback_t)(esp_mqtt_event_handle_t event);
 
 /**
  * *MQTT* client configuration structure
