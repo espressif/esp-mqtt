@@ -352,6 +352,9 @@ typedef struct esp_mqtt_client_config_t {
         int out_size; /*!< size of *MQTT* output buffer. If not defined, defaults to the size defined by
               ``buffer_size`` */
     } buffer; /*!< Buffer size configuration.*/
+    struct outbox_config_t {
+        uint64_t limit; /*!< Size limit for the outbox in bytes.*/
+    } outbox;
 } esp_mqtt_client_config_t;
 
 /**
@@ -430,7 +433,6 @@ esp_err_t esp_mqtt_client_disconnect(esp_mqtt_client_handle_t client);
  */
 esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
 
-
 #ifdef __cplusplus
 
 #define esp_mqtt_client_subscribe esp_mqtt_client_subscribe_single
@@ -449,6 +451,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
  *
  * @return message_id of the subscribe message on success
  *         -1 on failure
+ *         -2 in case of full outbox.
  */
 #define esp_mqtt_client_subscribe(client_handle, topic_type, qos_or_size) _Generic((topic_type), \
       char *: esp_mqtt_client_subscribe_single, \
@@ -473,6 +476,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
  *
  * @return message_id of the subscribe message on success
  *         -1 on failure
+ *         -2 in case of full outbox.
  */
 int esp_mqtt_client_subscribe_single(esp_mqtt_client_handle_t client,
                                      const char *topic, int qos);
@@ -493,6 +497,7 @@ int esp_mqtt_client_subscribe_single(esp_mqtt_client_handle_t client,
  *
  * @return message_id of the subscribe message on success
  *         -1 on failure
+ *         -2 in case of full outbox.
  */
 int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
                                        const esp_mqtt_topic_t *topic_list, int size);
@@ -536,7 +541,7 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client,
  * @param retain    retain flag
  *
  * @return message_id of the publish message (for QoS 0 message_id will always
- * be zero) on success. -1 on failure.
+ * be zero) on success. -1 on failure, -2 in case of full outbox.
  */
 int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic,
                             const char *data, int len, int qos, int retain);
@@ -561,7 +566,7 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic,
  * @param store     if true, all messages are enqueued; otherwise only QoS 1 and
  * QoS 2 are enqueued
  *
- * @return message_id if queued successfully, -1 otherwise
+ * @return message_id if queued successfully, -1 on failure, -2 in case of full outbox.
  */
 int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic,
                             const char *data, int len, int qos, int retain,

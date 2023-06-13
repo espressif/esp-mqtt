@@ -14,7 +14,7 @@ extern "C" {
 
 struct outbox_item;
 
-typedef struct outbox_list_t *outbox_handle_t;
+typedef struct outbox_t *outbox_handle_t;
 typedef struct outbox_item *outbox_item_handle_t;
 typedef struct outbox_message *outbox_message_handle_t;
 typedef long long outbox_tick_t;
@@ -42,8 +42,6 @@ outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox, pending_state_t pend
 outbox_item_handle_t outbox_get(outbox_handle_t outbox, int msg_id);
 uint8_t *outbox_item_get_data(outbox_item_handle_t item,  size_t *len, uint16_t *msg_id, int *msg_type, int *qos);
 esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type);
-esp_err_t outbox_delete_msgid(outbox_handle_t outbox, int msg_id);
-esp_err_t outbox_delete_msgtype(outbox_handle_t outbox, int msg_type);
 esp_err_t outbox_delete_item(outbox_handle_t outbox, outbox_item_handle_t item);
 int outbox_delete_expired(outbox_handle_t outbox, outbox_tick_t current_tick, outbox_tick_t timeout);
 /**
@@ -56,7 +54,7 @@ int outbox_delete_single_expired(outbox_handle_t outbox, outbox_tick_t current_t
 esp_err_t outbox_set_pending(outbox_handle_t outbox, int msg_id, pending_state_t pending);
 pending_state_t outbox_item_get_pending(outbox_item_handle_t item);
 esp_err_t outbox_set_tick(outbox_handle_t outbox, int msg_id, outbox_tick_t tick);
-int outbox_get_size(outbox_handle_t outbox);
+uint64_t outbox_get_size(outbox_handle_t outbox);
 void outbox_destroy(outbox_handle_t outbox);
 void outbox_delete_all_items(outbox_handle_t outbox);
 
