@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdlib.h>
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
@@ -303,6 +304,9 @@ static esp_err_t esp_mqtt_client_create_transport(esp_mqtt_client_handle_t clien
             esp_transport_handle_t tcp = esp_transport_tcp_init();
             ESP_MEM_CHECK(TAG, tcp, return ESP_ERR_NO_MEM);
             esp_transport_set_default_port(tcp, MQTT_TCP_DEFAULT_PORT);
+            if (client->config->if_name) {
+                esp_transport_tcp_set_interface_name(tcp, client->config->if_name);
+            }
             esp_transport_list_add(client->transport_list, tcp, MQTT_OVER_TCP_SCHEME);
             if (strncasecmp(client->config->scheme, MQTT_OVER_WS_SCHEME, sizeof(MQTT_OVER_WS_SCHEME)) == 0) {
 #if MQTT_ENABLE_WS
@@ -326,6 +330,9 @@ static esp_err_t esp_mqtt_client_create_transport(esp_mqtt_client_handle_t clien
             esp_transport_handle_t ssl = esp_transport_ssl_init();
             ESP_MEM_CHECK(TAG, ssl, return ESP_ERR_NO_MEM);
             esp_transport_set_default_port(ssl, MQTT_SSL_DEFAULT_PORT);
+            if (client->config->if_name) {
+                esp_transport_ssl_set_interface_name(ssl, client->config->if_name);
+            }
             esp_transport_list_add(client->transport_list, ssl, MQTT_OVER_SSL_SCHEME);
             if (strncasecmp(client->config->scheme, MQTT_OVER_WSS_SCHEME, sizeof(MQTT_OVER_WSS_SCHEME)) == 0) {
 #if MQTT_ENABLE_WS
@@ -486,6 +493,15 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
         client->config->reconnect_timeout_ms = config->network.reconnect_timeout_ms;
     } else {
         client->config->reconnect_timeout_ms = MQTT_RECON_DEFAULT_MS;
+    }
+    if (config->network.transport) {
+        client->config->transport = config->network.transport;
+    }
+
+    if (config->network.if_name) {
+        client->config->if_name = calloc(1, sizeof(struct ifreq) + 1);
+        ESP_MEM_CHECK(TAG, client->config->if_name, goto _mqtt_set_config_failed);
+        memcpy(client->config->if_name, config->network.if_name, sizeof(struct ifreq));
     }
 
     if (config->broker.verification.alpn_protos) {
