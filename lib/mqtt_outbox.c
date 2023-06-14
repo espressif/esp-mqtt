@@ -33,7 +33,7 @@ outbox_handle_t outbox_init(void)
     outbox_handle_t outbox = calloc(1, sizeof(struct outbox_t));
     ESP_MEM_CHECK(TAG, outbox, return NULL);
     outbox->list = calloc(1, sizeof(struct outbox_list_t));
-    ESP_MEM_CHECK(TAG, outbox->list, return NULL); //TODO: Free outbox on failure
+    ESP_MEM_CHECK(TAG, outbox->list, {free(outbox); return NULL;});
     outbox->size = 0;
     STAILQ_INIT(outbox->list);
     return outbox;
