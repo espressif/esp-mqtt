@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <memory>
+#include <net/if.h>
 #include <random>
 #include <string_view>
 #include <type_traits>
@@ -51,7 +52,6 @@ using unique_mqtt_client = std::unique_ptr < std::remove_pointer_t<esp_mqtt_clie
 
 SCENARIO("MQTT Client Operation")
 {
-    // [[maybe_unused]] auto protect = TEST_PROTECT();
     // Set expectations for the mocked calls.
     int mtx = 0;
     int transport_list = 0;
@@ -76,6 +76,7 @@ SCENARIO("MQTT Client Operation")
     esp_read_mac_IgnoreAndReturn(ESP_OK);
     esp_read_mac_ReturnThruPtr_mac(mac);
     esp_transport_list_destroy_IgnoreAndReturn(ESP_OK);
+    esp_transport_destroy_IgnoreAndReturn(ESP_OK);
     vEventGroupDelete_Ignore();
     vQueueDelete_Ignore();
     GIVEN("An a minimal config") {
@@ -111,6 +112,15 @@ SCENARIO("MQTT Client Operation")
                     http_parser_parse_url_ReturnThruPtr_u(&ret_uri);
                     auto res = esp_mqtt_client_set_uri(client.get(), " ");
                     REQUIRE(res == ESP_FAIL);
+                }
+            }
+            SECTION("User set interface to use"){
+                http_parser_parse_url_ExpectAnyArgsAndReturn(0);
+                http_parser_parse_url_ReturnThruPtr_u(&ret_uri);
+                struct ifreq if_name = {.ifr_ifrn = {"custom"}};
+                config.network.if_name = &if_name;
+                SECTION("Client is not started"){
+                    REQUIRE(esp_mqtt_set_config(client.get(), &config)== ESP_OK);
                 }
             }
             SECTION("After Start Client Is Cleanly destroyed") {

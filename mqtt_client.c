@@ -608,6 +608,7 @@ void esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
     }
     free(client->config->alpn_protos);
     free(client->config->clientkey_password);
+    free(client->config->if_name);
     free(client->mqtt_state.connection.information.will_topic);
     free(client->mqtt_state.connection.information.will_message);
     free(client->mqtt_state.connection.information.client_id);
