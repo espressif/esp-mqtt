@@ -877,7 +877,7 @@ esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client)
     if (client == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (client->api_lock) {
+    if (client->run) {
         esp_mqtt_client_stop(client);
     }
     esp_mqtt_destroy_config(client);
