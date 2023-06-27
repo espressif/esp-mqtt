@@ -999,7 +999,7 @@ static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
     client->event.protocol_ver = client->mqtt_state.connection.information.protocol_ver;
     esp_err_t ret = ESP_FAIL;
 
-    #ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
+#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
     esp_event_post_to(client->config->event_loop_handle, MQTT_EVENTS, client->event.event_id, &client->event, sizeof(client->event), portMAX_DELAY);
     ret = esp_event_loop_run(client->config->event_loop_handle, 0);
 #else
@@ -1149,16 +1149,16 @@ static outbox_item_handle_t mqtt_enqueue(esp_mqtt_client_handle_t client, uint8_
 {
     ESP_LOGD(TAG, "mqtt_enqueue id: %d, type=%d successful",
              client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
-        outbox_message_t msg = { 0 };
-        msg.data = client->mqtt_state.connection.outbound_message.data;
-        msg.len =  client->mqtt_state.connection.outbound_message.length;
-        msg.msg_id = client->mqtt_state.pending_msg_id;
-        msg.msg_type = client->mqtt_state.pending_msg_type;
-        msg.msg_qos = client->mqtt_state.pending_publish_qos;
-        msg.remaining_data = remaining_data;
-        msg.remaining_len = remaining_len;
-        //Copy to queue buffer
-        return outbox_enqueue(client->outbox, &msg, platform_tick_get_ms());
+    outbox_message_t msg = { 0 };
+    msg.data = client->mqtt_state.connection.outbound_message.data;
+    msg.len =  client->mqtt_state.connection.outbound_message.length;
+    msg.msg_id = client->mqtt_state.pending_msg_id;
+    msg.msg_type = client->mqtt_state.pending_msg_type;
+    msg.msg_qos = client->mqtt_state.pending_publish_qos;
+    msg.remaining_data = remaining_data;
+    msg.remaining_len = remaining_len;
+    //Copy to queue buffer
+    return outbox_enqueue(client->outbox, &msg, platform_tick_get_ms());
 }
 
 
@@ -1830,7 +1830,7 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
     }
 
     if (client->config->outbox_limit > 0 && outbox_get_size(client->outbox) > client->config->outbox_limit) {
-            return -2;
+        return -2;
     }
     MQTT_API_LOCK(client);
     if (client->state != MQTT_STATE_CONNECTED) {
@@ -1976,6 +1976,9 @@ static inline int mqtt_client_enqueue_publish(esp_mqtt_client_handle_t client, c
         int len, int qos, int retain, bool store)
 {
     int pending_msg_id = make_publish(client, topic, data, len, qos, retain);
+    if (pending_msg_id < 0) {
+        return -1;
+    }
     /* We have to set as pending all the qos>0 messages */
     //TODO: client->mqtt_state.outbound_message = publish_msg;
     if (qos > 0 || store) {
