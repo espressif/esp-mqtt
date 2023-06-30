@@ -339,7 +339,7 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
             continue;
         case MQTT5_PROPERTY_MESSAGE_EXPIRY_INTERVAL:
             MQTT5_CONVERT_ONE_BYTE_TO_FOUR(resp_property->message_expiry_interval, property[property_offset ++], property[property_offset ++], property[property_offset ++], property[property_offset ++])
-            ESP_LOGD(TAG, "MQTT5_PROPERTY_MESSAGE_EXPIRY_INTERVAL %d", resp_property->message_expiry_interval);
+            ESP_LOGD(TAG, "MQTT5_PROPERTY_MESSAGE_EXPIRY_INTERVAL %"PRIu32, resp_property->message_expiry_interval);
             continue;
         case MQTT5_PROPERTY_TOPIC_ALIAS:
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(resp_property->topic_alias, property[property_offset ++], property[property_offset ++])
@@ -603,7 +603,7 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
         switch (property_id) {
         case MQTT5_PROPERTY_SESSION_EXPIRY_INTERVAL:
             MQTT5_CONVERT_ONE_BYTE_TO_FOUR(connection_property->session_expiry_interval, property[property_offset ++], property[property_offset ++], property[property_offset ++], property[property_offset ++])
-            ESP_LOGD(TAG, "MQTT5_PROPERTY_SESSION_EXPIRY_INTERVAL %d", connection_property->session_expiry_interval);
+            ESP_LOGD(TAG, "MQTT5_PROPERTY_SESSION_EXPIRY_INTERVAL %"PRIu32, connection_property->session_expiry_interval);
             continue;
         case MQTT5_PROPERTY_RECEIVE_MAXIMUM:
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(resp_property->receive_maximum, property[property_offset ++], property[property_offset ++])
@@ -619,7 +619,7 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
             continue;
         case MQTT5_PROPERTY_MAXIMUM_PACKET_SIZE:
             MQTT5_CONVERT_ONE_BYTE_TO_FOUR(resp_property->maximum_packet_size, property[property_offset ++], property[property_offset ++], property[property_offset ++], property[property_offset ++])
-            ESP_LOGD(TAG, "MQTT5_PROPERTY_MAXIMUM_PACKET_SIZE %d", resp_property->maximum_packet_size);
+            ESP_LOGD(TAG, "MQTT5_PROPERTY_MAXIMUM_PACKET_SIZE %"PRIu32, resp_property->maximum_packet_size);
             continue;
         case MQTT5_PROPERTY_ASSIGNED_CLIENT_IDENTIFIER:
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])

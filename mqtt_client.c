@@ -999,7 +999,7 @@ static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
     client->event.protocol_ver = client->mqtt_state.connection.information.protocol_ver;
     esp_err_t ret = ESP_FAIL;
 
-    #ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
+#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
     esp_event_post_to(client->config->event_loop_handle, MQTT_EVENTS, client->event.event_id, &client->event, sizeof(client->event), portMAX_DELAY);
     ret = esp_event_loop_run(client->config->event_loop_handle, 0);
 #else
@@ -1037,7 +1037,7 @@ static esp_err_t deliver_publish(esp_mqtt_client_handle_t client)
             ESP_LOGE(TAG, "%s: mqtt_get_publish_topic() failed", __func__);
             return ESP_FAIL;
         }
-        ESP_LOGD(TAG, "%s: msg_topic_len=%"PRIu32, __func__, msg_topic_len);
+        ESP_LOGD(TAG, "%s: msg_topic_len=%"NEWLIB_NANO_COMPAT_FORMAT, __func__, NEWLIB_NANO_COMPAT_CAST(msg_topic_len));
 
         // get payload
         msg_data = mqtt_get_publish_data(msg_buf, &msg_data_len);
@@ -1059,8 +1059,9 @@ static esp_err_t deliver_publish(esp_mqtt_client_handle_t client)
     client->event.dup = mqtt_get_dup(msg_buf);
     client->event.total_data_len = msg_data_len + msg_total_len - msg_read_len;
 post_data_event:
-    ESP_LOGD(TAG, "Get data len= %"PRIu32", topic len=%"PRIu32", total_data: %d offset: %"PRIu32, msg_data_len, msg_topic_len,
-             client->event.total_data_len, msg_data_offset);
+    ESP_LOGD(TAG, "Get data len= %"NEWLIB_NANO_COMPAT_FORMAT", topic len=%"NEWLIB_NANO_COMPAT_FORMAT", total_data: %d offset: %"NEWLIB_NANO_COMPAT_FORMAT,
+             NEWLIB_NANO_COMPAT_CAST(msg_data_len), NEWLIB_NANO_COMPAT_CAST(msg_topic_len),
+             client->event.total_data_len, NEWLIB_NANO_COMPAT_CAST(msg_data_offset));
     client->event.event_id = MQTT_EVENT_DATA;
     client->event.data = msg_data_len > 0 ? msg_data : NULL;
     client->event.data_len = msg_data_len;
@@ -1149,16 +1150,16 @@ static outbox_item_handle_t mqtt_enqueue(esp_mqtt_client_handle_t client, uint8_
 {
     ESP_LOGD(TAG, "mqtt_enqueue id: %d, type=%d successful",
              client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
-        outbox_message_t msg = { 0 };
-        msg.data = client->mqtt_state.connection.outbound_message.data;
-        msg.len =  client->mqtt_state.connection.outbound_message.length;
-        msg.msg_id = client->mqtt_state.pending_msg_id;
-        msg.msg_type = client->mqtt_state.pending_msg_type;
-        msg.msg_qos = client->mqtt_state.pending_publish_qos;
-        msg.remaining_data = remaining_data;
-        msg.remaining_len = remaining_len;
-        //Copy to queue buffer
-        return outbox_enqueue(client->outbox, &msg, platform_tick_get_ms());
+    outbox_message_t msg = { 0 };
+    msg.data = client->mqtt_state.connection.outbound_message.data;
+    msg.len =  client->mqtt_state.connection.outbound_message.length;
+    msg.msg_id = client->mqtt_state.pending_msg_id;
+    msg.msg_type = client->mqtt_state.pending_msg_type;
+    msg.msg_qos = client->mqtt_state.pending_publish_qos;
+    msg.remaining_data = remaining_data;
+    msg.remaining_len = remaining_len;
+    //Copy to queue buffer
+    return outbox_enqueue(client->outbox, &msg, platform_tick_get_ms());
 }
 
 
@@ -1218,7 +1219,7 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
         } while ((client->mqtt_state.in_buffer_read_len < 6) && (*(buf - 1) & 0x80));
     }
     total_len = mqtt_get_total_length(client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_read_len, &fixed_header_len);
-    ESP_LOGD(TAG, "%s: total message length: %d (already read: %"PRIu32")", __func__, total_len, client->mqtt_state.in_buffer_read_len);
+    ESP_LOGD(TAG, "%s: total message length: %d (already read: %"NEWLIB_NANO_COMPAT_FORMAT")", __func__, total_len, NEWLIB_NANO_COMPAT_CAST(client->mqtt_state.in_buffer_read_len));
     client->mqtt_state.message_length = total_len;
     if (client->mqtt_state.in_buffer_length < total_len) {
         if (mqtt_get_type(client->mqtt_state.in_buffer) == MQTT_MSG_TYPE_PUBLISH) {
@@ -1236,8 +1237,8 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
                 client->mqtt_state.in_buffer_read_len += read_len;
                 buf += read_len;
                 if (client->mqtt_state.in_buffer_read_len < fixed_header_len + 2) {
-                    ESP_LOGD(TAG, "%s: transport_read(): message reading left in progress :: total message length: %d (already read: %"PRIu32")",
-                             __func__, total_len, client->mqtt_state.in_buffer_read_len);
+                    ESP_LOGD(TAG, "%s: transport_read(): message reading left in progress :: total message length: %d (already read: %"NEWLIB_NANO_COMPAT_FORMAT")",
+                             __func__, total_len, NEWLIB_NANO_COMPAT_CAST(client->mqtt_state.in_buffer_read_len));
                     return 0;
                 }
             }
@@ -1266,12 +1267,13 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
         }
         client->mqtt_state.in_buffer_read_len += read_len;
         if (client->mqtt_state.in_buffer_read_len < total_len) {
-            ESP_LOGD(TAG, "%s: transport_read(): message reading left in progress :: total message length: %d (already read: %"PRIu32")",
-                     __func__, total_len, client->mqtt_state.in_buffer_read_len);
+            ESP_LOGD(TAG, "%s: transport_read(): message reading left in progress :: total message length: %d (already read: %"NEWLIB_NANO_COMPAT_FORMAT")",
+                     __func__, total_len, NEWLIB_NANO_COMPAT_CAST(client->mqtt_state.in_buffer_read_len));
             return 0;
         }
     }
-    ESP_LOGD(TAG, "%s: transport_read():%"PRIu32" %"PRIu32, __func__, client->mqtt_state.in_buffer_read_len, client->mqtt_state.message_length);
+    ESP_LOGD(TAG, "%s: transport_read():%"NEWLIB_NANO_COMPAT_FORMAT" %"NEWLIB_NANO_COMPAT_FORMAT, __func__,
+             NEWLIB_NANO_COMPAT_CAST(client->mqtt_state.in_buffer_read_len), NEWLIB_NANO_COMPAT_CAST(client->mqtt_state.message_length));
     return 1;
 err:
     esp_mqtt_client_dispatch_transport_error(client);
@@ -1313,7 +1315,8 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
 #ifdef MQTT_PROTOCOL_5
             esp_mqtt5_parse_suback(client);
 #endif
-            ESP_LOGD(TAG, "deliver_suback, message_length_read=%"PRIu32", message_length=%"PRIu32, client->mqtt_state.in_buffer_read_len, client->mqtt_state.message_length);
+            ESP_LOGD(TAG, "deliver_suback, message_length_read=%"NEWLIB_NANO_COMPAT_FORMAT", message_length=%"NEWLIB_NANO_COMPAT_FORMAT,
+                     NEWLIB_NANO_COMPAT_CAST(client->mqtt_state.in_buffer_read_len), NEWLIB_NANO_COMPAT_CAST(client->mqtt_state.message_length));
             if (deliver_suback(client) != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to deliver suback message id=%d", msg_id);
                 return ESP_FAIL;
@@ -1331,7 +1334,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
         }
         break;
     case MQTT_MSG_TYPE_PUBLISH:
-        ESP_LOGD(TAG, "deliver_publish, message_length_read=%"PRIu32", message_length=%"PRIu32, client->mqtt_state.in_buffer_read_len, client->mqtt_state.message_length);
+        ESP_LOGD(TAG, "deliver_publish, message_length_read=%"NEWLIB_NANO_COMPAT_FORMAT", message_length=%"NEWLIB_NANO_COMPAT_FORMAT, NEWLIB_NANO_COMPAT_CAST(client->mqtt_state.in_buffer_read_len), NEWLIB_NANO_COMPAT_CAST(client->mqtt_state.message_length));
         if (deliver_publish(client) != ESP_OK) {
             ESP_LOGE(TAG, "Failed to deliver publish message id=%d", msg_id);
             return ESP_FAIL;
@@ -1830,7 +1833,7 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
     }
 
     if (client->config->outbox_limit > 0 && outbox_get_size(client->outbox) > client->config->outbox_limit) {
-            return -2;
+        return -2;
     }
     MQTT_API_LOCK(client);
     if (client->state != MQTT_STATE_CONNECTED) {
