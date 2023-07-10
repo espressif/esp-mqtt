@@ -39,6 +39,14 @@
 extern "C" {
 #endif
 
+#if CONFIG_NEWLIB_NANO_FORMAT
+#define NEWLIB_NANO_COMPAT_FORMAT            PRIu32
+#define NEWLIB_NANO_COMPAT_CAST(size_t_var)  (uint32_t)size_t_var
+#else
+#define NEWLIB_NANO_COMPAT_FORMAT            "zu"
+#define NEWLIB_NANO_COMPAT_CAST(size_t_var)  size_t_var
+#endif
+
 #ifdef MQTT_DISABLE_API_LOCKS
 # define MQTT_API_LOCK(c)
 # define MQTT_API_UNLOCK(c)
