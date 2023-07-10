@@ -315,7 +315,10 @@ typedef struct esp_mqtt_client_config_t {
             int retain;  /*!< LWT retained message flag */
         } last_will; /*!< Last will configuration */
         bool disable_clean_session; /*!< *MQTT* clean session, default clean_session is true */
-        int keepalive;              /*!< *MQTT* keepalive, default is 120 seconds */
+        int keepalive;              /*!< *MQTT* keepalive, default is 120 seconds
+                                        When configuring this value, keep in mind that the client attempts
+                                        to communicate with the broker at half the interval that is actually set.
+                                        This conservative approach allows for more attempts before the broker's timeout occurs */
         bool disable_keepalive; /*!< Set `disable_keepalive=true` to turn off keep-alive mechanism, keepalive is active
                         by default. Note: setting the config value `keepalive` to `0` doesn't disable
                         keepalive feature, but uses a default keepalive period */
@@ -334,7 +337,7 @@ typedef struct esp_mqtt_client_config_t {
         bool disable_auto_reconnect;     /*!< Client will reconnect to server (when errors/disconnect). Set
                                  `disable_auto_reconnect=true` to disable */
         esp_transport_handle_t transport; /*!< Custom transport handle to use. Warning: The transport should be valid during the client lifetime and is destroyed when esp_mqtt_client_destroy is called. */
-        struct ifreq * if_name; /*!< The name of interface for data to go through. Use the default interface without setting */    
+        struct ifreq * if_name; /*!< The name of interface for data to go through. Use the default interface without setting */
     } network; /*!< Network configuration */
     /**
      * Client task configuration
