@@ -173,7 +173,7 @@ static void esp_mqtt5_print_error_code(esp_mqtt5_client_handle_t client, int cod
     case MQTT5_UNSUPPORTED_PROTOCOL_VER:
         ESP_LOGW(TAG, "Unsupported Protocol Version");
         break;
-    case MQTT5_INVAILD_CLIENT_ID:
+    case MQTT5_INVALID_CLIENT_ID:
         ESP_LOGW(TAG, "Client Identifier not valid");
         break;
     case MQTT5_BAD_USERNAME_OR_PWD:
@@ -203,10 +203,10 @@ static void esp_mqtt5_print_error_code(esp_mqtt5_client_handle_t client, int cod
     case MQTT5_SESSION_TAKEN_OVER:
         ESP_LOGW(TAG, "Session taken over");
         break;
-    case MQTT5_TOPIC_FILTER_INVAILD:
+    case MQTT5_TOPIC_FILTER_INVALID:
         ESP_LOGW(TAG, "Topic Filter invalid");
         break;
-    case MQTT5_TOPIC_NAME_INVAILD:
+    case MQTT5_TOPIC_NAME_INVALID:
         ESP_LOGW(TAG, "Topic Name invalid");
         break;
     case MQTT5_PACKET_IDENTIFIER_IN_USE:
@@ -218,7 +218,7 @@ static void esp_mqtt5_print_error_code(esp_mqtt5_client_handle_t client, int cod
     case MQTT5_RECEIVE_MAXIMUM_EXCEEDED:
         ESP_LOGW(TAG, "Receive Maximum exceeded");
         break;
-    case MQTT5_TOPIC_ALIAS_INVAILD:
+    case MQTT5_TOPIC_ALIAS_INVALID:
         ESP_LOGW(TAG, "Topic Alias invalid");
         break;
     case MQTT5_PACKET_TOO_LARGE:
@@ -233,7 +233,7 @@ static void esp_mqtt5_print_error_code(esp_mqtt5_client_handle_t client, int cod
     case MQTT5_ADMINISTRATIVE_ACTION:
         ESP_LOGW(TAG, "Administrative action");
         break;
-    case MQTT5_PAYLOAD_FORMAT_INVAILD:
+    case MQTT5_PAYLOAD_FORMAT_INVALID:
         ESP_LOGW(TAG, "Payload format invalid");
         break;
     case MQTT5_RETAIN_NOT_SUPPORT:
