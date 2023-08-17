@@ -19,41 +19,46 @@ typedef struct esp_mqtt_client *esp_mqtt5_client_handle_t;
  *  MQTT5 protocol error reason code, more details refer to MQTT5 protocol document section 2.4
  */
 enum mqtt5_error_reason_code {
-    MQTT5_UNSPECIFIED_ERROR                      = 0x80,
-    MQTT5_MALFORMED_PACKET                       = 0x81,
-    MQTT5_PROTOCOL_ERROR                         = 0x82,
-    MQTT5_IMPLEMENT_SPECIFIC_ERROR               = 0x83,
-    MQTT5_UNSUPPORTED_PROTOCOL_VER               = 0x84,
-    MQTT5_INVALID_CLIENT_ID                      = 0x85,
-    MQTT5_BAD_USERNAME_OR_PWD                    = 0x86,
-    MQTT5_NOT_AUTHORIZED                         = 0x87,
-    MQTT5_SERVER_UNAVAILABLE                     = 0x88,
-    MQTT5_SERVER_BUSY                            = 0x89,
-    MQTT5_BANNED                                 = 0x8A,
-    MQTT5_SERVER_SHUTTING_DOWN                   = 0x8B,
-    MQTT5_BAD_AUTH_METHOD                        = 0x8C,
-    MQTT5_KEEP_ALIVE_TIMEOUT                     = 0x8D,
-    MQTT5_SESSION_TAKEN_OVER                     = 0x8E,
-    MQTT5_TOPIC_FILTER_INVALID                   = 0x8F,
-    MQTT5_TOPIC_NAME_INVALID                     = 0x90,
-    MQTT5_PACKET_IDENTIFIER_IN_USE               = 0x91,
-    MQTT5_PACKET_IDENTIFIER_NOT_FOUND            = 0x92,
-    MQTT5_RECEIVE_MAXIMUM_EXCEEDED               = 0x93,
-    MQTT5_TOPIC_ALIAS_INVALID                    = 0x94,
-    MQTT5_PACKET_TOO_LARGE                       = 0x95,
-    MQTT5_MESSAGE_RATE_TOO_HIGH                  = 0x96,
-    MQTT5_QUOTA_EXCEEDED                         = 0x97,
-    MQTT5_ADMINISTRATIVE_ACTION                  = 0x98,
-    MQTT5_PAYLOAD_FORMAT_INVALID                 = 0x99,
-    MQTT5_RETAIN_NOT_SUPPORT                     = 0x9A,
-    MQTT5_QOS_NOT_SUPPORT                        = 0x9B,
-    MQTT5_USE_ANOTHER_SERVER                     = 0x9C,
-    MQTT5_SERVER_MOVED                           = 0x9D,
-    MQTT5_SHARED_SUBSCR_NOT_SUPPORTED            = 0x9E,
-    MQTT5_CONNECTION_RATE_EXCEEDED               = 0x9F,
-    MQTT5_MAXIMUM_CONNECT_TIME                   = 0xA0,
-    MQTT5_SUBSCRIBE_IDENTIFIER_NOT_SUPPORT       = 0xA1,
-    MQTT5_WILDCARD_SUBSCRIBE_NOT_SUPPORT         = 0xA2,
+    MQTT5_UNSPECIFIED_ERROR                                   = 0x80,
+    MQTT5_MALFORMED_PACKET                                    = 0x81,
+    MQTT5_PROTOCOL_ERROR                                      = 0x82,
+    MQTT5_IMPLEMENT_SPECIFIC_ERROR                            = 0x83,
+    MQTT5_UNSUPPORTED_PROTOCOL_VER                            = 0x84,
+    MQTT5_INVAILD_CLIENT_ID __attribute__((deprecated))       = 0x85,
+    MQTT5_INVALID_CLIENT_ID                                   = 0x85,
+    MQTT5_BAD_USERNAME_OR_PWD                                 = 0x86,
+    MQTT5_NOT_AUTHORIZED                                      = 0x87,
+    MQTT5_SERVER_UNAVAILABLE                                  = 0x88,
+    MQTT5_SERVER_BUSY                                         = 0x89,
+    MQTT5_BANNED                                              = 0x8A,
+    MQTT5_SERVER_SHUTTING_DOWN                                = 0x8B,
+    MQTT5_BAD_AUTH_METHOD                                     = 0x8C,
+    MQTT5_KEEP_ALIVE_TIMEOUT                                  = 0x8D,
+    MQTT5_SESSION_TAKEN_OVER                                  = 0x8E,
+    MQTT5_TOPIC_FILTER_INVAILD __attribute__((deprecated))    = 0x8F,
+    MQTT5_TOPIC_FILTER_INVALID                                = 0x8F,
+    MQTT5_TOPIC_NAME_INVAILD  __attribute__((deprecated))     = 0x90,
+    MQTT5_TOPIC_NAME_INVALID                                  = 0x90,
+    MQTT5_PACKET_IDENTIFIER_IN_USE                            = 0x91,
+    MQTT5_PACKET_IDENTIFIER_NOT_FOUND                         = 0x92,
+    MQTT5_RECEIVE_MAXIMUM_EXCEEDED                            = 0x93,
+    MQTT5_TOPIC_ALIAS_INVAILD  __attribute__((deprecated))    = 0x94,
+    MQTT5_TOPIC_ALIAS_INVALID                                 = 0x94,
+    MQTT5_PACKET_TOO_LARGE                                    = 0x95,
+    MQTT5_MESSAGE_RATE_TOO_HIGH                               = 0x96,
+    MQTT5_QUOTA_EXCEEDED                                      = 0x97,
+    MQTT5_ADMINISTRATIVE_ACTION                               = 0x98,
+    MQTT5_PAYLOAD_FORMAT_INVAILD  __attribute__((deprecated)) = 0x99,
+    MQTT5_PAYLOAD_FORMAT_INVALID                              = 0x99,
+    MQTT5_RETAIN_NOT_SUPPORT                                  = 0x9A,
+    MQTT5_QOS_NOT_SUPPORT                                     = 0x9B,
+    MQTT5_USE_ANOTHER_SERVER                                  = 0x9C,
+    MQTT5_SERVER_MOVED                                        = 0x9D,
+    MQTT5_SHARED_SUBSCR_NOT_SUPPORTED                         = 0x9E,
+    MQTT5_CONNECTION_RATE_EXCEEDED                            = 0x9F,
+    MQTT5_MAXIMUM_CONNECT_TIME                                = 0xA0,
+    MQTT5_SUBSCRIBE_IDENTIFIER_NOT_SUPPORT                    = 0xA1,
+    MQTT5_WILDCARD_SUBSCRIBE_NOT_SUPPORT                      = 0xA2,
 };
 
 /**
@@ -65,7 +70,7 @@ typedef struct mqtt5_user_property_list_t *mqtt5_user_property_handle_t;
  *  MQTT5 protocol connect properties and will properties configuration, more details refer to MQTT5 protocol document section 3.1.2.11 and 3.3.2.3
  */
 typedef struct {
-    uint32_t session_expiry_interval;            /*!< The interval time of session expiry */ 
+    uint32_t session_expiry_interval;            /*!< The interval time of session expiry */
     uint32_t maximum_packet_size;                /*!< The maximum packet size that we can receive */
     uint16_t receive_maximum;                    /*!< The maximum pakcket count that we process concurrently */
     uint16_t topic_alias_maximum;                /*!< The maximum topic alias that we support */
@@ -270,7 +275,7 @@ uint8_t esp_mqtt5_client_get_user_property_count(mqtt5_user_property_handle_t us
  * @brief Free the user property list
  *
  * @param user_property            user_property handle
- * 
+ *
  * This API will free the memory in user property list and free user_property itself
  */
 void esp_mqtt5_client_delete_user_property(mqtt5_user_property_handle_t user_property);
