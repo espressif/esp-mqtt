@@ -2091,6 +2091,7 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
             ESP_LOGD(TAG, "Sending fragmented message, remains to send %d bytes of %d", remaining_len, len);
             int write_len = remaining_len > connection->buffer_length ? connection->buffer_length : remaining_len;
             memcpy(connection->buffer, current_data, write_len);
+            connection->outbound_message.data = connection->buffer;
             connection->outbound_message.length = write_len;
             sending = true;
         } else {
