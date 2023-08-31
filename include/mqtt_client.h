@@ -356,9 +356,13 @@ typedef struct esp_mqtt_client_config_t {
         int out_size; /*!< size of *MQTT* output buffer. If not defined, defaults to the size defined by
               ``buffer_size`` */
     } buffer; /*!< Buffer size configuration.*/
+
+    /**
+     * Client outbox configuration options.
+     */
     struct outbox_config_t {
         uint64_t limit; /*!< Size limit for the outbox in bytes.*/
-    } outbox;
+    } outbox; /*!< Outbox configuration. */
 } esp_mqtt_client_config_t;
 
 /**
