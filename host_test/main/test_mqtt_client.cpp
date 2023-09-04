@@ -24,6 +24,10 @@ extern "C" {
 #include "Mockhttp_parser.h"
 #include "Mockqueue.h"
 #include "Mocktask.h"
+#if __has_include ("Mockidf_additions.h")
+/* Some functions were moved from "task.h" to "idf_additions.h" */
+#include "Mockidf_additions.h"
+#endif
 #include "Mockesp_timer.h"
 
     /*
