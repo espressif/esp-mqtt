@@ -383,9 +383,26 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
         });
     }
 
+    mqtt_msg_buffer_destroy(&client->mqtt_state.connection);
+    int buffer_size = config->buffer.size;
+    if (buffer_size <= 0) {
+        buffer_size = MQTT_BUFFER_SIZE_BYTE;
+    }
+
+    // use separate value for output buffer size if configured
+    int out_buffer_size = config->buffer.out_size > 0 ? config->buffer.out_size : buffer_size;
+    if (mqtt_msg_buffer_init(&client->mqtt_state.connection, out_buffer_size) != ESP_OK) {
+        goto _mqtt_set_config_failed;
+    }
+
+    free(client->mqtt_state.in_buffer);
+    client->mqtt_state.in_buffer = (uint8_t *)malloc(buffer_size);
+    ESP_MEM_CHECK(TAG, client->mqtt_state.in_buffer, goto _mqtt_set_config_failed);
+    client->mqtt_state.in_buffer_length = buffer_size;
+
     client->config->message_retransmit_timeout = config->session.message_retransmit_timeout;
     if (config->session.message_retransmit_timeout <= 0) {
-        client->config->message_retransmit_timeout = 1000;
+        client->config->message_retransmit_timeout = MQTT_DEFAULT_RETRANSMIT_TIMEOUT_MS;
     }
 
     client->config->task_prio = config->task.priority;
@@ -599,6 +616,8 @@ void esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
     if (client->config == NULL) {
         return;
     }
+    free(client->mqtt_state.in_buffer);
+    mqtt_msg_buffer_destroy(&client->mqtt_state.connection);
     free(client->config->host);
     free(client->config->uri);
     free(client->config->path);
@@ -807,6 +826,11 @@ static bool create_client_data(esp_mqtt_client_handle_t client)
     client->api_lock = xSemaphoreCreateRecursiveMutex();
     ESP_MEM_CHECK(TAG, client->api_lock, return false);
 
+    client->outbox = outbox_init();
+    ESP_MEM_CHECK(TAG, client->outbox, return false);
+    client->status_bits = xEventGroupCreate();
+    ESP_MEM_CHECK(TAG, client->status_bits, return false);
+
     return true;
 }
 
@@ -824,24 +848,6 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     if (!create_client_data(client)) {
         goto _mqtt_init_failed;
     }
-    int buffer_size = config->buffer.size;
-    if (buffer_size <= 0) {
-        buffer_size = MQTT_BUFFER_SIZE_BYTE;
-    }
-
-    // use separate value for output buffer size if configured
-    int out_buffer_size = config->buffer.out_size > 0 ? config->buffer.out_size : buffer_size;
-    if (mqtt_msg_buffer_init(&client->mqtt_state.connection, out_buffer_size) != ESP_OK) {
-        goto _mqtt_init_failed;
-    }
-
-    client->mqtt_state.in_buffer = (uint8_t *)malloc(buffer_size);
-    ESP_MEM_CHECK(TAG, client->mqtt_state.in_buffer, goto _mqtt_init_failed);
-    client->mqtt_state.in_buffer_length = buffer_size;
-    client->outbox = outbox_init();
-    ESP_MEM_CHECK(TAG, client->outbox, goto _mqtt_init_failed);
-    client->status_bits = xEventGroupCreate();
-    ESP_MEM_CHECK(TAG, client->status_bits, goto _mqtt_init_failed);
 
     if (esp_mqtt_set_config(client, config) != ESP_OK) {
         goto _mqtt_init_failed;
@@ -890,8 +896,6 @@ esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client)
     if (client->status_bits) {
         vEventGroupDelete(client->status_bits);
     }
-    free(client->mqtt_state.in_buffer);
-    mqtt_msg_buffer_destroy(&client->mqtt_state.connection);
     if (client->api_lock) {
         vSemaphoreDelete(client->api_lock);
     }
