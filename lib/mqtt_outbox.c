@@ -41,7 +41,7 @@ outbox_handle_t outbox_init(void)
 
 outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, outbox_message_handle_t message, outbox_tick_t tick)
 {
-    outbox_item_handle_t item = heap_caps_calloc(1, sizeof(outbox_item_t), MQTT_OUTBOX_MEMORY);
+    outbox_item_handle_t item = calloc(1, sizeof(outbox_item_t));
     ESP_MEM_CHECK(TAG, item, return NULL);
     item->msg_id = message->msg_id;
     item->msg_type = message->msg_type;
@@ -49,7 +49,7 @@ outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, outbox_message_handl
     item->tick = tick;
     item->len =  message->len + message->remaining_len;
     item->pending = QUEUED;
-    item->buffer = malloc(message->len + message->remaining_len);
+    item->buffer = heap_caps_malloc(message->len + message->remaining_len, MQTT_OUTBOX_MEMORY);
     ESP_MEM_CHECK(TAG, item->buffer, {
         free(item);
         return NULL;
