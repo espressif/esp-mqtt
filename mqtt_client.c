@@ -1348,29 +1348,29 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             ESP_LOGE(TAG, "Failed to deliver publish message id=%d", msg_id);
             return ESP_FAIL;
         }
-        if (msg_qos == 1) {
-            if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-#ifdef MQTT_PROTOCOL_5
-                mqtt5_msg_puback(&client->mqtt_state.connection, msg_id);
-#endif
-            } else {
-                mqtt_msg_puback(&client->mqtt_state.connection, msg_id);
-            }
-        } else if (msg_qos == 2) {
-            if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-#ifdef MQTT_PROTOCOL_5
-                mqtt5_msg_pubrec(&client->mqtt_state.connection, msg_id);
-#endif
-            } else {
-                mqtt_msg_pubrec(&client->mqtt_state.connection, msg_id);
-            }
-        }
-        if (client->mqtt_state.connection.outbound_message.length == 0) {
-            ESP_LOGE(TAG, "Publish response message PUBACK or PUBREC cannot be created");
-            return ESP_FAIL;
-        }
-
         if (msg_qos == 1 || msg_qos == 2) {
+            if (msg_qos == 1) {
+                if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
+#ifdef MQTT_PROTOCOL_5
+                    mqtt5_msg_puback(&client->mqtt_state.connection, msg_id);
+#endif
+                } else {
+                    mqtt_msg_puback(&client->mqtt_state.connection, msg_id);
+                }
+            } else if (msg_qos == 2) {
+                if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
+#ifdef MQTT_PROTOCOL_5
+                    mqtt5_msg_pubrec(&client->mqtt_state.connection, msg_id);
+#endif
+                } else {
+                    mqtt_msg_pubrec(&client->mqtt_state.connection, msg_id);
+                }
+            }
+            if (client->mqtt_state.connection.outbound_message.length == 0) {
+                ESP_LOGE(TAG, "Publish response message PUBACK or PUBREC cannot be created");
+                return ESP_FAIL;
+            }
+
             ESP_LOGD(TAG, "Queue response QoS: %d", msg_qos);
 
             if (esp_mqtt_write(client) != ESP_OK) {
