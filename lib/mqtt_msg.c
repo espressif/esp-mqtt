@@ -618,7 +618,7 @@ int mqtt_has_valid_msg_hdr(uint8_t *buffer, size_t length)
 
 esp_err_t mqtt_msg_buffer_init(mqtt_connection_t *connection, int buffer_size)
 {
-    memset(connection, 0, sizeof(mqtt_connection_t));
+    memset(&connection->outbound_message, 0, sizeof(mqtt_message_t));
     connection->buffer = (uint8_t *)calloc(buffer_size, sizeof(uint8_t));
     if (!connection->buffer) {
         return ESP_ERR_NO_MEM;

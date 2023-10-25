@@ -597,6 +597,9 @@ esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client);
  * @brief Set configuration structure, typically used when updating the config
  * (i.e. on "before_connect" event
  *
+ * Notes:
+ * - When calling this function make sure to have all the intendend configurations
+ *   set, otherwise default values are set.
  * @param client    *MQTT* client handle
  *
  * @param config    *MQTT* configuration structure
