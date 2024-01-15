@@ -214,7 +214,6 @@ typedef struct esp_mqtt_event_t {
 
 typedef esp_mqtt_event_t *esp_mqtt_event_handle_t;
 
-
 /**
  * *MQTT* client configuration structure
  *
@@ -250,20 +249,21 @@ typedef struct esp_mqtt_client_config_t {
             bool use_global_ca_store; /*!< Use a global ca_store, look esp-tls
                          documentation for details. */
             esp_err_t (*crt_bundle_attach)(void *conf); /*!< Pointer to ESP x509 Certificate Bundle attach function for
-                                                the usage of certificate bundles. */
-            const char *certificate; /*!< Certificate data, default is NULL, not required to verify the server. */
+                                                the usage of certificate bundles. Client only attach the bundle, the clean up must be done by the user. */
+            const char *certificate; /*!< Certificate data, default is NULL. It's not copied nor freed by the client, user needs to clean up.*/
             size_t certificate_len; /*!< Length of the buffer pointed to by certificate. */
             const struct psk_key_hint *psk_hint_key; /*!< Pointer to PSK struct defined in esp_tls.h to enable PSK
                                              authentication (as alternative to certificate verification).
                                              PSK is enabled only if there are no other ways to
-                                             verify broker.*/
+                                             verify broker. It's not copied nor freed by the client, user needs to clean up.*/
             bool skip_cert_common_name_check; /*!< Skip any validation of server certificate CN field, this reduces the
                                       security of TLS and makes the *MQTT* client susceptible to MITM attacks  */
-            const char **alpn_protos;        /*!< NULL-terminated list of supported application protocols to be used for ALPN */
-			const char *common_name;         /*!< Pointer to the string containing server certificate common name.
+            const char **alpn_protos;        /*!< NULL-terminated list of supported application protocols to be used for ALPN.*/
+            const char *common_name;         /*!< Pointer to the string containing server certificate common name.
                                                                If non-NULL, server certificate CN must match this name,
                                                                If NULL, server certificate CN must match hostname.
-                                                               This is ignored if skip_cert_common_name_check=true. */
+                                                               This is ignored if skip_cert_common_name_check=true.
+                                                  It's not copied nor freed by the client, user needs to clean up.*/
         } verification; /*!< Security verification of the broker */
     } broker; /*!< Broker address and security verification */
     /**
@@ -287,17 +287,17 @@ typedef struct esp_mqtt_client_config_t {
         struct authentication_t {
             const char *password;    /*!< *MQTT* password */
             const char *certificate; /*!< Certificate for ssl mutual authentication, not required if mutual
-                             authentication is not needed. Must be provided with `key`.*/
+                             authentication is not needed. Must be provided with `key`. It's not copied nor freed by the client, user needs to clean up.*/
             size_t certificate_len;  /*!< Length of the buffer pointed to by certificate.*/
             const char *key;       /*!< Private key for SSL mutual authentication, not required if mutual authentication
-                           is not needed. If it is not NULL, also `certificate` has to be provided.*/
+                           is not needed. If it is not NULL, also `certificate` has to be provided. It's not copied nor freed by the client, user needs to clean up.*/
             size_t key_len; /*!< Length of the buffer pointed to by key.*/
             const char *key_password; /*!< Client key decryption password, not PEM nor DER, if provided
-                               `key_password_len` must be correctly set. */
+                               `key_password_len` must be correctly set.*/
             int key_password_len;    /*!< Length of the password pointed to by `key_password` */
             bool use_secure_element; /*!< Enable secure element, available in ESP32-ROOM-32SE, for SSL connection */
             void *ds_data; /*!< Carrier of handle for digital signature parameters, digital signature peripheral is
-                   available in some Espressif devices. */
+                   available in some Espressif devices.  It's not copied nor freed by the client, user needs to clean up.*/
         } authentication; /*!< Client authentication */
     } credentials; /*!< User credentials for broker */
     /**
@@ -621,9 +621,9 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client,
  *         ESP_OK on success
  */
 esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client,
-        esp_mqtt_event_id_t event,
-        esp_event_handler_t event_handler,
-        void *event_handler_arg);
+                                         esp_mqtt_event_id_t event,
+                                         esp_event_handler_t event_handler,
+                                         void *event_handler_arg);
 
 /**
  * @brief Unregisters mqtt event
