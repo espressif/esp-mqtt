@@ -463,6 +463,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
  */
 #define esp_mqtt_client_subscribe(client_handle, topic_type, qos_or_size) _Generic((topic_type), \
       char *: esp_mqtt_client_subscribe_single, \
+      const char *: esp_mqtt_client_subscribe_single, \
       esp_mqtt_topic_t*: esp_mqtt_client_subscribe_multiple \
     )(client_handle, topic_type, qos_or_size)
 
