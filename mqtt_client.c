@@ -1658,6 +1658,11 @@ static void esp_mqtt_task(void *pv)
                 break;
             }
 
+            if (last_retransmit == 0) {
+                // connected for first time, set last_retransmit to now, avoid retransmit
+                last_retransmit = platform_tick_get_ms();
+            }
+
             // delete long pending messages
             mqtt_delete_expired_messages(client);
 
