@@ -1585,7 +1585,8 @@ static void esp_mqtt_task(void *pv)
     while (client->run) {
         MQTT_API_LOCK(client);
         run_event_loop(client);
-        switch (client->state) {
+        mqtt_client_state_t state = client->state;
+        switch (state) {
         case MQTT_STATE_DISCONNECTED:
             break;
         case MQTT_STATE_INIT:
@@ -1874,12 +1875,13 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
     if (client->config->outbox_limit > 0 && outbox_get_size(client->outbox) > client->config->outbox_limit) {
         return -2;
     }
-    MQTT_API_LOCK(client);
+
     if (client->state != MQTT_STATE_CONNECTED) {
         ESP_LOGE(TAG, "Client has not connected");
-        MQTT_API_UNLOCK(client);
         return -1;
     }
+
+    MQTT_API_LOCK(client);
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
         int max_qos = topic_list[0].qos;
@@ -1942,12 +1944,11 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
         ESP_LOGE(TAG, "Client was not initialized");
         return -1;
     }
-    MQTT_API_LOCK(client);
     if (client->state != MQTT_STATE_CONNECTED) {
-        MQTT_API_UNLOCK(client);
         ESP_LOGE(TAG, "Client has not connected");
         return -1;
     }
+    MQTT_API_LOCK(client);
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
         mqtt5_msg_unsubscribe(&client->mqtt_state.connection,
@@ -2049,15 +2050,14 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         ESP_LOGE(TAG, "Client was not initialized");
         return -1;
     }
-    MQTT_API_LOCK(client);
 #if MQTT_SKIP_PUBLISH_IF_DISCONNECTED
     if (client->state != MQTT_STATE_CONNECTED) {
         ESP_LOGI(TAG, "Publishing skipped: client is not connected");
-        MQTT_API_UNLOCK(client);
         return -1;
     }
 #endif
 
+MQTT_API_LOCK(client);
 #ifdef MQTT_PROTOCOL_5
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
         if (esp_mqtt5_client_publish_check(client, qos, retain) != ESP_OK) {

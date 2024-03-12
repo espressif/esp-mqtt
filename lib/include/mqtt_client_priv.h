@@ -114,7 +114,7 @@ struct esp_mqtt_client {
     esp_transport_handle_t transport;
     mqtt_config_storage_t *config;
     mqtt_state_t  mqtt_state;
-    mqtt_client_state_t state;
+    _Atomic mqtt_client_state_t state;
     uint64_t refresh_connection_tick;
     int64_t keepalive_tick;
     uint64_t reconnect_tick;
