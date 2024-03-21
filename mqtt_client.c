@@ -62,7 +62,7 @@ static int esp_mqtt_handle_transport_read_error(int err, esp_mqtt_client_handle_
             return -1;
         }
         // Not an error, continue
-        ESP_LOGD(TAG, "%s: transport_read(): call timed out before data was ready!", __func__);
+        ESP_LOGV(TAG, "%s: transport_read(): call timed out before data was ready!", __func__);
         return 0;
     }
 
@@ -1302,7 +1302,7 @@ static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_t
             return 0;
         }
     }
-    ESP_LOGD(TAG, "%s: transport_read():%"NEWLIB_NANO_COMPAT_FORMAT" %"NEWLIB_NANO_COMPAT_FORMAT, __func__,
+    ESP_LOGV(TAG, "%s: transport_read():%"NEWLIB_NANO_COMPAT_FORMAT" %"NEWLIB_NANO_COMPAT_FORMAT, __func__,
              NEWLIB_NANO_COMPAT_CAST(client->mqtt_state.in_buffer_read_len), NEWLIB_NANO_COMPAT_CAST(client->mqtt_state.message_length));
     return 1;
 err:
