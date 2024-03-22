@@ -24,7 +24,7 @@ typedef struct outbox_item {
 STAILQ_HEAD(outbox_list_t, outbox_item);
 
 struct outbox_t {
-    uint64_t size;
+    _Atomic uint64_t size;
     struct outbox_list_t *list;
 };
 
