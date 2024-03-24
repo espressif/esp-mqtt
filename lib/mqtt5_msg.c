@@ -763,7 +763,9 @@ mqtt_message_t *mqtt5_msg_publish(mqtt_connection_t *connection, const char *top
                     ESP_LOGE(TAG, "Failed to calloc %d memory", response_topic_size);
                     fail_message(connection);
                 }
-                snprintf(response_topic, response_topic_size, "%s/%s", property->response_topic, resp_info);
+                if (response_topic) { // makes the compiler happy
+                    snprintf(response_topic, response_topic_size, "%s/%s", property->response_topic, resp_info);
+                }
                 if (append_property(connection, MQTT5_PROPERTY_RESPONSE_TOPIC, 2, response_topic, response_topic_size) == -1) {
                     ESP_LOGE(TAG, "%s(%d) fail", __FUNCTION__, __LINE__);
                     free(response_topic);
