@@ -25,8 +25,13 @@ char *platform_create_id_string(void)
     uint8_t mac[6];
     char *id_string = calloc(1, MAX_ID_STRING);
     ESP_MEM_CHECK(TAG, id_string, return NULL);
+    #ifndef MAC_TYPE
+    ESP_LOGW(TAG, "Soc doesn't provide MAC, client could be disconnected in case of device with same name in the broker.");
+    sprintf(id_string, "esp_mqtt_client_id");
+    #else
     esp_read_mac(mac, MAC_TYPE);
     sprintf(id_string, "ESP32_%02x%02X%02X", mac[3], mac[4], mac[5]);
+    #endif
     return id_string;
 }
 
