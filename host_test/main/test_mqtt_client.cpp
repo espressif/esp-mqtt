@@ -9,8 +9,7 @@
 #include <string_view>
 #include <type_traits>
 #include "esp_transport.h"
-#define CATCH_CONFIG_MAIN  // This tells the catch header to generate a main
-#include "catch.hpp"
+#include <catch2/catch_test_macros.hpp>
 
 #include "mqtt_client.h"
 extern "C" {
