@@ -944,6 +944,9 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
     // This API could be also executed when client is active (need to protect config fields)
     MQTT_API_LOCK(client);
     // set uri overrides actual scheme, host, path if configured previously
+// False-positive leak detection. TODO: GCC-366
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
     free(client->config->scheme);
     free(client->config->host);
     free(client->config->path);
@@ -951,6 +954,7 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
     client->config->scheme = create_string(uri + puri.field_data[UF_SCHEMA].off, puri.field_data[UF_SCHEMA].len);
     client->config->host = create_string(uri + puri.field_data[UF_HOST].off, puri.field_data[UF_HOST].len);
     client->config->path = NULL;
+#pragma GCC diagnostic pop
 
     if (puri.field_data[UF_PATH].len || puri.field_data[UF_QUERY].len) {
         int asprintf_ret_value;
