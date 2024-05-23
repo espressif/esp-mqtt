@@ -724,11 +724,12 @@ mqtt_message_t *mqtt5_msg_publish(mqtt_connection_t *connection, const char *top
 {
     init_message(connection);
 
-    if (topic == NULL || topic[0] == '\0') {
+    if ((topic == NULL || topic[0] == '\0') &&  (!property || !property->topic_alias)){
+        ESP_LOGE(TAG, "Message must have a topic filter or a topic alias set");
         return fail_message(connection);
     }
-
-    APPEND_CHECK(append_property(connection, 0, 2, topic, strlen(topic)), fail_message(connection));
+    int topic_len = (topic == NULL || topic[0] == '\0') ? 0 : strlen(topic);
+    APPEND_CHECK(append_property(connection, 0, 2, topic, topic_len), fail_message(connection));
 
     if (data == NULL && data_length > 0) {
         return fail_message(connection);
@@ -809,18 +810,21 @@ mqtt_message_t *mqtt5_msg_publish(mqtt_connection_t *connection, const char *top
 int mqtt5_msg_get_reason_code(uint8_t *buffer, size_t length)
 {
     uint8_t len_bytes = 0;
-    size_t offset = 1;
-    size_t totlen = get_variable_len(buffer, offset, length, &len_bytes);
+    size_t offset = 1; // Message type
+    size_t variable_len = get_variable_len(buffer, offset, length, &len_bytes);
     offset += len_bytes;
-    totlen += offset;
 
     switch (mqtt5_get_type(buffer)) {
     case MQTT_MSG_TYPE_PUBACK:
     case MQTT_MSG_TYPE_PUBREC:
     case MQTT_MSG_TYPE_PUBREL:
     case MQTT_MSG_TYPE_PUBCOMP:
+        if(variable_len == 2) {
+                return 0;
+        }
         offset += 2; //skip the message id
         if (offset >= length) {
+            ESP_LOGE(TAG, "Invalid control packet, reason code is absent");
             return -1;
         }
         return buffer[offset];
@@ -833,10 +837,10 @@ int mqtt5_msg_get_reason_code(uint8_t *buffer, size_t length)
         size_t property_len = get_variable_len(buffer, offset, length, &len_bytes);
         offset = offset + len_bytes + property_len;
         if (offset >= length) {
+            ESP_LOGE(TAG, "Invalid control packet, reason code is absent");
             return -1;
-        } else {
-            return buffer[offset];
         }
+        return buffer[offset];
     }
     case MQTT_MSG_TYPE_DISCONNECT:
         if (offset >= length) {
