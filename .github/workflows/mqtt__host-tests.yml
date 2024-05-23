@@ -43,7 +43,7 @@ jobs:
        - name: Run gcovr
          shell: bash
          run: |
-           python -m pip install gcovr
+           python -m pip install gcovr --break-system-packages
            cd $IDF_PATH/${{ env.COMP_DIR }}
            gcov -b host_test/main/mqtt_client.c. -o  `find . -name "mqtt_client*gcda" -exec dirname {} \;`
            gcovr --gcov-ignore-parse-errors -g -k -r . --html index.html -x esp_mqtt_coverage.xml
