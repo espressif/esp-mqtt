@@ -1574,6 +1574,8 @@ static void esp_mqtt_task(void *pv)
     while (client->run) {
         MQTT_API_LOCK(client);
         run_event_loop(client);
+        // delete long pending messages
+        mqtt_delete_expired_messages(client);
         mqtt_client_state_t state = client->state;
         switch (state) {
         case MQTT_STATE_DISCONNECTED:
@@ -1653,8 +1655,6 @@ static void esp_mqtt_task(void *pv)
                 last_retransmit = platform_tick_get_ms();
             }
 
-            // delete long pending messages
-            mqtt_delete_expired_messages(client);
 
             // resend all non-transmitted messages first
             outbox_item_handle_t item = outbox_dequeue(client->outbox, QUEUED, NULL);
