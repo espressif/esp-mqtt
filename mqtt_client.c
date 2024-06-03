@@ -1513,21 +1513,6 @@ static esp_err_t mqtt_resend_queued(esp_mqtt_client_handle_t client, outbox_item
         return ESP_FAIL;
     }
 
-    // check if it was QoS-0 publish message
-    if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH) {
-        if (client->mqtt_state.pending_publish_qos == 0) {
-            // delete all qos0 publish messages once we process them
-            if (outbox_delete_item(client->outbox, item) != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to remove queued qos0 message from the outbox");
-            }
-        } else if (client->mqtt_state.pending_publish_qos > 0) {
-#ifdef MQTT_PROTOCOL_5
-            if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-                esp_mqtt5_increment_packet_counter(client);
-            }
-#endif
-        }
-    }
     return ESP_OK;
 }
 
@@ -1675,14 +1660,33 @@ static void esp_mqtt_task(void *pv)
             outbox_item_handle_t item = outbox_dequeue(client->outbox, QUEUED, NULL);
             if (item) {
                 if (mqtt_resend_queued(client, item) == ESP_OK) {
-                    outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED);
+                    if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH && client->mqtt_state.pending_publish_qos == 0) {
+                        // delete all qos0 publish messages once we process them
+                        if (outbox_delete_item(client->outbox, item) != ESP_OK) {
+                            ESP_LOGE(TAG, "Failed to remove queued qos0 message from the outbox");
+                        }
+                    }
+                    if (client->mqtt_state.pending_publish_qos > 0) {
+                        outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED);
+#ifdef MQTT_PROTOCOL_5
+                        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
+                            esp_mqtt5_increment_packet_counter(client);
+                        }
+#endif
+                    }
                 }
                 // resend other "transmitted" messages after 1s
             } else if (has_timed_out(last_retransmit, client->config->message_retransmit_timeout)) {
                 last_retransmit = platform_tick_get_ms();
                 item = outbox_dequeue(client->outbox, TRANSMITTED, &msg_tick);
                 if (item && (last_retransmit - msg_tick > client->config->message_retransmit_timeout))  {
-                    mqtt_resend_queued(client, item);
+                    if (mqtt_resend_queued(client, item) == ESP_OK) {
+#ifdef MQTT_PROTOCOL_5
+                        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
+                            esp_mqtt5_increment_packet_counter(client);
+                        }
+#endif
+                    }
                 }
             }
 
