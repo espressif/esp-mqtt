@@ -946,6 +946,7 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
     // set uri overrides actual scheme, host, path if configured previously
 // False-positive leak detection. TODO: GCC-366
 #pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpragmas"
 #pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
     free(client->config->scheme);
     free(client->config->host);
