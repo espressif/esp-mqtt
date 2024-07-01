@@ -526,9 +526,8 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     } else {
         client->config->reconnect_timeout_ms = MQTT_RECON_DEFAULT_MS;
     }
-    if (config->network.transport) {
-        client->config->transport = config->network.transport;
-    }
+    
+    client->config->transport = config->network.transport;
 
     if (config->network.if_name) {
         client->config->if_name = calloc(1, sizeof(struct ifreq) + 1);
