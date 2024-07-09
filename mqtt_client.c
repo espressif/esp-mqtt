@@ -2118,9 +2118,6 @@ MQTT_API_LOCK(client);
             ret = -1;
         }
 
-        // delete long pending messages
-        mqtt_delete_expired_messages(client);
-
         goto cannot_publish;
     }
 
