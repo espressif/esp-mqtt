@@ -24,11 +24,6 @@ static const char *TAG = "mqtt_client";
 ESP_EVENT_DEFINE_BASE(MQTT_EVENTS);
 #endif
 
-#define MQTT_OVER_TCP_SCHEME "mqtt"
-#define MQTT_OVER_SSL_SCHEME "mqtts"
-#define MQTT_OVER_WS_SCHEME  "ws"
-#define MQTT_OVER_WSS_SCHEME "wss"
-
 const static int STOPPED_BIT = (1 << 0);
 const static int RECONNECT_BIT = (1 << 1);
 const static int DISCONNECT_BIT = (1 << 2);
@@ -1587,9 +1582,6 @@ static void esp_mqtt_task(void *pv)
             break;
         case MQTT_STATE_INIT:
             xEventGroupClearBits(client->status_bits, RECONNECT_BIT | DISCONNECT_BIT);
-            client->event.event_id = MQTT_EVENT_BEFORE_CONNECT;
-            esp_mqtt_dispatch_event_with_msgid(client);
-
 
             client->transport = client->config->transport;
             if (!client->transport) {
@@ -1616,6 +1608,9 @@ static void esp_mqtt_task(void *pv)
 #if MQTT_ENABLE_SSL
             esp_mqtt_set_ssl_transport_properties(client->transport_list, client->config);
 #endif
+
+            client->event.event_id = MQTT_EVENT_BEFORE_CONNECT;
+            esp_mqtt_dispatch_event_with_msgid(client);
 
             if (esp_transport_connect(client->transport,
                                       client->config->host,
@@ -2281,4 +2276,14 @@ int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client)
     MQTT_API_UNLOCK(client);
 
     return outbox_size;
+}
+
+esp_transport_handle_t esp_mqtt_client_get_transport(esp_mqtt_client_handle_t client, char *transport_scheme){
+    if (client == NULL || (transport_scheme == NULL && client->config->transport == NULL)) {
+        return NULL;
+    }
+    if (transport_scheme == NULL && client->config->transport != NULL) {
+        return client->config->transport;
+    }
+    return esp_transport_list_get_transport(client->transport_list, transport_scheme);
 }
