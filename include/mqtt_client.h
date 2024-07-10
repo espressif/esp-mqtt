@@ -29,6 +29,11 @@ typedef void *esp_event_handler_t;
 
 typedef struct esp_mqtt_client *esp_mqtt_client_handle_t;
 
+#define MQTT_OVER_TCP_SCHEME "mqtt"
+#define MQTT_OVER_SSL_SCHEME "mqtts"
+#define MQTT_OVER_WS_SCHEME  "ws"
+#define MQTT_OVER_WSS_SCHEME "wss"
+
 /**
  * @brief *MQTT* event types.
  *
@@ -661,6 +666,27 @@ int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client);
  */
 esp_err_t esp_mqtt_dispatch_custom_event(esp_mqtt_client_handle_t client, esp_mqtt_event_t *event);
 
+/**
+ * @brief Get a transport from the scheme
+ *
+ * Allows extra settings to be made on the selected transport,
+ * for convenience the scheme used by the mqtt client are defined as
+ * MQTT_OVER_TCP_SCHEME, MQTT_OVER_SSL_SCHEME, MQTT_OVER_WS_SCHEME and MQTT_OVER_WSS_SCHEME
+ * If the transport_scheme is NULL and the client was set with a custom transport the custom transport will be returned.
+ *
+ * Notes:
+ * - This function should be called only on MQTT_EVENT_BEFORE_CONNECT.
+ * - The intetion is to provide a way to set different configurations than the ones available from client config.
+ * - If esp_mqtt_client_destroy is called the returned pointer will be invalidated.
+ * - All the required settings should be made in the MQTT_EVENT_BEFORE_CONNECT event handler
+ *
+ * @param client            *MQTT* client handle
+ * @param transport_scheme  Transport handle to search for.
+ * @return the transport handle
+ *         NULL in case of error
+ *
+*/
+esp_transport_handle_t esp_mqtt_client_get_transport(esp_mqtt_client_handle_t client, char *transport_scheme);
 #ifdef __cplusplus
 }
 #endif //__cplusplus
