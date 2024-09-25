@@ -341,6 +341,7 @@ typedef struct esp_mqtt_client_config_t {
         int refresh_connection_after_ms; /*!< Refresh connection after this value (in milliseconds) */
         bool disable_auto_reconnect;     /*!< Client will reconnect to server (when errors/disconnect). Set
                                  `disable_auto_reconnect=true` to disable */
+        esp_transport_keep_alive_t tcp_keep_alive_cfg;  /*!< Transport keep-alive config*/
         esp_transport_handle_t transport; /*!< Custom transport handle to use, leave it NULL to allow MQTT client create or recreate its own. Warning: The transport should be valid during the client lifetime and is destroyed when esp_mqtt_client_destroy is called. */
         struct ifreq * if_name; /*!< The name of interface for data to go through. Use the default interface without setting */
     } network; /*!< Network configuration */

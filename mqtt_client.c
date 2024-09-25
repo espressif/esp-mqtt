@@ -429,6 +429,10 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
         client->config->port = config->broker.address.port;
     }
 
+    if (config->network.tcp_keep_alive_cfg.keep_alive_enable) {
+        client->config->tcp_keep_alive_cfg = config->network.tcp_keep_alive_cfg;
+    }
+
     err = ESP_ERR_NO_MEM;
     ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->broker.address.hostname, &client->config->host), goto _mqtt_set_config_failed);
     ESP_MEM_CHECK(TAG, esp_mqtt_set_if_config(config->broker.address.path, &client->config->path), goto _mqtt_set_config_failed);
@@ -1626,6 +1630,10 @@ static void esp_mqtt_task(void *pv)
 #if MQTT_ENABLE_SSL
             esp_mqtt_set_ssl_transport_properties(client->transport_list, client->config);
 #endif
+
+            if(client->config->tcp_keep_alive_cfg.keep_alive_enable) {
+                esp_transport_tcp_set_keep_alive(client->transport, &client->config->tcp_keep_alive_cfg);
+            }
 
             client->event.event_id = MQTT_EVENT_BEFORE_CONNECT;
             esp_mqtt_dispatch_event_with_msgid(client);
