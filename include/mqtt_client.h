@@ -80,13 +80,13 @@ typedef enum esp_mqtt_event_id_t {
     MQTT_EVENT_BEFORE_CONNECT, /*!< The event occurs before connecting */
     MQTT_EVENT_DELETED,        /*!< Notification on delete of one message from the
                                 internal outbox,        if the message couldn't have been sent
-                                and acknowledged before expiring        defined in
+                                or acknowledged before expiring        defined in
                                 OUTBOX_EXPIRED_TIMEOUT_MS.        (events are not posted upon
                                 deletion of successfully acknowledged messages)
                                   - This event id is posted only if
                                 MQTT_REPORT_DELETED_MESSAGES==1
                                   - Additional context: msg_id (id of the deleted
-                                message).
+                                message, always 0 for QoS = 0 messages).
                                   */
     MQTT_USER_EVENT,            /*!< Custom event used to queue tasks into mqtt event handler
                                  All fields from the esp_mqtt_event_t type could be used to pass

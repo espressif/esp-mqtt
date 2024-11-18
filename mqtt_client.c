@@ -1544,7 +1544,7 @@ static void mqtt_delete_expired_messages(esp_mqtt_client_handle_t client)
 #if MQTT_REPORT_DELETED_MESSAGES
     // also report the deleted items as MQTT_EVENT_DELETED events if enabled
     int msg_id = 0;
-    while ((msg_id = outbox_delete_single_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS)) > 0) {
+    while ((msg_id = outbox_delete_single_expired(client->outbox, platform_tick_get_ms(), OUTBOX_EXPIRED_TIMEOUT_MS)) >= 0) {
         client->event.event_id = MQTT_EVENT_DELETED;
         client->event.msg_id = msg_id;
         if (esp_mqtt_dispatch_event(client) != ESP_OK) {
