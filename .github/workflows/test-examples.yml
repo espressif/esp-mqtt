@@ -28,21 +28,7 @@ jobs:
             matrix:
                 idf_version: ["release-v5.0", "release-v5.1", "latest"]
                 target: ["esp32s2", "esp32c3", "esp32s3"]
-                example: [{name: ssl_psk, path: "mqtt/ssl_psk"}]
-        uses: "./.github/workflows/build-app.yml"
-        with:
-            idf_version: ${{matrix.idf_version}}
-            target: ${{matrix.target}}
-            app_name: ${{matrix.example.name}}
-            app_path: $IDF_PATH/examples/protocols/${{matrix.example.path}}
-
-    build-only-ds-example:
-        name: Build Only Apps
-        strategy:
-            matrix:
-                idf_version: ["release-v5.0", "release-v5.1", "latest"]
-                target: ["esp32s2", "esp32c3", "esp32s3"]
-                example: [{name: ssl_ds, path: "mqtt/ssl_ds"}, {name: ssl_psk, path: "mqtt/ssl_psk"}]
+                example: [{name: ssl_psk, path: "mqtt/ssl_psk"}, {name: ssl_ds, path: "mqtt/ssl_ds"}]
         uses: "./.github/workflows/build-app.yml"
         with:
             idf_version: ${{matrix.idf_version}}

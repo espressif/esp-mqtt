@@ -18,7 +18,7 @@ jobs:
         COMP_DIR: components/mqtt/esp-mqtt
     steps:
        - name: Checkout esp-mqtt
-         uses: actions/checkout@v3
+         uses: actions/checkout@v4
        - name: Build and Test
          shell: bash
          run: |
@@ -66,7 +66,7 @@ jobs:
        - name: Write to Job Summary
          run: cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
        - name: Upload artifacts
-         uses: actions/upload-artifact@v3
+         uses: actions/upload-artifact@v4
          if: always()
          with:
            name: docs_gcovr
