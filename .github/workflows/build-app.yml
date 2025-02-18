@@ -31,7 +31,7 @@ jobs:
                 curl -fsSL https://deb.nodesource.com/setup_14.x | bash -
                 apt-get install -y nodejs
           - name: Checkout esp-mqtt
-            uses: actions/checkout@v3
+            uses: actions/checkout@v4
           - name: ccache
             uses: hendrikmuhs/ccache-action@v1.2
             with:
@@ -46,7 +46,7 @@ jobs:
               cp -r . $IDF_PATH/components/mqtt/esp-mqtt
               IDF_CCACHE_ENABLE=1 idf-build-apps build --config-file ci/idf_build_apps.toml -p ${{inputs.app_path}} -t ${{inputs.target}}
           - name: Upload files to artifacts for run-target job
-            uses: actions/upload-artifact@v3
+            uses: actions/upload-artifact@v4
             if: ${{inputs.upload_artifacts}}
             with:
               name: mqtt_bin_${{inputs.target}}_${{ inputs.idf_version }}_${{ inputs.app_name }}

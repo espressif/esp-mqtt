@@ -39,7 +39,7 @@ jobs:
                 ip route
                 echo runner_ip ="`ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'`" >> "$GITHUB_OUTPUT"
           - name: Checkout IDF ${{inputs.idf_version}}
-            uses: actions/checkout@v3
+            uses: actions/checkout@v4
             with:
                 repository: espressif/esp-idf
                 path: ${{env.IDF_PATH}}
@@ -49,7 +49,7 @@ jobs:
               PIP_EXTRA_INDEX_URL: "https://dl.espressif.com/pypi/"
             run: |
                 pip install --only-binary cryptography -r ${{env.IDF_PATH}}/tools/requirements/requirements.pytest.txt
-          - uses: actions/download-artifact@v3
+          - uses: actions/download-artifact@v4
             with:
               name: mqtt_bin_${{inputs.target}}_${{ inputs.idf_version }}_${{ inputs.app_name }}
               path: build
@@ -57,7 +57,7 @@ jobs:
           - name: Run ${{inputs.app_name}} application on ${{inputs.target}}
             run: |
                 python -m pytest ${{inputs.app_path}} --log-cli-level DEBUG --app-path . --junit-xml=./results_${{inputs.app_name}}_${{inputs.idf_version}}.xml --target=${{inputs.target}}
-          - uses: actions/upload-artifact@v3
+          - uses: actions/upload-artifact@v4
             if: always()
             with:
                 name: results_${{inputs.app_name}}_${{inputs.idf_version}}.xml
