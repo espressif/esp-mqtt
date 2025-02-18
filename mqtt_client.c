@@ -1511,6 +1511,18 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
          */
         client->keepalive_tick = platform_tick_get_ms();
         break;
+    case MQTT_MSG_TYPE_DISCONNECT:
+        ESP_LOGD(TAG, "MQTT_MSG_TYPE_DISCONNECT");
+#ifdef MQTT_PROTOCOL_5
+        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
+            int disconnect_rsp_code;
+            esp_mqtt5_parse_disconnect(client, &disconnect_rsp_code);
+            client->event.event_id = MQTT_EVENT_DISCONNECTED;
+            client->event.error_handle->disconnect_return_code = disconnect_rsp_code;
+            esp_mqtt_dispatch_event_with_msgid(client);
+        }
+#endif
+        break;
     }
 
     client->mqtt_state.in_buffer_read_len = 0;
@@ -2274,6 +2286,9 @@ static void esp_mqtt_client_dispatch_transport_error(esp_mqtt_client_handle_t cl
     client->event.event_id = MQTT_EVENT_ERROR;
     client->event.error_handle->error_type = MQTT_ERROR_TYPE_TCP_TRANSPORT;
     client->event.error_handle->connect_return_code = 0;
+#ifdef MQTT_PROTOCOL_5
+    client->event.error_handle->disconnect_return_code = 0;
+#endif
 #ifdef MQTT_SUPPORTED_FEATURE_TRANSPORT_ERR_REPORTING
     client->event.error_handle->esp_tls_last_esp_err = esp_tls_get_and_clear_last_error(esp_transport_get_error_handle(client->transport),
             &client->event.error_handle->esp_tls_stack_err,

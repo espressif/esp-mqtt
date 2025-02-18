@@ -42,6 +42,7 @@ void esp_mqtt5_parse_pubcomp(esp_mqtt5_client_handle_t client);
 void esp_mqtt5_parse_puback(esp_mqtt5_client_handle_t client);
 void esp_mqtt5_parse_unsuback(esp_mqtt5_client_handle_t client);
 void esp_mqtt5_parse_suback(esp_mqtt5_client_handle_t client);
+void esp_mqtt5_parse_disconnect(esp_mqtt5_client_handle_t client, int *disconnect_rsp_code);
 esp_err_t esp_mqtt5_parse_connack(esp_mqtt5_client_handle_t client, int *connect_rsp_code);
 void esp_mqtt5_client_destory(esp_mqtt5_client_handle_t client);
 esp_err_t esp_mqtt5_client_publish_check(esp_mqtt5_client_handle_t client, int qos, int retain);
