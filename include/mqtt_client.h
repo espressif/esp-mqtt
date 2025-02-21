@@ -182,6 +182,11 @@ typedef struct esp_mqtt_error_codes {
     esp_mqtt_connect_return_code_t
     connect_return_code; /*!< connection refused error code reported from
                               *MQTT* broker on connection */
+#ifdef CONFIG_MQTT_PROTOCOL_5
+    esp_mqtt5_error_reason_code_t
+    disconnect_return_code; /*!< disconnection reason code reported from
+                              *MQTT* broker on disconnection */
+#endif
     /* tcp_transport extension */
     int esp_transport_sock_errno; /*!< errno from the underlying socket */
 

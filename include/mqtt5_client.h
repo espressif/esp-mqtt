@@ -18,7 +18,7 @@ typedef struct esp_mqtt_client *esp_mqtt5_client_handle_t;
 /**
  *  MQTT5 protocol error reason code, more details refer to MQTT5 protocol document section 2.4
  */
-enum mqtt5_error_reason_code {
+typedef enum mqtt5_error_reason_code_t {
     MQTT5_UNSPECIFIED_ERROR                                   = 0x80,
     MQTT5_MALFORMED_PACKET                                    = 0x81,
     MQTT5_PROTOCOL_ERROR                                      = 0x82,
@@ -59,7 +59,7 @@ enum mqtt5_error_reason_code {
     MQTT5_MAXIMUM_CONNECT_TIME                                = 0xA0,
     MQTT5_SUBSCRIBE_IDENTIFIER_NOT_SUPPORT                    = 0xA1,
     MQTT5_WILDCARD_SUBSCRIBE_NOT_SUPPORT                      = 0xA2,
-};
+} esp_mqtt5_error_reason_code_t;
 
 /**
  *  MQTT5 user property handle
