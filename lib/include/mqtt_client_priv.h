@@ -114,8 +114,10 @@ typedef enum {
 } mqtt_client_state_t;
 
 struct esp_mqtt_client {
-    esp_transport_list_handle_t transport_list;
-    esp_transport_handle_t transport;
+    struct {
+        esp_transport_list_handle_t list;
+        esp_transport_handle_t handle;
+    } transport;
     mqtt_config_storage_t *config;
     mqtt_state_t  mqtt_state;
     _Atomic mqtt_client_state_t state;
