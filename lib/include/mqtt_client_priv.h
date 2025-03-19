@@ -121,9 +121,11 @@ struct esp_mqtt_client {
     mqtt_config_storage_t *config;
     mqtt_state_t  mqtt_state;
     _Atomic mqtt_client_state_t state;
-    uint64_t refresh_connection_tick;
-    int64_t keepalive_tick;
-    uint64_t reconnect_tick;
+    struct {
+        uint64_t refresh_connection;
+        uint64_t keepalive;
+        uint64_t reconnect;
+    } tick;
 #ifdef MQTT_PROTOCOL_5
     mqtt5_config_storage_t *mqtt5_config;
     uint16_t send_publish_packet_count; // This is for MQTT v5.0 flow control

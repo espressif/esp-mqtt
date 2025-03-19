@@ -736,7 +736,7 @@ static esp_err_t process_keepalive(esp_mqtt_client_handle_t client)
         const uint64_t keepalive_ms = client->mqtt_state.connection.information.keepalive * 1000;
 
         if (client->wait_for_ping_resp == true) {
-            if (has_timed_out(client->keepalive_tick, keepalive_ms)) {
+            if (has_timed_out(client->tick.keepalive, keepalive_ms)) {
                 ESP_LOGE(TAG, "No PING_RESP, disconnected");
                 esp_mqtt_abort_connection(client);
                 client->wait_for_ping_resp = false;
@@ -746,7 +746,7 @@ static esp_err_t process_keepalive(esp_mqtt_client_handle_t client)
             return ESP_OK;
         }
 
-        if (has_timed_out(client->keepalive_tick, keepalive_ms / 2)) {
+        if (has_timed_out(client->tick.keepalive, keepalive_ms / 2)) {
             if (esp_mqtt_client_ping(client) == ESP_FAIL) {
                 ESP_LOGE(TAG, "Can't send ping, disconnected");
                 esp_mqtt_abort_connection(client);
@@ -946,7 +946,7 @@ static void esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
     MQTT_API_LOCK(client);
     esp_transport_close(client->transport.handle);
     client->wait_timeout_ms = client->config->reconnect_timeout_ms;
-    client->reconnect_tick = platform_tick_get_ms();
+    client->tick.reconnect = platform_tick_get_ms();
     client->state = MQTT_STATE_WAIT_RECONNECT;
     ESP_LOGD(TAG, "Reconnect after %d ms", client->wait_timeout_ms);
     client->event.event_id = MQTT_EVENT_DISCONNECTED;
@@ -997,9 +997,9 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
 #if MQTT_EVENT_QUEUE_SIZE > 1
     atomic_init(&client->queued_events, 0);
 #endif
-    client->keepalive_tick = platform_tick_get_ms();
-    client->reconnect_tick = platform_tick_get_ms();
-    client->refresh_connection_tick = platform_tick_get_ms();
+    client->tick.keepalive = platform_tick_get_ms();
+    client->tick.reconnect = platform_tick_get_ms();
+    client->tick.refresh_connection = platform_tick_get_ms();
     client->wait_for_ping_resp = false;
 #ifdef MQTT_PROTOCOL_5
 
@@ -1768,7 +1768,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
          * Packets, the Client MUST send a PINGREQ Packet [MQTT-3.1.2-23].
          * [MQTT-3.1.2-23]
          */
-        client->keepalive_tick = platform_tick_get_ms();
+        client->tick.keepalive = platform_tick_get_ms();
         esp_mqtt_dispatch_keepalive_event(client, MQTT_KEEPALIVE_PINGRESP);
         break;
 
@@ -2003,8 +2003,8 @@ static void esp_mqtt_task(void *pv)
 
             client->state = MQTT_STATE_CONNECTED;
             esp_mqtt_dispatch_event_with_msgid(client);
-            client->refresh_connection_tick = platform_tick_get_ms();
-            client->keepalive_tick = platform_tick_get_ms();
+            client->tick.refresh_connection = platform_tick_get_ms();
+            client->tick.keepalive = platform_tick_get_ms();
             break;
 
         case MQTT_STATE_CONNECTED:
@@ -2089,7 +2089,7 @@ static void esp_mqtt_task(void *pv)
             }
 
             if (client->config->refresh_connection_after_ms &&
-                    has_timed_out(client->refresh_connection_tick, client->config->refresh_connection_after_ms)) {
+                    has_timed_out(client->tick.refresh_connection, client->config->refresh_connection_after_ms)) {
                 ESP_LOGD(TAG, "Refreshing the connection...");
                 esp_mqtt_abort_connection(client);
                 client->state = MQTT_STATE_INIT;
@@ -2105,9 +2105,9 @@ static void esp_mqtt_task(void *pv)
                 ESP_LOGD(TAG, "Reconnecting per user request...");
                 break;
             } else if (client->config->auto_reconnect &&
-                       platform_tick_get_ms() - client->reconnect_tick > client->wait_timeout_ms) {
+                       platform_tick_get_ms() - client->tick.reconnect > client->wait_timeout_ms) {
                 client->state = MQTT_STATE_INIT;
-                client->reconnect_tick = platform_tick_get_ms();
+                client->tick.reconnect = platform_tick_get_ms();
                 ESP_LOGD(TAG, "Reconnecting...");
                 break;
             }
