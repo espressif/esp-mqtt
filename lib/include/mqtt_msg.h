@@ -19,6 +19,8 @@ extern "C" {
 /*|      --- Message Type----     |  DUP Flag |    QoS Level    | Retain  | */
 /*                    Remaining Length                 */
 
+typedef struct mqtt_connection mqtt_connection_t;
+
 enum mqtt_message_type {
     MQTT_MSG_TYPE_CONNECT = 1,
     MQTT_MSG_TYPE_CONNACK = 2,
@@ -36,11 +38,14 @@ enum mqtt_message_type {
     MQTT_MSG_TYPE_DISCONNECT = 14
 };
 
+
 typedef struct mqtt_message {
-    uint8_t *data;
     size_t length;
     size_t fragmented_msg_total_length;       /*!< total len of fragmented messages (zero for all other messages) */
     size_t fragmented_msg_data_offset;        /*!< data offset of fragmented messages (zero for all other messages) */
+    uint8_t *data;
+    uint8_t *buffer;
+    size_t buffer_length;
 } mqtt_message_t;
 
 typedef struct mqtt_connect_info {
@@ -57,16 +62,6 @@ typedef struct mqtt_connect_info {
     esp_mqtt_protocol_ver_t protocol_ver;
 } mqtt_connect_info_t;
 
-typedef struct mqtt_connection {
-    mqtt_message_t outbound_message;
-#if MQTT_MSG_ID_INCREMENTAL
-    uint16_t last_message_id;   /*!< last used id if incremental message id configured */
-#endif
-    uint8_t *buffer;
-    size_t buffer_length;
-    mqtt_connect_info_t information;
-
-} mqtt_connection_t;
 
 static inline int mqtt_get_type(const uint8_t *buffer)
 {

@@ -55,6 +55,14 @@ extern "C" {
 # define MQTT_API_UNLOCK(c)        xSemaphoreGiveRecursive(c->api_lock)
 #endif /* MQTT_USE_API_LOCKS */
 
+typedef struct mqtt_connection {
+    mqtt_message_t outbound_message;
+#if MQTT_MSG_ID_INCREMENTAL
+    uint16_t last_message_id;   /*!< last used id if incremental message id configured */
+#endif
+    mqtt_connect_info_t information;
+} mqtt_connection_t;
+
 typedef struct mqtt_state {
     uint8_t *in_buffer;
     int in_buffer_length;
