@@ -421,7 +421,8 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
         });
     }
 
-    mqtt_msg_buffer_destroy(&client->mqtt_state.connection);
+    uint16_t last_message_id = client->mqtt_state.connection.outbound_message.last_message_id;
+    mqtt_msg_buffer_destroy(&client->mqtt_state.connection.outbound_message);
     int buffer_size = config->buffer.size;
 
     if (buffer_size <= 0) {
@@ -431,10 +432,11 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     // use separate value for output buffer size if configured
     int out_buffer_size = config->buffer.out_size > 0 ? config->buffer.out_size : buffer_size;
 
-    if (mqtt_msg_buffer_init(&client->mqtt_state.connection, out_buffer_size) != ESP_OK) {
+    if (mqtt_msg_buffer_init(&client->mqtt_state.connection.outbound_message, out_buffer_size) != ESP_OK) {
         goto _mqtt_set_config_failed;
     }
 
+    client->mqtt_state.connection.outbound_message.last_message_id = last_message_id;
     free(client->mqtt_state.in_buffer);
     client->mqtt_state.in_buffer = (uint8_t *)heap_caps_malloc(buffer_size, MQTT_BUFFER_MEMORY);
     ESP_MEM_CHECK(TAG, client->mqtt_state.in_buffer, goto _mqtt_set_config_failed);
@@ -691,7 +693,7 @@ void esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
     }
 
     free(client->mqtt_state.in_buffer);
-    mqtt_msg_buffer_destroy(&client->mqtt_state.connection);
+    mqtt_msg_buffer_destroy(&client->mqtt_state.connection.outbound_message);
     free(client->config->host);
     free(client->config->uri);
     free(client->config->path);
@@ -835,12 +837,12 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
 
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
-        mqtt5_msg_connect(&client->mqtt_state.connection,
+        mqtt5_msg_connect(&client->mqtt_state.connection.outbound_message,
                           &client->mqtt_state.connection.information, &client->mqtt5_config->connect_property_info,
                           &client->mqtt5_config->will_property_info);
 #endif
     } else {
-        mqtt_msg_connect(&client->mqtt_state.connection,
+        mqtt_msg_connect(&client->mqtt_state.connection.outbound_message,
                          &client->mqtt_state.connection.information);
     }
 
@@ -1647,18 +1649,18 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             if (msg_qos == 1) {
                 if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
-                    mqtt5_msg_puback(&client->mqtt_state.connection, msg_id);
+                    mqtt5_msg_puback(&client->mqtt_state.connection.outbound_message, msg_id);
 #endif
                 } else {
-                    mqtt_msg_puback(&client->mqtt_state.connection, msg_id);
+                    mqtt_msg_puback(&client->mqtt_state.connection.outbound_message, msg_id);
                 }
             } else if (msg_qos == 2) {
                 if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
-                    mqtt5_msg_pubrec(&client->mqtt_state.connection, msg_id);
+                    mqtt5_msg_pubrec(&client->mqtt_state.connection.outbound_message, msg_id);
 #endif
                 } else {
-                    mqtt_msg_pubrec(&client->mqtt_state.connection, msg_id);
+                    mqtt_msg_pubrec(&client->mqtt_state.connection.outbound_message, msg_id);
                 }
             }
 
@@ -1703,10 +1705,10 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
 #ifdef MQTT_PROTOCOL_5
             ESP_LOGI(TAG, "MQTT_MSG_TYPE_PUBREC return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer,
                                                                                               client->mqtt_state.in_buffer_read_len));
-            mqtt5_msg_pubrel(&client->mqtt_state.connection, msg_id);
+            mqtt5_msg_pubrel(&client->mqtt_state.connection.outbound_message, msg_id);
 #endif
         } else {
-            mqtt_msg_pubrel(&client->mqtt_state.connection, msg_id);
+            mqtt_msg_pubrel(&client->mqtt_state.connection.outbound_message, msg_id);
         }
 
         if (client->mqtt_state.connection.outbound_message.length == 0) {
@@ -1725,10 +1727,10 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
 #ifdef MQTT_PROTOCOL_5
             ESP_LOGI(TAG, "MQTT_MSG_TYPE_PUBREL return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer,
                                                                                               client->mqtt_state.in_buffer_read_len));
-            mqtt5_msg_pubcomp(&client->mqtt_state.connection, msg_id);
+            mqtt5_msg_pubcomp(&client->mqtt_state.connection.outbound_message, msg_id);
 #endif
         } else {
-            mqtt_msg_pubcomp(&client->mqtt_state.connection, msg_id);
+            mqtt_msg_pubcomp(&client->mqtt_state.connection.outbound_message, msg_id);
         }
 
         if (client->mqtt_state.connection.outbound_message.length == 0) {
@@ -1848,10 +1850,10 @@ static esp_err_t mqtt_resend_pubrel(esp_mqtt_client_handle_t client, outbox_item
 
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
-        mqtt5_msg_pubrel(&client->mqtt_state.connection, client->mqtt_state.pending_msg_id);
+        mqtt5_msg_pubrel(&client->mqtt_state.connection.outbound_message, client->mqtt_state.pending_msg_id);
 #endif
     } else {
-        mqtt_msg_pubrel(&client->mqtt_state.connection, client->mqtt_state.pending_msg_id);
+        mqtt_msg_pubrel(&client->mqtt_state.connection.outbound_message, client->mqtt_state.pending_msg_id);
     }
 
     if (client->mqtt_state.connection.outbound_message.length == 0) {
@@ -2229,7 +2231,7 @@ static esp_err_t send_disconnect_msg(esp_mqtt_client_handle_t client)
     // Notify the broker we are disconnecting
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
-        mqtt5_msg_disconnect(&client->mqtt_state.connection, &client->mqtt5_config->disconnect_property_info);
+        mqtt5_msg_disconnect(&client->mqtt_state.connection.outbound_message, &client->mqtt5_config->disconnect_property_info);
 
         if (client->mqtt_state.connection.outbound_message.length) {
             esp_mqtt5_client_delete_user_property(client->mqtt5_config->disconnect_property_info.user_property);
@@ -2239,7 +2241,7 @@ static esp_err_t send_disconnect_msg(esp_mqtt_client_handle_t client)
 
 #endif
     } else {
-        mqtt_msg_disconnect(&client->mqtt_state.connection);
+        mqtt_msg_disconnect(&client->mqtt_state.connection.outbound_message);
     }
 
     if (client->mqtt_state.connection.outbound_message.length == 0) {
@@ -2293,7 +2295,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 
 static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client)
 {
-    mqtt_msg_pingreq(&client->mqtt_state.connection);
+    mqtt_msg_pingreq(&client->mqtt_state.connection.outbound_message);
 
     if (client->mqtt_state.connection.outbound_message.length == 0) {
         ESP_LOGE(TAG, "Ping message cannot be created");
@@ -2348,7 +2350,7 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
 
         const esp_mqtt5_subscribe_property_config_t *property =
             esp_mqtt5_staged_property_get(&client->mqtt5_config->subscribe_property);
-        mqtt5_msg_subscribe(&client->mqtt_state.connection,
+        mqtt5_msg_subscribe(&client->mqtt_state.connection.outbound_message,
                             topic_list, size,
                             &client->mqtt_state.pending_msg_id, property);
 
@@ -2358,7 +2360,7 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
 
 #endif
     } else {
-        mqtt_msg_subscribe(&client->mqtt_state.connection,
+        mqtt_msg_subscribe(&client->mqtt_state.connection.outbound_message,
                            topic_list, size,
                            &client->mqtt_state.pending_msg_id);
     }
@@ -2416,7 +2418,7 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
 #ifdef MQTT_PROTOCOL_5
         const esp_mqtt5_unsubscribe_property_config_t *property =
             esp_mqtt5_staged_property_get(&client->mqtt5_config->unsubscribe_property);
-        mqtt5_msg_unsubscribe(&client->mqtt_state.connection,
+        mqtt5_msg_unsubscribe(&client->mqtt_state.connection.outbound_message,
                               topic,
                               &client->mqtt_state.pending_msg_id, property);
 
@@ -2426,7 +2428,7 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
 
 #endif
     } else {
-        mqtt_msg_unsubscribe(&client->mqtt_state.connection,
+        mqtt_msg_unsubscribe(&client->mqtt_state.connection.outbound_message,
                              topic,
                              &client->mqtt_state.pending_msg_id);
     }
@@ -2468,7 +2470,7 @@ static int make_publish(esp_mqtt_client_handle_t client, const char *topic, cons
 #ifdef MQTT_PROTOCOL_5
         const esp_mqtt5_publish_property_config_t *property =
             esp_mqtt5_staged_property_get(&client->mqtt5_config->publish_property);
-        mqtt5_msg_publish(&client->mqtt_state.connection,
+        mqtt5_msg_publish(&client->mqtt_state.connection.outbound_message,
                           topic, data, len,
                           qos, retain,
                           &pending_msg_id, property,
@@ -2480,7 +2482,7 @@ static int make_publish(esp_mqtt_client_handle_t client, const char *topic, cons
 
 #endif
     } else {
-        mqtt_msg_publish(&client->mqtt_state.connection,
+        mqtt_msg_publish(&client->mqtt_state.connection.outbound_message,
                          topic, data, len,
                          qos, retain,
                          &pending_msg_id);

@@ -19,8 +19,6 @@ extern "C" {
 /*|      --- Message Type----     |  DUP Flag |    QoS Level    | Retain  | */
 /*                    Remaining Length                 */
 
-typedef struct mqtt_connection mqtt_connection_t;
-
 enum mqtt_message_type {
     MQTT_MSG_TYPE_CONNECT = 1,
     MQTT_MSG_TYPE_CONNACK = 2,
@@ -38,7 +36,6 @@ enum mqtt_message_type {
     MQTT_MSG_TYPE_DISCONNECT = 14
 };
 
-
 typedef struct mqtt_message {
     size_t length;
     size_t fragmented_msg_total_length;       /*!< total len of fragmented messages (zero for all other messages) */
@@ -46,6 +43,7 @@ typedef struct mqtt_message {
     uint8_t *data;
     uint8_t *buffer;
     size_t buffer_length;
+    uint16_t last_message_id;                 /*!< last generated id when incremental message ids are configured */
 } mqtt_message_t;
 
 typedef struct mqtt_connect_info {
@@ -61,7 +59,6 @@ typedef struct mqtt_connect_info {
     int clean_session;
     esp_mqtt_protocol_ver_t protocol_ver;
 } mqtt_connect_info_t;
-
 
 static inline int mqtt_get_type(const uint8_t *buffer)
 {
@@ -100,22 +97,20 @@ char *mqtt_get_suback_data(uint8_t *buffer, size_t *length);
 uint16_t mqtt_get_id(uint8_t *buffer, size_t length);
 int mqtt_has_valid_msg_hdr(uint8_t *buffer, size_t length);
 
-esp_err_t mqtt_msg_buffer_init(mqtt_connection_t *connection, int buffer_size);
-void mqtt_msg_buffer_destroy(mqtt_connection_t *connection);
+esp_err_t mqtt_msg_buffer_init(mqtt_message_t *message, int buffer_size);
+void mqtt_msg_buffer_destroy(mqtt_message_t *message);
 
-mqtt_message_t *mqtt_msg_connect(mqtt_connection_t *connection, mqtt_connect_info_t *info);
-mqtt_message_t *mqtt_msg_publish(mqtt_connection_t *connection, const char *topic, const char *data, int data_length,
-                                 int qos, int retain, uint16_t *message_id);
-mqtt_message_t *mqtt_msg_puback(mqtt_connection_t *connection, uint16_t message_id);
-mqtt_message_t *mqtt_msg_pubrec(mqtt_connection_t *connection, uint16_t message_id);
-mqtt_message_t *mqtt_msg_pubrel(mqtt_connection_t *connection, uint16_t message_id);
-mqtt_message_t *mqtt_msg_pubcomp(mqtt_connection_t *connection, uint16_t message_id);
-mqtt_message_t *mqtt_msg_subscribe(mqtt_connection_t *connection, const esp_mqtt_topic_t topic_list[], int size,
-                                   uint16_t *message_id) __attribute__((nonnull));
-mqtt_message_t *mqtt_msg_unsubscribe(mqtt_connection_t *connection, const char *topic, uint16_t *message_id);
-mqtt_message_t *mqtt_msg_pingreq(mqtt_connection_t *connection);
-mqtt_message_t *mqtt_msg_pingresp(mqtt_connection_t *connection);
-mqtt_message_t *mqtt_msg_disconnect(mqtt_connection_t *connection);
+mqtt_message_t *mqtt_msg_connect(mqtt_message_t *message, mqtt_connect_info_t *info);
+mqtt_message_t *mqtt_msg_publish(mqtt_message_t *message, const char *topic, const char *data, int data_length, int qos, int retain, uint16_t *message_id);
+mqtt_message_t *mqtt_msg_puback(mqtt_message_t *message, uint16_t message_id);
+mqtt_message_t *mqtt_msg_pubrec(mqtt_message_t *message, uint16_t message_id);
+mqtt_message_t *mqtt_msg_pubrel(mqtt_message_t *message, uint16_t message_id);
+mqtt_message_t *mqtt_msg_pubcomp(mqtt_message_t *message, uint16_t message_id);
+mqtt_message_t *mqtt_msg_subscribe(mqtt_message_t *message, const esp_mqtt_topic_t topic_list[], int size, uint16_t *message_id) __attribute__((nonnull));
+mqtt_message_t *mqtt_msg_unsubscribe(mqtt_message_t *message, const char *topic, uint16_t *message_id);
+mqtt_message_t *mqtt_msg_pingreq(mqtt_message_t *message);
+mqtt_message_t *mqtt_msg_pingresp(mqtt_message_t *message);
+mqtt_message_t *mqtt_msg_disconnect(mqtt_message_t *message);
 #ifdef  __cplusplus
 }
 #endif

@@ -9,7 +9,6 @@
 #include "mqtt_msg.h"
 #include "mqtt_config.h"
 #include "platform.h"
-#include "mqtt_client_priv.h"
 
 #define MQTT_MAX_FIXED_HEADER_SIZE 5
 #define MQTT_3_1_VARIABLE_HEADER_SIZE 12
@@ -23,63 +22,63 @@ enum mqtt_connect_flag {
     MQTT_CONNECT_FLAG_CLEAN_SESSION = 1 << 1
 };
 
-static int append_string(mqtt_connection_t *connection, const char *string, int len)
+static int append_string(mqtt_message_t *message, const char *string, int len)
 {
-    if (connection->outbound_message.length + len + 2 > connection->outbound_message.buffer_length) {
+    if (message->length + len + 2 > message->buffer_length) {
         return -1;
     }
 
-    connection->outbound_message.buffer[connection->outbound_message.length++] = len >> 8;
-    connection->outbound_message.buffer[connection->outbound_message.length++] = len & 0xff;
-    memcpy(connection->outbound_message.buffer + connection->outbound_message.length, string, len);
-    connection->outbound_message.length += len;
+    message->buffer[message->length++] = len >> 8;
+    message->buffer[message->length++] = len & 0xff;
+    memcpy(message->buffer + message->length, string, len);
+    message->length += len;
     return len + 2;
 }
 
-static uint16_t append_message_id(mqtt_connection_t *connection, uint16_t message_id)
+static uint16_t append_message_id(mqtt_message_t *message, uint16_t message_id)
 {
     // If message_id is zero then we should assign one, otherwise
     // we'll use the one supplied by the caller
     while (message_id == 0) {
 #if MQTT_MSG_ID_INCREMENTAL
-        message_id = ++connection->last_message_id;
+        message_id = ++message->last_message_id;
 #else
         message_id = platform_random(65535);
 #endif
     }
 
-    if (connection->outbound_message.length + 2 > connection->outbound_message.buffer_length) {
+    if (message->length + 2 > message->buffer_length) {
         return 0;
     }
 
-    connection->outbound_message.buffer[connection->outbound_message.length++] = message_id >> 8;
-    connection->outbound_message.buffer[connection->outbound_message.length++] = message_id & 0xff;
+    message->buffer[message->length++] = message_id >> 8;
+    message->buffer[message->length++] = message_id & 0xff;
     return message_id;
 }
 
-static int set_message_header_size(mqtt_connection_t *connection)
+static int set_message_header_size(mqtt_message_t *message)
 {
-    connection->outbound_message.length = MQTT_MAX_FIXED_HEADER_SIZE;
+    message->length = MQTT_MAX_FIXED_HEADER_SIZE;
     return MQTT_MAX_FIXED_HEADER_SIZE;
 }
 
-static mqtt_message_t *fail_message(mqtt_connection_t *connection)
+static mqtt_message_t *fail_message(mqtt_message_t *message)
 {
-    connection->outbound_message.data = connection->outbound_message.buffer;
-    connection->outbound_message.length = 0;
-    return &connection->outbound_message;
+    message->data = message->buffer;
+    message->length = 0;
+    return message;
 }
 
-static mqtt_message_t *fini_message(mqtt_connection_t *connection, int type, int dup, int qos, int retain)
+static mqtt_message_t *fini_message(mqtt_message_t *message, int type, int dup, int qos, int retain)
 {
-    int message_length = connection->outbound_message.length - MQTT_MAX_FIXED_HEADER_SIZE;
+    int message_length = message->length - MQTT_MAX_FIXED_HEADER_SIZE;
     int total_length = message_length;
     int encoded_length = 0;
     uint8_t encoded_lens[4] = {0};
 
     // Check if we have fragmented message and update total_len
-    if (connection->outbound_message.fragmented_msg_total_length) {
-        total_length = connection->outbound_message.fragmented_msg_total_length - MQTT_MAX_FIXED_HEADER_SIZE;
+    if (message->fragmented_msg_total_length) {
+        total_length = message->fragmented_msg_total_length - MQTT_MAX_FIXED_HEADER_SIZE;
     }
 
     // Encode MQTT message length
@@ -99,23 +98,23 @@ static mqtt_message_t *fini_message(mqtt_connection_t *connection, int type, int
 
     // Sanity check for MQTT header
     if (len_bytes + 1 > MQTT_MAX_FIXED_HEADER_SIZE) {
-        return fail_message(connection);
+        return fail_message(message);
     }
 
     // Save the header bytes
-    connection->outbound_message.length = message_length + len_bytes + 1; // msg len + encoded_size len + type (1 byte)
+    message->length = message_length + len_bytes + 1; // msg len + encoded_size len + type (1 byte)
     int offs = MQTT_MAX_FIXED_HEADER_SIZE - 1 - len_bytes;
-    connection->outbound_message.data = connection->outbound_message.buffer + offs;
-    connection->outbound_message.fragmented_msg_data_offset -= offs;
+    message->data = message->buffer + offs;
+    message->fragmented_msg_data_offset -= offs;
     // type byte
-    connection->outbound_message.buffer[offs++] = ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
+    message->buffer[offs++] = ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
 
     // length bytes
     for (int j = 0; j < len_bytes; j++) {
-        connection->outbound_message.buffer[offs++] = encoded_lens[j];
+        message->buffer[offs++] = encoded_lens[j];
     }
 
-    return &connection->outbound_message;
+    return message;
 }
 
 size_t mqtt_get_total_length(const uint8_t *buffer, size_t length, int *fixed_size_len)
@@ -334,9 +333,9 @@ uint16_t mqtt_get_id(uint8_t *buffer, size_t length)
     }
 }
 
-mqtt_message_t *mqtt_msg_connect(mqtt_connection_t *connection, mqtt_connect_info_t *info)
+mqtt_message_t *mqtt_msg_connect(mqtt_message_t *message, mqtt_connect_info_t *info)
 {
-    set_message_header_size(connection);
+    set_message_header_size(message);
     int header_len;
 
     if (info->protocol_ver == MQTT_PROTOCOL_V_3_1) {
@@ -345,12 +344,12 @@ mqtt_message_t *mqtt_msg_connect(mqtt_connection_t *connection, mqtt_connect_inf
         header_len = MQTT_3_1_1_VARIABLE_HEADER_SIZE;
     }
 
-    if (connection->outbound_message.length + header_len > connection->outbound_message.buffer_length) {
-        return fail_message(connection);
+    if (message->length + header_len > message->buffer_length) {
+        return fail_message(message);
     }
 
-    char *variable_header = (char *)(connection->outbound_message.buffer + connection->outbound_message.length);
-    connection->outbound_message.length += header_len;
+    char *variable_header = (char *)(message->buffer + message->length);
+    message->length += header_len;
     int header_idx = 0;
     variable_header[header_idx++] = 0;                              // Variable header length MSB
 
@@ -377,22 +376,22 @@ mqtt_message_t *mqtt_msg_connect(mqtt_connection_t *connection, mqtt_connect_inf
     }
 
     if (info->client_id != NULL && info->client_id[0] != '\0') {
-        if (append_string(connection, info->client_id, strlen(info->client_id)) < 0) {
-            return fail_message(connection);
+        if (append_string(message, info->client_id, strlen(info->client_id)) < 0) {
+            return fail_message(message);
         }
     } else {
-        if (append_string(connection, "", 0) < 0) {
-            return fail_message(connection);
+        if (append_string(message, "", 0) < 0) {
+            return fail_message(message);
         }
     }
 
     if (info->will_topic != NULL && info->will_topic[0] != '\0') {
-        if (append_string(connection, info->will_topic, strlen(info->will_topic)) < 0) {
-            return fail_message(connection);
+        if (append_string(message, info->will_topic, strlen(info->will_topic)) < 0) {
+            return fail_message(message);
         }
 
-        if (append_string(connection, info->will_message, info->will_length) < 0) {
-            return fail_message(connection);
+        if (append_string(message, info->will_message, info->will_length) < 0) {
+            return fail_message(message);
         }
 
         variable_header[flags_offset] |= MQTT_CONNECT_FLAG_WILL;
@@ -405,8 +404,8 @@ mqtt_message_t *mqtt_msg_connect(mqtt_connection_t *connection, mqtt_connect_inf
     }
 
     if (info->username != NULL && info->username[0] != '\0') {
-        if (append_string(connection, info->username, strlen(info->username)) < 0) {
-            return fail_message(connection);
+        if (append_string(message, info->username, strlen(info->username)) < 0) {
+            return fail_message(message);
         }
 
         variable_header[flags_offset] |= MQTT_CONNECT_FLAG_USERNAME;
@@ -417,175 +416,175 @@ mqtt_message_t *mqtt_msg_connect(mqtt_connection_t *connection, mqtt_connect_inf
             /* In case if password is set without username, we need to set a zero length username.
              * (otherwise we violate: MQTT-3.1.2-22: If the User Name Flag is set to 0 then the Password Flag MUST be set to 0.)
              */
-            if (append_string(connection, "", 0) < 0) {
-                return fail_message(connection);
+            if (append_string(message, "", 0) < 0) {
+                return fail_message(message);
             }
 
             variable_header[flags_offset] |= MQTT_CONNECT_FLAG_USERNAME;
         }
 
-        if (append_string(connection, info->password, strlen(info->password)) < 0) {
-            return fail_message(connection);
+        if (append_string(message, info->password, strlen(info->password)) < 0) {
+            return fail_message(message);
         }
 
         variable_header[flags_offset] |= MQTT_CONNECT_FLAG_PASSWORD;
     }
 
-    return fini_message(connection, MQTT_MSG_TYPE_CONNECT, 0, 0, 0);
+    return fini_message(message, MQTT_MSG_TYPE_CONNECT, 0, 0, 0);
 }
 
-mqtt_message_t *mqtt_msg_publish(mqtt_connection_t *connection, const char *topic, const char *data, int data_length,
+mqtt_message_t *mqtt_msg_publish(mqtt_message_t *message, const char *topic, const char *data, int data_length,
                                  int qos, int retain, uint16_t *message_id)
 {
-    set_message_header_size(connection);
+    set_message_header_size(message);
 
     if (topic == NULL || topic[0] == '\0') {
-        return fail_message(connection);
+        return fail_message(message);
     }
 
-    if (append_string(connection, topic, strlen(topic)) < 0) {
-        return fail_message(connection);
+    if (append_string(message, topic, strlen(topic)) < 0) {
+        return fail_message(message);
     }
 
     if (data == NULL && data_length > 0) {
-        return fail_message(connection);
+        return fail_message(message);
     }
 
     if (qos > 0) {
-        if ((*message_id = append_message_id(connection, 0)) == 0) {
-            return fail_message(connection);
+        if ((*message_id = append_message_id(message, 0)) == 0) {
+            return fail_message(message);
         }
     } else {
         *message_id = 0;
     }
 
     if (data != NULL) {
-        if (connection->outbound_message.length + data_length > connection->outbound_message.buffer_length) {
+        if (message->length + data_length > message->buffer_length) {
             // Not enough size in buffer -> fragment this message
-            connection->outbound_message.fragmented_msg_data_offset = connection->outbound_message.length;
-            memcpy(connection->outbound_message.buffer + connection->outbound_message.length, data,
-                   connection->outbound_message.buffer_length - connection->outbound_message.length);
-            connection->outbound_message.length = connection->outbound_message.buffer_length;
-            connection->outbound_message.fragmented_msg_total_length = data_length +
-                                                                       connection->outbound_message.fragmented_msg_data_offset;
+            message->fragmented_msg_data_offset = message->length;
+            memcpy(message->buffer + message->length, data,
+                   message->buffer_length - message->length);
+            message->length = message->buffer_length;
+            message->fragmented_msg_total_length = data_length +
+                                                                       message->fragmented_msg_data_offset;
         } else {
-            memcpy(connection->outbound_message.buffer + connection->outbound_message.length, data, data_length);
-            connection->outbound_message.length += data_length;
-            connection->outbound_message.fragmented_msg_total_length = 0;
+            memcpy(message->buffer + message->length, data, data_length);
+            message->length += data_length;
+            message->fragmented_msg_total_length = 0;
         }
     }
 
-    return fini_message(connection, MQTT_MSG_TYPE_PUBLISH, 0, qos, retain);
+    return fini_message(message, MQTT_MSG_TYPE_PUBLISH, 0, qos, retain);
 }
 
-mqtt_message_t *mqtt_msg_puback(mqtt_connection_t *connection, uint16_t message_id)
+mqtt_message_t *mqtt_msg_puback(mqtt_message_t *message, uint16_t message_id)
 {
-    set_message_header_size(connection);
+    set_message_header_size(message);
 
-    if (append_message_id(connection, message_id) == 0) {
-        return fail_message(connection);
+    if (append_message_id(message, message_id) == 0) {
+        return fail_message(message);
     }
 
-    return fini_message(connection, MQTT_MSG_TYPE_PUBACK, 0, 0, 0);
+    return fini_message(message, MQTT_MSG_TYPE_PUBACK, 0, 0, 0);
 }
 
-mqtt_message_t *mqtt_msg_pubrec(mqtt_connection_t *connection, uint16_t message_id)
+mqtt_message_t *mqtt_msg_pubrec(mqtt_message_t *message, uint16_t message_id)
 {
-    set_message_header_size(connection);
+    set_message_header_size(message);
 
-    if (append_message_id(connection, message_id) == 0) {
-        return fail_message(connection);
+    if (append_message_id(message, message_id) == 0) {
+        return fail_message(message);
     }
 
-    return fini_message(connection, MQTT_MSG_TYPE_PUBREC, 0, 0, 0);
+    return fini_message(message, MQTT_MSG_TYPE_PUBREC, 0, 0, 0);
 }
 
-mqtt_message_t *mqtt_msg_pubrel(mqtt_connection_t *connection, uint16_t message_id)
+mqtt_message_t *mqtt_msg_pubrel(mqtt_message_t *message, uint16_t message_id)
 {
-    set_message_header_size(connection);
+    set_message_header_size(message);
 
-    if (append_message_id(connection, message_id) == 0) {
-        return fail_message(connection);
+    if (append_message_id(message, message_id) == 0) {
+        return fail_message(message);
     }
 
-    return fini_message(connection, MQTT_MSG_TYPE_PUBREL, 0, 1, 0);
+    return fini_message(message, MQTT_MSG_TYPE_PUBREL, 0, 1, 0);
 }
 
-mqtt_message_t *mqtt_msg_pubcomp(mqtt_connection_t *connection, uint16_t message_id)
+mqtt_message_t *mqtt_msg_pubcomp(mqtt_message_t *message, uint16_t message_id)
 {
-    set_message_header_size(connection);
+    set_message_header_size(message);
 
-    if (append_message_id(connection, message_id) == 0) {
-        return fail_message(connection);
+    if (append_message_id(message, message_id) == 0) {
+        return fail_message(message);
     }
 
-    return fini_message(connection, MQTT_MSG_TYPE_PUBCOMP, 0, 0, 0);
+    return fini_message(message, MQTT_MSG_TYPE_PUBCOMP, 0, 0, 0);
 }
 
-mqtt_message_t *mqtt_msg_subscribe(mqtt_connection_t *connection, const esp_mqtt_topic_t topic_list[], int size,
+mqtt_message_t *mqtt_msg_subscribe(mqtt_message_t *message, const esp_mqtt_topic_t topic_list[], int size,
                                    uint16_t *message_id)
 {
-    set_message_header_size(connection);
+    set_message_header_size(message);
 
-    if ((*message_id = append_message_id(connection, 0)) == 0) {
-        return fail_message(connection);
+    if ((*message_id = append_message_id(message, 0)) == 0) {
+        return fail_message(message);
     }
 
     for (int topic_number = 0; topic_number < size; ++topic_number) {
         if (topic_list[topic_number].filter[0] == '\0') {
-            return fail_message(connection);
+            return fail_message(message);
         }
 
-        if (append_string(connection, topic_list[topic_number].filter, strlen(topic_list[topic_number].filter)) < 0) {
-            return fail_message(connection);
+        if (append_string(message, topic_list[topic_number].filter, strlen(topic_list[topic_number].filter)) < 0) {
+            return fail_message(message);
         }
 
-        if (connection->outbound_message.length + 1 > connection->outbound_message.buffer_length) {
-            return fail_message(connection);
+        if (message->length + 1 > message->buffer_length) {
+            return fail_message(message);
         }
 
-        connection->outbound_message.buffer[connection->outbound_message.length] = topic_list[topic_number].qos;
-        connection->outbound_message.length ++;
+        message->buffer[message->length] = topic_list[topic_number].qos;
+        message->length ++;
     }
 
-    return fini_message(connection, MQTT_MSG_TYPE_SUBSCRIBE, 0, 1, 0);
+    return fini_message(message, MQTT_MSG_TYPE_SUBSCRIBE, 0, 1, 0);
 }
 
-mqtt_message_t *mqtt_msg_unsubscribe(mqtt_connection_t *connection, const char *topic, uint16_t *message_id)
+mqtt_message_t *mqtt_msg_unsubscribe(mqtt_message_t *message, const char *topic, uint16_t *message_id)
 {
-    set_message_header_size(connection);
+    set_message_header_size(message);
 
     if (topic == NULL || topic[0] == '\0') {
-        return fail_message(connection);
+        return fail_message(message);
     }
 
-    if ((*message_id = append_message_id(connection, 0)) == 0) {
-        return fail_message(connection);
+    if ((*message_id = append_message_id(message, 0)) == 0) {
+        return fail_message(message);
     }
 
-    if (append_string(connection, topic, strlen(topic)) < 0) {
-        return fail_message(connection);
+    if (append_string(message, topic, strlen(topic)) < 0) {
+        return fail_message(message);
     }
 
-    return fini_message(connection, MQTT_MSG_TYPE_UNSUBSCRIBE, 0, 1, 0);
+    return fini_message(message, MQTT_MSG_TYPE_UNSUBSCRIBE, 0, 1, 0);
 }
 
-mqtt_message_t *mqtt_msg_pingreq(mqtt_connection_t *connection)
+mqtt_message_t *mqtt_msg_pingreq(mqtt_message_t *message)
 {
-    set_message_header_size(connection);
-    return fini_message(connection, MQTT_MSG_TYPE_PINGREQ, 0, 0, 0);
+    set_message_header_size(message);
+    return fini_message(message, MQTT_MSG_TYPE_PINGREQ, 0, 0, 0);
 }
 
-mqtt_message_t *mqtt_msg_pingresp(mqtt_connection_t *connection)
+mqtt_message_t *mqtt_msg_pingresp(mqtt_message_t *message)
 {
-    set_message_header_size(connection);
-    return fini_message(connection, MQTT_MSG_TYPE_PINGRESP, 0, 0, 0);
+    set_message_header_size(message);
+    return fini_message(message, MQTT_MSG_TYPE_PINGRESP, 0, 0, 0);
 }
 
-mqtt_message_t *mqtt_msg_disconnect(mqtt_connection_t *connection)
+mqtt_message_t *mqtt_msg_disconnect(mqtt_message_t *message)
 {
-    set_message_header_size(connection);
-    return fini_message(connection, MQTT_MSG_TYPE_DISCONNECT, 0, 0, 0);
+    set_message_header_size(message);
+    return fini_message(message, MQTT_MSG_TYPE_DISCONNECT, 0, 0, 0);
 }
 
 /*
@@ -632,22 +631,22 @@ int mqtt_has_valid_msg_hdr(uint8_t *buffer, size_t length)
     }
 }
 
-esp_err_t mqtt_msg_buffer_init(mqtt_connection_t *connection, int buffer_size)
+esp_err_t mqtt_msg_buffer_init(mqtt_message_t *message, int buffer_size)
 {
-    memset(&connection->outbound_message, 0, sizeof(mqtt_message_t));
-    connection->outbound_message.buffer = (uint8_t *)heap_caps_calloc(buffer_size, sizeof(uint8_t), MQTT_BUFFER_MEMORY);
+    memset(message, 0, sizeof(mqtt_message_t));
+    message->buffer = (uint8_t *)heap_caps_calloc(buffer_size, sizeof(uint8_t), MQTT_BUFFER_MEMORY);
 
-    if (!connection->outbound_message.buffer) {
+    if (!message->buffer) {
         return ESP_ERR_NO_MEM;
     }
 
-    connection->outbound_message.buffer_length = buffer_size;
+    message->buffer_length = buffer_size;
     return ESP_OK;
 }
 
-void mqtt_msg_buffer_destroy(mqtt_connection_t *connection)
+void mqtt_msg_buffer_destroy(mqtt_message_t *message)
 {
-    if (connection) {
-        free(connection->outbound_message.buffer);
+    if (message) {
+        free(message->buffer);
     }
 }
