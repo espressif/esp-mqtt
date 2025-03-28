@@ -5,7 +5,6 @@
  */
 #include <string.h>
 #include "esp_heap_caps.h"
-#include "mqtt_client.h"
 #include "mqtt_msg.h"
 #include "mqtt_config.h"
 #include "platform.h"

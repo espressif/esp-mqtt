@@ -15,6 +15,7 @@
 #include "platform.h"
 
 #include "esp_event.h"
+#include "mqtt_config.h"
 #include "mqtt_client.h"
 #include "mqtt_msg.h"
 #ifdef MQTT_PROTOCOL_5

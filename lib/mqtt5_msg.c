@@ -5,11 +5,11 @@
  */
 #include <string.h>
 #include "mqtt5_msg.h"
-#include "mqtt_client.h"
-#include "mqtt_config.h"
+#include "esp_err.h"
+#include "mqtt_common.h"
 #include "platform.h"
 #include "esp_log.h"
-#include "mqtt_client_priv.h"
+#include "sys/queue.h"
 
 #define MQTT5_MAX_FIXED_HEADER_SIZE 5
 #define MQTT5_MAX_PROPERTY_STRING_LEN (16 * 1024)
@@ -31,6 +31,13 @@ static const char *TAG = "mqtt5_msg";
 
 #define MQTT5_CONVERT_TWO_BYTE(i, a)                  i = (a >> 8) & 0xff; \
                                                       i = a & 0xff;
+
+typedef struct mqtt5_user_property {
+    char *key;
+    char *value;
+    STAILQ_ENTRY(mqtt5_user_property) next;
+} mqtt5_user_property_t;
+STAILQ_HEAD(mqtt5_user_property_list_t, mqtt5_user_property);
 
 enum mqtt5_connect_flag {
     MQTT5_CONNECT_FLAG_USERNAME = 1 << 7,
@@ -234,13 +241,12 @@ static mqtt_message_t *fini_message(mqtt_message_t *message, int type, int dup, 
     return message;
 }
 
-static esp_err_t mqtt5_msg_set_user_property(mqtt5_user_property_handle_t *user_property, char *key, size_t key_len,
-                                             char *value, size_t value_len)
+esp_err_t mqtt5_msg_set_user_property(mqtt5_user_property_handle_t *user_property_list, const char *key, size_t key_len,
+                                      const char *value, size_t value_len)
 {
-    if (!*user_property) {
-        *user_property = calloc(1, sizeof(struct mqtt5_user_property_list_t));
-        ESP_MEM_CHECK(TAG, *user_property, return ESP_FAIL);
-        STAILQ_INIT(*user_property);
+    if (!*user_property_list) {
+        *user_property_list = mqtt5_msg_create_user_property_list();
+        ESP_MEM_CHECK(TAG, *user_property_list, return ESP_FAIL);
     }
 
     mqtt5_user_property_item_t user_property_item = calloc(1, sizeof(mqtt5_user_property_t));
@@ -260,13 +266,13 @@ static esp_err_t mqtt5_msg_set_user_property(mqtt5_user_property_handle_t *user_
     });
     memcpy(user_property_item->value, value, value_len);
     user_property_item->value[value_len] = '\0';
-    STAILQ_INSERT_TAIL(*user_property, user_property_item, next);
+    STAILQ_INSERT_TAIL(*user_property_list, user_property_item, next);
     return ESP_OK;
 }
 
-static mqtt5_user_property_handle_t mqtt5_msg_get_user_property(uint8_t *buffer, size_t buffer_length)
+static mqtt5_user_property_handle_t mqtt5_msg_parse_user_property(uint8_t *buffer, size_t buffer_length)
 {
-    mqtt5_user_property_handle_t user_porperty = NULL;
+    mqtt5_user_property_handle_t user_property = NULL;
     uint8_t *property = buffer;
     uint16_t property_offset = 0, len = 0;
 
@@ -327,8 +333,7 @@ static mqtt5_user_property_handle_t mqtt5_msg_get_user_property(uint8_t *buffer,
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
 
-            if (mqtt5_msg_set_user_property(&user_porperty, (char *)key, key_len, (char *)value, value_len) != ESP_OK) {
-#pragma GCC diagnostic pop
+            if (mqtt5_msg_set_user_property(&user_property, (char *)key, key_len, (char *)value, value_len) != ESP_OK) {
                 ESP_LOGE(TAG, "mqtt5_msg_set_user_property fail");
                 goto err;
             }
@@ -342,9 +347,9 @@ static mqtt5_user_property_handle_t mqtt5_msg_get_user_property(uint8_t *buffer,
         }
     }
 
-    return user_porperty;
+    return user_property;
 err:
-    esp_mqtt5_client_delete_user_property(user_porperty);
+    mqtt5_msg_delete_user_property(user_property);
     return NULL;
 }
 
@@ -562,7 +567,7 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
             property_offset += len;
 
             if (mqtt5_msg_set_user_property(user_property, (char *)key, key_len, (char *)value, value_len) != ESP_OK) {
-                esp_mqtt5_client_delete_user_property(*user_property);
+                mqtt5_msg_delete_user_property(*user_property);
                 *user_property = NULL;
                 ESP_LOGE(TAG, "mqtt5_msg_set_user_property fail");
                 return NULL;
@@ -613,7 +618,7 @@ char *mqtt5_get_suback_data(uint8_t *buffer, size_t *length, mqtt5_user_property
 
     if (*user_property) {
         ESP_LOGE(TAG, "user_property not freed before mqtt5_get_suback_data");
-        esp_mqtt5_client_delete_user_property(*user_property);
+        mqtt5_msg_delete_user_property(*user_property);
         *user_property = NULL;
     }
 
@@ -637,16 +642,11 @@ char *mqtt5_get_suback_data(uint8_t *buffer, size_t *length, mqtt5_user_property
         return NULL;
     }
 
-    /* False positive: the previous *user_property value is freed above if non-NULL.
-     * The analyzer cannot track the deallocation across the TU boundary. */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
-    *user_property = mqtt5_msg_get_user_property(buffer + offset, property_len);
-#pragma GCC diagnostic pop
+    *user_property = mqtt5_msg_parse_user_property(buffer + offset, property_len);
     offset += property_len;
 
     if (offset >= totlen) {
-        esp_mqtt5_client_delete_user_property(*user_property);
+        mqtt5_msg_delete_user_property(*user_property);
         *user_property = NULL;
         *length = 0;
         return NULL;
@@ -667,7 +667,7 @@ char *mqtt5_get_puback_data(uint8_t *buffer, size_t *length, mqtt5_user_property
 
     if (*user_property) {
         ESP_LOGE(TAG, "user_property not freed before mqtt5_get_puback_data");
-        esp_mqtt5_client_delete_user_property(*user_property);
+        mqtt5_msg_delete_user_property(*user_property);
         *user_property = NULL;
     }
 
@@ -689,12 +689,7 @@ char *mqtt5_get_puback_data(uint8_t *buffer, size_t *length, mqtt5_user_property
             return NULL;
         }
 
-        /* False positive: the previous *user_property value is freed above if non-NULL.
-         * The analyzer cannot track the deallocation across the TU boundary. */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
-        *user_property = mqtt5_msg_get_user_property(buffer + offset, property_len);
-#pragma GCC diagnostic pop
+        *user_property = mqtt5_msg_parse_user_property(buffer + offset, property_len);
     }
 
     return data;
@@ -1006,7 +1001,7 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
             property_offset += len;
 
             if (mqtt5_msg_set_user_property(user_property, (char *)key, key_len, (char *)value, value_len) != ESP_OK) {
-                esp_mqtt5_client_delete_user_property(*user_property);
+                mqtt5_msg_delete_user_property(*user_property);
                 *user_property = NULL;
                 ESP_LOGE(TAG, "mqtt5_msg_set_user_property fail");
                 return ESP_FAIL;
@@ -1542,4 +1537,113 @@ mqtt_message_t *mqtt5_msg_pubcomp(mqtt_message_t *message, uint16_t message_id)
     APPEND_CHECK(update_property_len_value(message, message->length - properties_offset - 1,
                                            properties_offset), fail_message(message));
     return fini_message(message, MQTT_MSG_TYPE_PUBCOMP, 0, 0, 0);
+}
+
+void mqtt5_msg_delete_user_property(mqtt5_user_property_handle_t user_property_list)
+{
+    if (user_property_list) {
+        mqtt5_user_property_item_t item;
+        mqtt5_user_property_item_t tmp;
+        STAILQ_FOREACH_SAFE(item, user_property_list, next, tmp) {
+            STAILQ_REMOVE(user_property_list, item, mqtt5_user_property, next);
+            free(item->key);
+            free(item->value);
+            free(item);
+        }
+    }
+
+    free(user_property_list);
+}
+
+mqtt5_user_property_handle_t mqtt5_msg_create_user_property_list(void)
+{
+    mqtt5_user_property_handle_t user_property = calloc(1, sizeof(struct mqtt5_user_property_list_t));
+    ESP_MEM_CHECK(TAG, user_property, return NULL);
+    STAILQ_INIT(user_property);
+    return user_property;
+}
+
+uint8_t mqtt5_msg_get_user_property_count(mqtt5_user_property_handle_t user_property_list)
+{
+    uint8_t count = 0;
+    mqtt5_user_property_item_t item;
+    STAILQ_FOREACH(item, user_property_list, next) {
+        count ++;
+    }
+    return count;
+}
+
+static void mqtt5_msg_free_user_property_result(esp_mqtt5_user_property_item_t *item)
+{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+    free((void *)item->key);
+    free((void *)item->value);
+#pragma GCC diagnostic pop
+    item->key = NULL;
+    item->value = NULL;
+}
+
+esp_err_t mqtt5_msg_get_user_property(mqtt5_user_property_handle_t user_property_list,
+                                      esp_mqtt5_user_property_item_t *item, uint8_t *item_num)
+{
+    int property_item_idx = 0;
+    int j = 0;
+    mqtt5_user_property_item_t user_property_item;
+    uint8_t num = *item_num;
+    STAILQ_FOREACH(user_property_item, user_property_list, next) {
+        if (property_item_idx < num) {
+            size_t item_key_len = strlen(user_property_item->key);
+            size_t item_value_len = strlen(user_property_item->value);
+            char *key = calloc(1, item_key_len + 1);
+            ESP_MEM_CHECK(TAG, key, goto err);
+            memcpy(key, user_property_item->key, item_key_len);
+            key[item_key_len] = '\0';
+            char *value = calloc(1, item_value_len + 1);
+            ESP_MEM_CHECK(TAG, value, {
+                free(key);
+                goto err;
+            });
+            memcpy(value, user_property_item->value, item_value_len);
+            value[item_value_len] = '\0';
+            item[property_item_idx].key = key;
+            item[property_item_idx].value = value;
+            property_item_idx ++;
+        } else {
+            break;
+        }
+    }
+    *item_num = property_item_idx;
+    return ESP_OK;
+err:
+
+    for (j = 0; j < property_item_idx; j ++) {
+        mqtt5_msg_free_user_property_result(&item[j]);
+    }
+
+    return ESP_ERR_NO_MEM;
+}
+
+esp_err_t mqtt5_msg_copy_user_property(mqtt5_user_property_handle_t user_property_new,
+                                       const struct mqtt5_user_property_list_t *user_property_old)
+{
+    mqtt5_user_property_item_t old_item;
+    mqtt5_user_property_item_t new_item;
+    STAILQ_FOREACH(old_item, user_property_old, next) {
+        new_item = calloc(1, sizeof(mqtt5_user_property_t));
+        ESP_MEM_CHECK(TAG, new_item, return ESP_FAIL);
+        new_item->key = strdup(old_item->key);
+        ESP_MEM_CHECK(TAG, new_item->key, {
+            free(new_item);
+            return ESP_FAIL;
+        });
+        new_item->value = strdup(old_item->value);
+        ESP_MEM_CHECK(TAG, new_item->value, {
+            free(new_item->key);
+            free(new_item);
+            return ESP_FAIL;
+        });
+        STAILQ_INSERT_TAIL(user_property_new, new_item, next);
+    }
+    return ESP_OK;
 }

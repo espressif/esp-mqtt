@@ -7,10 +7,8 @@
 #define MQTT5_MSG_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "sys/queue.h"
-#include "mqtt_config.h"
 #include "mqtt_msg.h"
-#include "mqtt_client.h"
+#include "mqtt_common.h"
 #ifdef  __cplusplus
 extern "C" {
 #endif
@@ -45,12 +43,6 @@ enum mqtt_properties_type {
     MQTT5_PROPERTY_SHARED_SUBSCR_AVAILABLE       = 0x2A,
 };
 
-typedef struct mqtt5_user_property {
-    char *key;
-    char *value;
-    STAILQ_ENTRY(mqtt5_user_property) next;
-} mqtt5_user_property_t;
-STAILQ_HEAD(mqtt5_user_property_list_t, mqtt5_user_property);
 typedef struct mqtt5_user_property *mqtt5_user_property_item_t;
 
 typedef struct {
@@ -140,6 +132,16 @@ mqtt_message_t *mqtt5_msg_pubcomp(mqtt_message_t *message, uint16_t message_id);
 mqtt_message_t *mqtt5_msg_pubrel(mqtt_message_t *message, uint16_t message_id);
 mqtt_message_t *mqtt5_msg_pubrec(mqtt_message_t *message, uint16_t message_id);
 mqtt_message_t *mqtt5_msg_puback(mqtt_message_t *message, uint16_t message_id);
+
+mqtt5_user_property_handle_t mqtt5_msg_create_user_property_list(void);
+esp_err_t mqtt5_msg_set_user_property(mqtt5_user_property_handle_t *user_property_list, const char *key, size_t key_len,
+                                      const char *value, size_t value_len);
+void mqtt5_msg_delete_user_property(mqtt5_user_property_handle_t user_property_list);
+esp_err_t mqtt5_msg_get_user_property(mqtt5_user_property_handle_t user_property_list,
+                                      esp_mqtt5_user_property_item_t *item, uint8_t *item_num);
+uint8_t mqtt5_msg_get_user_property_count(mqtt5_user_property_handle_t user_property_list);
+esp_err_t mqtt5_msg_copy_user_property(mqtt5_user_property_handle_t user_property_new,
+                                       const struct mqtt5_user_property_list_t *user_property_old);
 
 #ifdef  __cplusplus
 }

@@ -18,6 +18,7 @@
 #include "esp_err.h"
 #include "esp_event.h"
 #include "esp_transport.h"
+#include "mqtt_common.h"
 #ifdef CONFIG_MQTT_PROTOCOL_5
 #include "mqtt5_client.h"
 #endif
@@ -27,11 +28,6 @@ extern "C" {
 #endif
 
 typedef struct esp_mqtt_client *esp_mqtt_client_handle_t;
-
-#define MQTT_OVER_TCP_SCHEME "mqtt"
-#define MQTT_OVER_SSL_SCHEME "mqtts"
-#define MQTT_OVER_WS_SCHEME  "ws"
-#define MQTT_OVER_WSS_SCHEME "wss"
 
 /**
  * @brief *MQTT* event types.
@@ -151,16 +147,6 @@ typedef enum esp_mqtt_transport_t {
     MQTT_TRANSPORT_OVER_WSS  /*!< *MQTT* over Websocket Secure, using scheme:
                               ``wss`` */
 } esp_mqtt_transport_t;
-
-/**
- *  *MQTT* protocol version used for connection
- */
-typedef enum esp_mqtt_protocol_ver_t {
-    MQTT_PROTOCOL_UNDEFINED = 0,
-    MQTT_PROTOCOL_V_3_1,
-    MQTT_PROTOCOL_V_3_1_1,
-    MQTT_PROTOCOL_V_5,
-} esp_mqtt_protocol_ver_t;
 
 /**
  * States of MQTT client connection
@@ -407,14 +393,6 @@ typedef struct esp_mqtt_client_config_t {
         uint64_t limit; /*!< Size limit for the outbox in bytes.*/
     } outbox; /*!< Outbox configuration. */
 } esp_mqtt_client_config_t;
-
-/**
- * Topic definition struct
- */
-typedef struct topic_t {
-    const char *filter;  /*!< Topic filter  to subscribe */
-    int qos; /*!< Max QoS level of the subscription */
-} esp_mqtt_topic_t;
 
 /**
  * @brief Creates *MQTT* client handle based on the configuration

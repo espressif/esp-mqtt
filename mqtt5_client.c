@@ -4,14 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "esp_err.h"
+#include "mqtt_config.h"
+#include "mqtt_client.h"
 #include "mqtt_client_priv.h"
+#include "mqtt5_client.h"
+#include "mqtt5_msg.h"
 #include "esp_log.h"
 #include <string.h>
+#include <sys/queue.h>
 
 static const char *TAG = "mqtt5_client";
 
 // Receive Maximum is optional in CONNACK; when absent the limit is 65535
 #define MQTT5_DEFAULT_RECEIVE_MAXIMUM 65535
+
+typedef struct mqtt5_topic_alias {
+    char *topic;
+    uint16_t topic_len;
+    uint16_t topic_alias;
+    STAILQ_ENTRY(mqtt5_topic_alias) next;
+} mqtt5_topic_alias_t;
+STAILQ_HEAD(mqtt5_topic_alias_list_t, mqtt5_topic_alias);
 
 static void esp_mqtt5_print_error_code(esp_mqtt5_client_handle_t client, int code);
 static esp_err_t esp_mqtt5_client_update_topic_alias(mqtt5_topic_alias_handle_t topic_alias_handle,
@@ -505,25 +519,7 @@ static esp_err_t esp_mqtt5_user_property_copy(mqtt5_user_property_handle_t user_
         ESP_LOGE(TAG, "Input is NULL");
         return ESP_FAIL;
     }
-
-    mqtt5_user_property_item_t old_item, new_item;
-    STAILQ_FOREACH(old_item, user_property_old, next) {
-        new_item = calloc(1, sizeof(mqtt5_user_property_t));
-        ESP_MEM_CHECK(TAG, new_item, return ESP_FAIL);
-        new_item->key = strdup(old_item->key);
-        ESP_MEM_CHECK(TAG, new_item->key, {
-            free(new_item);
-            return ESP_FAIL;
-        });
-        new_item->value = strdup(old_item->value);
-        ESP_MEM_CHECK(TAG, new_item->value, {
-            free(new_item->key);
-            free(new_item);
-            return ESP_FAIL;
-        });
-        STAILQ_INSERT_TAIL(user_property_new, new_item, next);
-    }
-    return ESP_OK;
+    return mqtt5_msg_copy_user_property(user_property_new, user_property_old);
 }
 
 esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client,
@@ -688,17 +684,11 @@ esp_err_t esp_mqtt5_client_set_disconnect_property(esp_mqtt5_client_handle_t cli
 
         if (property->user_property) {
             esp_mqtt5_client_delete_user_property(client->mqtt5_config->disconnect_property_info.user_property);
-            /* False positive: the allocation remains owned by disconnect_property_info
-             * until it is replaced or the MQTT 5 configuration is destroyed. */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
-            client->mqtt5_config->disconnect_property_info.user_property = calloc(1, sizeof(struct mqtt5_user_property_list_t));
+            client->mqtt5_config->disconnect_property_info.user_property = mqtt5_msg_create_user_property_list();
             ESP_MEM_CHECK(TAG, client->mqtt5_config->disconnect_property_info.user_property, {
                 MQTT_API_UNLOCK(client);
                 return ESP_ERR_NO_MEM;
             });
-#pragma GCC diagnostic pop
-            STAILQ_INIT(client->mqtt5_config->disconnect_property_info.user_property);
 
             if (esp_mqtt5_user_property_copy(client->mqtt5_config->disconnect_property_info.user_property,
                                              property->user_property) != ESP_OK) {
@@ -772,9 +762,8 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
 
         if (connect_property->user_property) {
             esp_mqtt5_client_delete_user_property(client->mqtt5_config->connect_property_info.user_property);
-            client->mqtt5_config->connect_property_info.user_property = calloc(1, sizeof(struct mqtt5_user_property_list_t));
+            client->mqtt5_config->connect_property_info.user_property = mqtt5_msg_create_user_property_list();
             ESP_MEM_CHECK(TAG, client->mqtt5_config->connect_property_info.user_property, goto _mqtt_set_config_failed);
-            STAILQ_INIT(client->mqtt5_config->connect_property_info.user_property);
 
             if (esp_mqtt5_user_property_copy(client->mqtt5_config->connect_property_info.user_property,
                                              connect_property->user_property) != ESP_OK) {
@@ -817,14 +806,8 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
 
         if (connect_property->will_user_property) {
             esp_mqtt5_client_delete_user_property(client->mqtt5_config->will_property_info.user_property);
-            /* False positive: esp_mqtt_destroy_config() releases this allocation on failure,
-             * but the analyzer cannot follow that cleanup across the translation-unit boundary. */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
-            client->mqtt5_config->will_property_info.user_property = calloc(1, sizeof(struct mqtt5_user_property_list_t));
+            client->mqtt5_config->will_property_info.user_property = mqtt5_msg_create_user_property_list();
             ESP_MEM_CHECK(TAG, client->mqtt5_config->will_property_info.user_property, goto _mqtt_set_config_failed);
-#pragma GCC diagnostic pop
-            STAILQ_INIT(client->mqtt5_config->will_property_info.user_property);
 
             if (esp_mqtt5_user_property_copy(client->mqtt5_config->will_property_info.user_property,
                                              connect_property->will_user_property) != ESP_OK) {
@@ -842,7 +825,7 @@ _mqtt_set_config_failed:
     return ESP_ERR_NO_MEM;
 }
 
-esp_err_t esp_mqtt5_client_set_user_property(mqtt5_user_property_handle_t *user_property,
+esp_err_t esp_mqtt5_client_set_user_property(mqtt5_user_property_handle_t *user_property_list,
                                              esp_mqtt5_user_property_item_t item[], uint8_t item_num)
 {
     if (!item_num || !item) {
@@ -850,124 +833,46 @@ esp_err_t esp_mqtt5_client_set_user_property(mqtt5_user_property_handle_t *user_
         return ESP_FAIL;
     }
 
-    if (!*user_property) {
-        *user_property = calloc(1, sizeof(struct mqtt5_user_property_list_t));
-        ESP_MEM_CHECK(TAG, *user_property, return ESP_ERR_NO_MEM);
-        STAILQ_INIT(*user_property);
-    }
-
     for (int i = 0; i < item_num; i ++) {
         if (item[i].key && item[i].value) {
-            mqtt5_user_property_item_t user_property_item = calloc(1, sizeof(mqtt5_user_property_t));
-            ESP_MEM_CHECK(TAG, user_property_item, goto err);
             size_t key_len = strlen(item[i].key);
             size_t value_len = strlen(item[i].value);
-            user_property_item->key = calloc(1, key_len + 1);
-            ESP_MEM_CHECK(TAG, user_property_item->key, {
-                free(user_property_item);
-                goto err;
-            });
-            memcpy(user_property_item->key, item[i].key, key_len);
-            user_property_item->key[key_len] = '\0';
-            user_property_item->value = calloc(1, value_len + 1);
-            ESP_MEM_CHECK(TAG, user_property_item->value, {
-                free(user_property_item->key);
-                free(user_property_item);
-                goto err;
-            });
-            memcpy(user_property_item->value, item[i].value, value_len);
-            user_property_item->value[value_len] = '\0';
-            STAILQ_INSERT_TAIL(*user_property, user_property_item, next);
+            esp_err_t ret = mqtt5_msg_set_user_property(user_property_list, item[i].key, key_len, item[i].value,
+                                                        value_len);
+
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to set user property");
+                esp_mqtt5_client_delete_user_property(*user_property_list);
+                *user_property_list = NULL;
+                return ret;
+            }
         }
     }
 
     return ESP_OK;
-err:
-    esp_mqtt5_client_delete_user_property(*user_property);
-    *user_property = NULL;
-    return ESP_ERR_NO_MEM;
 }
 
 esp_err_t esp_mqtt5_client_get_user_property(mqtt5_user_property_handle_t user_property,
                                              esp_mqtt5_user_property_item_t *item, uint8_t *item_num)
 {
-    int i = 0, j = 0;
-
-    if (user_property && item && *item_num) {
-        mqtt5_user_property_item_t user_property_item;
-        uint8_t num = *item_num;
-        STAILQ_FOREACH(user_property_item, user_property, next) {
-            if (i < num) {
-                size_t item_key_len = strlen(user_property_item->key);
-                size_t item_value_len = strlen(user_property_item->value);
-                char *key = calloc(1, item_key_len + 1);
-                ESP_MEM_CHECK(TAG, key, goto err);
-                memcpy(key, user_property_item->key, item_key_len);
-                key[item_key_len] = '\0';
-                char *value = calloc(1, item_value_len + 1);
-                ESP_MEM_CHECK(TAG, value, {
-                    free(key);
-                    goto err;
-                });
-                memcpy(value, user_property_item->value, item_value_len);
-                value[item_value_len] = '\0';
-                item[i].key = key;
-                item[i].value = value;
-                i ++;
-            } else {
-                break;
-            }
-        }
-        *item_num = i;
-        return ESP_OK;
-    } else {
+    if (!user_property || !item || !item_num || !*item_num) {
         ESP_LOGE(TAG, "Input value is NULL or item_num is 0");
         return ESP_FAIL;
     }
 
-err:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-qual"
-
-    for (j = 0; j < i; j ++) {
-        if (item[j].key) {
-            free((char *)item[j].key);
-        }
-
-        if (item[j].value) {
-            free((char *)item[j].value);
-        }
-    }
-
-#pragma GCC diagnostic pop
-    return ESP_ERR_NO_MEM;
+    return mqtt5_msg_get_user_property(user_property, item, item_num);
 }
 
 uint8_t esp_mqtt5_client_get_user_property_count(mqtt5_user_property_handle_t user_property)
 {
-    uint8_t count = 0;
-
-    if (user_property) {
-        mqtt5_user_property_item_t item;
-        STAILQ_FOREACH(item, user_property, next) {
-            count ++;
-        }
+    if (!user_property) {
+        return 0;
     }
 
-    return count;
+    return mqtt5_msg_get_user_property_count(user_property);
 }
 
-void esp_mqtt5_client_delete_user_property(mqtt5_user_property_handle_t user_property)
+void esp_mqtt5_client_delete_user_property(mqtt5_user_property_handle_t user_property_list)
 {
-    if (user_property) {
-        mqtt5_user_property_item_t item, tmp;
-        STAILQ_FOREACH_SAFE(item, user_property, next, tmp) {
-            STAILQ_REMOVE(user_property, item, mqtt5_user_property, next);
-            free(item->key);
-            free(item->value);
-            free(item);
-        }
-    }
-
-    free(user_property);
+    mqtt5_msg_delete_user_property(user_property_list);
 }

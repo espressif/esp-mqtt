@@ -8,9 +8,10 @@
 #define MQTT_MSG_H
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include "esp_err.h"
+#include "mqtt_common.h"
 
-#include "mqtt_config.h"
-#include "mqtt_client.h"
 #ifdef  __cplusplus
 extern "C" {
 #endif

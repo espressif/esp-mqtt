@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 #include "esp_transport.h"
+#include "mqtt_config.h"
 #include "mqtt_client.h"
 #include "mqtt_client_priv.h"
 #include "mqtt_msg.h"
