@@ -79,9 +79,9 @@ static int esp_mqtt_handle_transport_read_error(int err, esp_mqtt_client_handle_
 // Reset per-message pending state before composing a new outbound control packet
 static inline void mqtt_reset_pending_message(esp_mqtt_client_handle_t client)
 {
-    client->mqtt_state.pending_msg_id = 0;
-    client->mqtt_state.pending_msg_type = 0;
-    client->mqtt_state.pending_publish_qos = 0;
+    client->mqtt_state.connection.outbound_message.id = 0;
+    client->mqtt_state.connection.outbound_message.type = 0;
+    client->mqtt_state.connection.outbound_message.qos = 0;
     client->mqtt_state.connection.outbound_message.fragmented_msg_total_length = 0;
     client->mqtt_state.connection.outbound_message.fragmented_msg_data_offset = 0;
 }
@@ -852,21 +852,21 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
         return ESP_FAIL;
     }
 
-    client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.connection.outbound_message.data);
+    client->mqtt_state.connection.outbound_message.type = mqtt_get_type(client->mqtt_state.connection.outbound_message.data);
 
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
-        client->mqtt_state.pending_msg_id = mqtt5_get_id(client->mqtt_state.connection.outbound_message.data,
-                                                         client->mqtt_state.connection.outbound_message.length);
+        client->mqtt_state.connection.outbound_message.id = mqtt5_get_id(client->mqtt_state.connection.outbound_message.data,
+                                                                         client->mqtt_state.connection.outbound_message.length);
 #endif
     } else {
-        client->mqtt_state.pending_msg_id = mqtt_get_id(client->mqtt_state.connection.outbound_message.data,
-                                                        client->mqtt_state.connection.outbound_message.length);
+        client->mqtt_state.connection.outbound_message.id = mqtt_get_id(client->mqtt_state.connection.outbound_message.data,
+                                                                        client->mqtt_state.connection.outbound_message.length);
     }
 
     ESP_LOGD(TAG, "Sending MQTT CONNECT message, type: %d, id: %04X",
-             client->mqtt_state.pending_msg_type,
-             client->mqtt_state.pending_msg_id);
+             client->mqtt_state.connection.outbound_message.type,
+             client->mqtt_state.connection.outbound_message.id);
 
     if (esp_mqtt_write(client) != ESP_OK) {
         return ESP_FAIL;
@@ -1404,13 +1404,13 @@ static bool remove_initiator_message(esp_mqtt_client_handle_t client, int msg_ty
 static outbox_item_handle_t mqtt_enqueue(esp_mqtt_client_handle_t client, const uint8_t *remaining_data, int remaining_len)
 {
     ESP_LOGD(TAG, "mqtt_enqueue id: %d, type=%d successful",
-             client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
+             client->mqtt_state.connection.outbound_message.id, client->mqtt_state.connection.outbound_message.type);
     outbox_message_t msg = { 0 };
     msg.data = client->mqtt_state.connection.outbound_message.data;
     msg.len =  client->mqtt_state.connection.outbound_message.length;
-    msg.msg_id = client->mqtt_state.pending_msg_id;
-    msg.msg_type = client->mqtt_state.pending_msg_type;
-    msg.msg_qos = client->mqtt_state.pending_publish_qos;
+    msg.msg_id = client->mqtt_state.connection.outbound_message.id;
+    msg.msg_type = client->mqtt_state.connection.outbound_message.type;
+    msg.msg_qos = client->mqtt_state.connection.outbound_message.qos;
     msg.remaining_data = remaining_data;
     msg.remaining_len = remaining_len;
     //Copy to queue buffer
@@ -1803,15 +1803,15 @@ static esp_err_t mqtt_resend_queued(esp_mqtt_client_handle_t client, outbox_item
 {
     // decode queued data
     client->mqtt_state.connection.outbound_message.data = outbox_item_get_data(item,
-                                                                               &client->mqtt_state.connection.outbound_message.length, &client->mqtt_state.pending_msg_id,
-                                                                               &client->mqtt_state.pending_msg_type, &client->mqtt_state.pending_publish_qos);
+                                                                               &client->mqtt_state.connection.outbound_message.length, &client->mqtt_state.connection.outbound_message.id,
+                                                                               &client->mqtt_state.connection.outbound_message.type, &client->mqtt_state.connection.outbound_message.qos);
 
     // set duplicate flag for QoS-1 and QoS-2 messages
-    if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH && client->mqtt_state.pending_publish_qos > 0 &&
+    if (client->mqtt_state.connection.outbound_message.type == MQTT_MSG_TYPE_PUBLISH && client->mqtt_state.connection.outbound_message.qos > 0 &&
             (outbox_item_get_pending(item) == TRANSMITTED)) {
         mqtt_set_dup(client->mqtt_state.connection.outbound_message.data);
-        ESP_LOGD(TAG, "Sending Duplicated QoS%d message with id=%d", client->mqtt_state.pending_publish_qos,
-                 client->mqtt_state.pending_msg_id);
+        ESP_LOGD(TAG, "Sending Duplicated QoS%d message with id=%d", client->mqtt_state.connection.outbound_message.qos,
+                 client->mqtt_state.connection.outbound_message.id);
     }
 
     // try to resend the data
@@ -1846,15 +1846,15 @@ static outbox_item_handle_t mqtt_get_queued_qos0(outbox_handle_t outbox)
 static esp_err_t mqtt_resend_pubrel(esp_mqtt_client_handle_t client, outbox_item_handle_t item)
 {
     client->mqtt_state.connection.outbound_message.data = outbox_item_get_data(item,
-                                                                               &client->mqtt_state.connection.outbound_message.length, &client->mqtt_state.pending_msg_id,
-                                                                               &client->mqtt_state.pending_msg_type, &client->mqtt_state.pending_publish_qos);
+                                                                               &client->mqtt_state.connection.outbound_message.length, &client->mqtt_state.connection.outbound_message.id,
+                                                                               &client->mqtt_state.connection.outbound_message.type, &client->mqtt_state.connection.outbound_message.qos);
 
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
-        mqtt5_msg_pubrel(&client->mqtt_state.connection.outbound_message, client->mqtt_state.pending_msg_id);
+        mqtt5_msg_pubrel(&client->mqtt_state.connection.outbound_message, client->mqtt_state.connection.outbound_message.id);
 #endif
     } else {
-        mqtt_msg_pubrel(&client->mqtt_state.connection.outbound_message, client->mqtt_state.pending_msg_id);
+        mqtt_msg_pubrel(&client->mqtt_state.connection.outbound_message, client->mqtt_state.connection.outbound_message.id);
     }
 
     if (client->mqtt_state.connection.outbound_message.length == 0) {
@@ -2052,17 +2052,17 @@ static void esp_mqtt_task(void *pv)
 
             if (item) {
                 if (mqtt_resend_queued(client, item) == ESP_OK) {
-                    if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH && client->mqtt_state.pending_publish_qos == 0) {
+                    if (client->mqtt_state.connection.outbound_message.type == MQTT_MSG_TYPE_PUBLISH && client->mqtt_state.connection.outbound_message.qos == 0) {
                         // delete all qos0 publish messages once we process them
                         if (outbox_delete_item(client->outbox, item) != ESP_OK) {
                             ESP_LOGE(TAG, "Failed to remove queued qos0 message from the outbox");
                         }
                     } else {
-                        outbox_set_tick(client->outbox, client->mqtt_state.pending_msg_id, platform_tick_get_ms());
-                        outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED);
+                        outbox_set_tick(client->outbox, client->mqtt_state.connection.outbound_message.id, platform_tick_get_ms());
+                        outbox_set_pending(client->outbox, client->mqtt_state.connection.outbound_message.id, TRANSMITTED);
 #ifdef MQTT_PROTOCOL_5
 
-                        if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH &&
+                        if (client->mqtt_state.connection.outbound_message.type == MQTT_MSG_TYPE_PUBLISH &&
                                 client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
                             esp_mqtt5_increment_packet_counter(client);
                         }
@@ -2353,7 +2353,7 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
             esp_mqtt5_staged_property_get(&client->mqtt5_config->subscribe_property);
         mqtt5_msg_subscribe(&client->mqtt_state.connection.outbound_message,
                             topic_list, size,
-                            &client->mqtt_state.pending_msg_id, property);
+                            &client->mqtt_state.connection.outbound_message.id, property);
 
         if (property && client->mqtt_state.connection.outbound_message.length) {
             esp_mqtt5_staged_property_clear(&client->mqtt5_config->subscribe_property);
@@ -2363,7 +2363,7 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
     } else {
         mqtt_msg_subscribe(&client->mqtt_state.connection.outbound_message,
                            topic_list, size,
-                           &client->mqtt_state.pending_msg_id);
+                           &client->mqtt_state.connection.outbound_message.id);
     }
 
     if (client->mqtt_state.connection.outbound_message.length == 0) {
@@ -2372,7 +2372,7 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
         return -1;
     }
 
-    client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.connection.outbound_message.data);
+    client->mqtt_state.connection.outbound_message.type = mqtt_get_type(client->mqtt_state.connection.outbound_message.data);
 
     //move pending msg to outbox (if have)
     if (!mqtt_enqueue(client, NULL, 0)) {
@@ -2380,7 +2380,7 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
         return -1;
     }
 
-    outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED);// handle error
+    outbox_set_pending(client->outbox, client->mqtt_state.connection.outbound_message.id, TRANSMITTED);// handle error
 
     if (esp_mqtt_write(client) != ESP_OK) {
         ESP_LOGE(TAG, "Error to send subscribe message, first topic: %s, qos: %d", topic_list[0].filter, topic_list[0].qos);
@@ -2388,8 +2388,8 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
         return -1;
     }
 
-    ESP_LOGD(TAG, "Sent subscribe, first topic=%s, id: %d", topic_list[0].filter, client->mqtt_state.pending_msg_id);
-    int pending_msg_id = client->mqtt_state.pending_msg_id;
+    ESP_LOGD(TAG, "Sent subscribe, first topic=%s, id: %d", topic_list[0].filter, client->mqtt_state.connection.outbound_message.id);
+    int pending_msg_id = client->mqtt_state.connection.outbound_message.id;
     MQTT_API_UNLOCK(client);
     return pending_msg_id;
 }
@@ -2421,7 +2421,7 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
             esp_mqtt5_staged_property_get(&client->mqtt5_config->unsubscribe_property);
         mqtt5_msg_unsubscribe(&client->mqtt_state.connection.outbound_message,
                               topic,
-                              &client->mqtt_state.pending_msg_id, property);
+                              &client->mqtt_state.connection.outbound_message.id, property);
 
         if (property && client->mqtt_state.connection.outbound_message.length) {
             esp_mqtt5_staged_property_clear(&client->mqtt5_config->unsubscribe_property);
@@ -2431,7 +2431,7 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
     } else {
         mqtt_msg_unsubscribe(&client->mqtt_state.connection.outbound_message,
                              topic,
-                             &client->mqtt_state.pending_msg_id);
+                             &client->mqtt_state.connection.outbound_message.id);
     }
 
     if (client->mqtt_state.connection.outbound_message.length == 0) {
@@ -2440,15 +2440,15 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
         return -1;
     }
 
-    ESP_LOGD(TAG, "unsubscribe, topic\"%s\", id: %d", topic, client->mqtt_state.pending_msg_id);
-    client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.connection.outbound_message.data);
+    ESP_LOGD(TAG, "unsubscribe, topic\"%s\", id: %d", topic, client->mqtt_state.connection.outbound_message.id);
+    client->mqtt_state.connection.outbound_message.type = mqtt_get_type(client->mqtt_state.connection.outbound_message.data);
 
     if (!mqtt_enqueue(client, NULL, 0)) {
         MQTT_API_UNLOCK(client);
         return -1;
     }
 
-    outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED); //handle error
+    outbox_set_pending(client->outbox, client->mqtt_state.connection.outbound_message.id, TRANSMITTED); //handle error
 
     if (esp_mqtt_write(client) != ESP_OK) {
         ESP_LOGE(TAG, "Error to unsubscribe topic=%s", topic);
@@ -2456,8 +2456,8 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
         return -1;
     }
 
-    ESP_LOGD(TAG, "Sent Unsubscribe topic=%s, id: %d, successful", topic, client->mqtt_state.pending_msg_id);
-    int pending_msg_id = client->mqtt_state.pending_msg_id;
+    ESP_LOGD(TAG, "Sent Unsubscribe topic=%s, id: %d, successful", topic, client->mqtt_state.connection.outbound_message.id);
+    int pending_msg_id = client->mqtt_state.connection.outbound_message.id;
     MQTT_API_UNLOCK(client);
     return pending_msg_id;
 }
@@ -2508,9 +2508,9 @@ static inline int mqtt_client_enqueue_publish(esp_mqtt_client_handle_t client, c
     /* We have to set as pending all the qos>0 messages */
     //TODO: client->mqtt_state.outbound_message = publish_msg;
     if (qos > 0 || store) {
-        client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.connection.outbound_message.data);
-        client->mqtt_state.pending_msg_id = pending_msg_id;
-        client->mqtt_state.pending_publish_qos = qos;
+        client->mqtt_state.connection.outbound_message.type = mqtt_get_type(client->mqtt_state.connection.outbound_message.data);
+        client->mqtt_state.connection.outbound_message.id = pending_msg_id;
+        client->mqtt_state.connection.outbound_message.qos = qos;
 
         // by default store as QUEUED (not transmitted yet) only for messages which would fit outbound buffer
         if (client->mqtt_state.connection.outbound_message.fragmented_msg_total_length == 0) {

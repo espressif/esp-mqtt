@@ -44,7 +44,10 @@ typedef struct mqtt_message {
     uint8_t *data;
     uint8_t *buffer;
     size_t buffer_length;
+    uint16_t id;
     uint16_t last_message_id;                 /*!< last generated id when incremental message ids are configured */
+    int type;
+    int qos;
 } mqtt_message_t;
 
 typedef struct mqtt_connect_info {
