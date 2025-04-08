@@ -22,7 +22,7 @@ uint64_t platform_tick_get_ms(void);
         }
 
 #define ESP_OK_CHECK(TAG, a, action) if ((a) != ESP_OK) {                                                     \
-        ESP_LOGE(TAG,"%s(%d): %s", __FUNCTION__, __LINE__, "Failed with non ESP_OK err code"); \
+        ESP_LOGE(TAG,"%s(%d): %s", __FUNCTION__, __LINE__, "Failed"); \
         action;                                                                                               \
         }
 
