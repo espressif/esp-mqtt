@@ -639,6 +639,7 @@ esp_err_t mqtt_msg_buffer_init(mqtt_message_t *message, int buffer_size)
         return ESP_ERR_NO_MEM;
     }
 
+    message->data = message->buffer;
     message->buffer_length = buffer_size;
     return ESP_OK;
 }

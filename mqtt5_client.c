@@ -79,11 +79,11 @@ void esp_mqtt5_decrement_packet_counter(esp_mqtt5_client_handle_t client)
 void esp_mqtt5_parse_pubcomp(esp_mqtt5_client_handle_t client)
 {
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-        ESP_LOGD(TAG, "MQTT_MSG_TYPE_PUBCOMP return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer,
-                                                                                           client->mqtt_state.in_buffer_read_len));
-        size_t msg_data_len = client->mqtt_state.in_buffer_read_len;
-        client->event.reason_code = mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_read_len);
-        client->event.data = mqtt5_get_pubcomp_data(client->mqtt_state.in_buffer, &msg_data_len,
+        ESP_LOGD(TAG, "MQTT_MSG_TYPE_PUBCOMP return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.inbound_message.data,
+                                                                                           client->mqtt_state.inbound_message.read_len));
+        size_t msg_data_len = client->mqtt_state.inbound_message.read_len;
+        client->event.reason_code = mqtt5_msg_get_reason_code(client->mqtt_state.inbound_message.data, client->mqtt_state.inbound_message.read_len);
+        client->event.data = mqtt5_get_pubcomp_data(client->mqtt_state.inbound_message.data, &msg_data_len,
                                                     &client->event.property->user_property);
         client->event.data_len = msg_data_len;
         client->event.total_data_len = msg_data_len;
@@ -94,11 +94,11 @@ void esp_mqtt5_parse_pubcomp(esp_mqtt5_client_handle_t client)
 void esp_mqtt5_parse_puback(esp_mqtt5_client_handle_t client)
 {
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-        ESP_LOGD(TAG, "MQTT_MSG_TYPE_PUBACK return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer,
-                                                                                          client->mqtt_state.in_buffer_read_len));
-        size_t msg_data_len = client->mqtt_state.in_buffer_read_len;
-        client->event.reason_code = mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_read_len);
-        client->event.data = mqtt5_get_puback_data(client->mqtt_state.in_buffer, &msg_data_len,
+        ESP_LOGD(TAG, "MQTT_MSG_TYPE_PUBACK return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.inbound_message.data,
+                                                                                          client->mqtt_state.inbound_message.read_len));
+        size_t msg_data_len = client->mqtt_state.inbound_message.read_len;
+        client->event.reason_code = mqtt5_msg_get_reason_code(client->mqtt_state.inbound_message.data, client->mqtt_state.inbound_message.read_len);
+        client->event.data = mqtt5_get_puback_data(client->mqtt_state.inbound_message.data, &msg_data_len,
                                                    &client->event.property->user_property);
         client->event.data_len = msg_data_len;
         client->event.total_data_len = msg_data_len;
@@ -109,11 +109,11 @@ void esp_mqtt5_parse_puback(esp_mqtt5_client_handle_t client)
 void esp_mqtt5_parse_unsuback(esp_mqtt5_client_handle_t client)
 {
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-        ESP_LOGD(TAG, "MQTT_MSG_TYPE_UNSUBACK return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer,
-                                                                                            client->mqtt_state.in_buffer_read_len));
-        size_t msg_data_len = client->mqtt_state.in_buffer_read_len;
-        client->event.reason_code = mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_read_len);
-        client->event.data = mqtt5_get_unsuback_data(client->mqtt_state.in_buffer, &msg_data_len,
+        ESP_LOGD(TAG, "MQTT_MSG_TYPE_UNSUBACK return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.inbound_message.data,
+                                                                                            client->mqtt_state.inbound_message.read_len));
+        size_t msg_data_len = client->mqtt_state.inbound_message.read_len;
+        client->event.reason_code = mqtt5_msg_get_reason_code(client->mqtt_state.inbound_message.data, client->mqtt_state.inbound_message.read_len);
+        client->event.data = mqtt5_get_unsuback_data(client->mqtt_state.inbound_message.data, &msg_data_len,
                                                      &client->event.property->user_property);
         client->event.data_len = msg_data_len;
         client->event.total_data_len = msg_data_len;
@@ -124,28 +124,28 @@ void esp_mqtt5_parse_unsuback(esp_mqtt5_client_handle_t client)
 void esp_mqtt5_parse_suback(esp_mqtt5_client_handle_t client)
 {
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-        ESP_LOGD(TAG, "MQTT_MSG_TYPE_SUBACK return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer,
-                                                                                          client->mqtt_state.in_buffer_read_len));
-        client->event.reason_code = mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_read_len);
+        ESP_LOGD(TAG, "MQTT_MSG_TYPE_SUBACK return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.inbound_message.data,
+                                                                                          client->mqtt_state.inbound_message.read_len));
+        client->event.reason_code = mqtt5_msg_get_reason_code(client->mqtt_state.inbound_message.data, client->mqtt_state.inbound_message.read_len);
     }
 }
 
 void esp_mqtt5_parse_disconnect(esp_mqtt5_client_handle_t client, int *disconnect_rsp_code)
 {
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-        *disconnect_rsp_code = mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_read_len);
+        *disconnect_rsp_code = mqtt5_msg_get_reason_code(client->mqtt_state.inbound_message.data, client->mqtt_state.inbound_message.read_len);
         ESP_LOGD(TAG, "MQTT_MSG_TYPE_DISCONNECT return code is %d", *disconnect_rsp_code);
     }
 }
 
 esp_err_t esp_mqtt5_parse_connack(esp_mqtt5_client_handle_t client, int *connect_rsp_code)
 {
-    size_t len = client->mqtt_state.in_buffer_read_len;
-    client->mqtt_state.in_buffer_read_len = 0;
+    size_t len = client->mqtt_state.inbound_message.read_len;
+    client->mqtt_state.inbound_message.read_len = 0;
     uint8_t ack_flag = 0;
     client->mqtt5_config->server_resp_property_info.receive_maximum = MQTT5_DEFAULT_RECEIVE_MAXIMUM;
 
-    if (mqtt5_msg_parse_connack_property(client->mqtt_state.in_buffer, len, &client->mqtt_state.
+    if (mqtt5_msg_parse_connack_property(client->mqtt_state.inbound_message.data, len, &client->mqtt_state.
                                          connection.information, &client->mqtt5_config->connect_property_info, &client->mqtt5_config->server_resp_property_info,
                                          connect_rsp_code, &ack_flag, &client->event.property->user_property) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to parse CONNACK packet");
@@ -735,7 +735,7 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
         if (connect_property->maximum_packet_size) {
             client->mqtt5_config->connect_property_info.maximum_packet_size = connect_property->maximum_packet_size;
         } else {
-            client->mqtt5_config->connect_property_info.maximum_packet_size = client->mqtt_state.in_buffer_length;
+            client->mqtt5_config->connect_property_info.maximum_packet_size = client->mqtt_state.inbound_message.buffer_length;
         }
 
         if (connect_property->receive_maximum) {

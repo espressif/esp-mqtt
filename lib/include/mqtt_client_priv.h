@@ -62,11 +62,8 @@ typedef struct mqtt_connection {
 } mqtt_connection_t;
 
 typedef struct mqtt_state {
-    uint8_t *in_buffer;
-    int in_buffer_length;
-    size_t message_length;
-    size_t in_buffer_read_len;
     mqtt_connection_t connection;
+    mqtt_message_t inbound_message;
 } mqtt_state_t;
 
 typedef struct {
