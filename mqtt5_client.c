@@ -519,6 +519,7 @@ static esp_err_t esp_mqtt5_user_property_copy(mqtt5_user_property_handle_t user_
         ESP_LOGE(TAG, "Input is NULL");
         return ESP_FAIL;
     }
+
     return mqtt5_msg_copy_user_property(user_property_new, user_property_old);
 }
 

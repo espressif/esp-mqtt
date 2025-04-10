@@ -1403,20 +1403,36 @@ static bool remove_initiator_message(esp_mqtt_client_handle_t client, int msg_ty
     return false;
 }
 
-static outbox_item_handle_t mqtt_enqueue(esp_mqtt_client_handle_t client, const uint8_t *remaining_data, int remaining_len)
+static outbox_item_handle_t mqtt_enqueue(outbox_handle_t outbox, mqtt_message_t *message, const uint8_t *remaining_data,
+                                         int remaining_len)
 {
-    ESP_LOGD(TAG, "mqtt_enqueue id: %d, type=%d successful",
-             client->mqtt_state.connection.outbound_message.id, client->mqtt_state.connection.outbound_message.type);
-    outbox_message_t msg = { 0 };
-    msg.data = client->mqtt_state.connection.outbound_message.data;
-    msg.len =  client->mqtt_state.connection.outbound_message.length;
-    msg.msg_id = client->mqtt_state.connection.outbound_message.id;
-    msg.msg_type = client->mqtt_state.connection.outbound_message.type;
-    msg.msg_qos = client->mqtt_state.connection.outbound_message.qos;
-    msg.remaining_data = remaining_data;
-    msg.remaining_len = remaining_len;
-    //Copy to queue buffer
-    return outbox_enqueue(client->outbox, &msg, platform_tick_get_ms());
+    ESP_LOGD(TAG, "mqtt_enqueue id: %d, type=%d", message->id, message->type);
+    size_t append_len = (remaining_data && remaining_len > 0) ? (size_t)remaining_len : 0;
+    mqtt_message_t *new_message = mqtt_msg_create(message->length + append_len);
+
+    if (!new_message) {
+        ESP_LOGE(TAG, "Failed to allocate message to be stored in the outbox");
+        return NULL;
+    }
+
+    if (mqtt_msg_copy(new_message, message) != ESP_OK) {
+        mqtt_msg_destroy(new_message);
+        return NULL;
+    }
+
+    if (append_len > 0 && mqtt_msg_append(new_message, remaining_data, append_len) != ESP_OK) {
+        mqtt_msg_destroy(new_message);
+        return NULL;
+    }
+
+    outbox_item_handle_t item = outbox_enqueue(outbox, new_message, platform_tick_get_ms());
+
+    if (!item) {
+        /* The outbox takes ownership of the message only when the item is created. */
+        mqtt_msg_destroy(new_message);
+    }
+
+    return item;
 }
 
 /*
@@ -2377,7 +2393,7 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
     client->mqtt_state.connection.outbound_message.type = mqtt_get_type(client->mqtt_state.connection.outbound_message.data);
 
     //move pending msg to outbox (if have)
-    if (!mqtt_enqueue(client, NULL, 0)) {
+    if (!mqtt_enqueue(client->outbox, &client->mqtt_state.connection.outbound_message, NULL, 0)) {
         MQTT_API_UNLOCK(client);
         return -1;
     }
@@ -2445,7 +2461,7 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
     ESP_LOGD(TAG, "unsubscribe, topic\"%s\", id: %d", topic, client->mqtt_state.connection.outbound_message.id);
     client->mqtt_state.connection.outbound_message.type = mqtt_get_type(client->mqtt_state.connection.outbound_message.data);
 
-    if (!mqtt_enqueue(client, NULL, 0)) {
+    if (!mqtt_enqueue(client->outbox, &client->mqtt_state.connection.outbound_message, NULL, 0)) {
         MQTT_API_UNLOCK(client);
         return -1;
     }
@@ -2516,14 +2532,15 @@ static inline int mqtt_client_enqueue_publish(esp_mqtt_client_handle_t client, c
 
         // by default store as QUEUED (not transmitted yet) only for messages which would fit outbound buffer
         if (client->mqtt_state.connection.outbound_message.fragmented_msg_total_length == 0) {
-            if (!mqtt_enqueue(client, NULL, 0)) {
+            if (!mqtt_enqueue(client->outbox, &client->mqtt_state.connection.outbound_message, NULL, 0)) {
                 return -1;
             }
         } else {
             int first_fragment = client->mqtt_state.connection.outbound_message.length -
                                  client->mqtt_state.connection.outbound_message.fragmented_msg_data_offset;
 
-            if (!mqtt_enqueue(client, (const uint8_t *)data + first_fragment, len - first_fragment)) {
+            if (!mqtt_enqueue(client->outbox, &client->mqtt_state.connection.outbound_message,
+                              ((const uint8_t *)data) + first_fragment, len - first_fragment)) {
                 return -1;
             }
 

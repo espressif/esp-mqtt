@@ -102,8 +102,13 @@ char *mqtt_get_suback_data(uint8_t *buffer, size_t *length);
 uint16_t mqtt_get_id(uint8_t *buffer, size_t length);
 int mqtt_has_valid_msg_hdr(uint8_t *buffer, size_t length);
 
-esp_err_t mqtt_msg_buffer_init(mqtt_message_t *message, int buffer_size);
+mqtt_message_t *mqtt_msg_create(size_t buffer_length);
+void mqtt_msg_destroy(mqtt_message_t *message);
+esp_err_t mqtt_msg_buffer_init(mqtt_message_t *message, size_t buffer_size);
 void mqtt_msg_buffer_destroy(mqtt_message_t *message);
+mqtt_message_t *mqtt_msg_dup(const mqtt_message_t *message);
+esp_err_t mqtt_msg_copy(mqtt_message_t *message, const mqtt_message_t *src);
+esp_err_t mqtt_msg_append(mqtt_message_t *message, const uint8_t *data, size_t length);
 
 mqtt_message_t *mqtt_msg_connect(mqtt_message_t *message, mqtt_connect_info_t *info);
 mqtt_message_t *mqtt_msg_publish(mqtt_message_t *message, const char *topic, const char *data, int data_length, int qos, int retain, uint16_t *message_id);

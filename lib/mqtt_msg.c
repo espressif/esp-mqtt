@@ -3,9 +3,11 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
+#include <stdlib.h>
 #include <string.h>
 #include "esp_heap_caps.h"
 #include "mqtt_msg.h"
+#include "esp_log.h"
 #include "mqtt_config.h"
 #include "platform.h"
 
@@ -465,7 +467,7 @@ mqtt_message_t *mqtt_msg_publish(mqtt_message_t *message, const char *topic, con
                    message->buffer_length - message->length);
             message->length = message->buffer_length;
             message->fragmented_msg_total_length = data_length +
-                                                                       message->fragmented_msg_data_offset;
+                                                   message->fragmented_msg_data_offset;
         } else {
             memcpy(message->buffer + message->length, data, data_length);
             message->length += data_length;
@@ -630,10 +632,10 @@ int mqtt_has_valid_msg_hdr(uint8_t *buffer, size_t length)
     }
 }
 
-esp_err_t mqtt_msg_buffer_init(mqtt_message_t *message, int buffer_size)
+static esp_err_t msg_buffer_init(mqtt_message_t *message, size_t buffer_size, uint32_t caps)
 {
     memset(message, 0, sizeof(mqtt_message_t));
-    message->buffer = (uint8_t *)heap_caps_calloc(buffer_size, sizeof(uint8_t), MQTT_BUFFER_MEMORY);
+    message->buffer = (uint8_t *)heap_caps_calloc(buffer_size, sizeof(uint8_t), caps);
 
     if (!message->buffer) {
         return ESP_ERR_NO_MEM;
@@ -644,9 +646,107 @@ esp_err_t mqtt_msg_buffer_init(mqtt_message_t *message, int buffer_size)
     return ESP_OK;
 }
 
+esp_err_t mqtt_msg_buffer_init(mqtt_message_t *message, size_t buffer_size)
+{
+    return msg_buffer_init(message, buffer_size, MQTT_BUFFER_MEMORY);
+}
+
 void mqtt_msg_buffer_destroy(mqtt_message_t *message)
 {
     if (message) {
         free(message->buffer);
     }
+}
+
+/* Messages created here are owned by the outbox, hence the outbox memory capabilities. */
+mqtt_message_t *mqtt_msg_create(size_t buffer_size)
+{
+    mqtt_message_t *message = heap_caps_calloc(1, sizeof(mqtt_message_t), MQTT_OUTBOX_MEMORY);
+
+    if (!message) {
+        return NULL;
+    }
+
+    if (msg_buffer_init(message, buffer_size, MQTT_OUTBOX_MEMORY) != ESP_OK) {
+        free(message);
+        return NULL;
+    }
+
+    return message;
+}
+
+void mqtt_msg_destroy(mqtt_message_t *message)
+{
+    if (message) {
+        mqtt_msg_buffer_destroy(message);
+        free(message);
+    }
+}
+
+/* `data` may be offset from `buffer` start to leave room for the fixed header, so the copy is
+   placed at `data_offset` and the payload is taken from `src->data`, not from `src->buffer`. */
+static esp_err_t msg_copy_at_offset(mqtt_message_t *message, const mqtt_message_t *src, size_t data_offset)
+{
+    if (message->buffer_length < data_offset + src->length) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    message->length = src->length;
+    message->fragmented_msg_data_offset = src->fragmented_msg_data_offset;
+    message->fragmented_msg_total_length = src->fragmented_msg_total_length;
+    message->read_len = src->read_len;
+    message->id = src->id;
+    message->type = src->type;
+    message->qos = src->qos;
+    message->data = message->buffer + data_offset;
+    memcpy(message->data, src->data, src->length);
+    return ESP_OK;
+}
+
+mqtt_message_t *mqtt_msg_dup(const mqtt_message_t *message)
+{
+    if (!message || !message->buffer || !message->data) {
+        return NULL;
+    }
+
+    mqtt_message_t *new_message = mqtt_msg_create(message->buffer_length);
+
+    if (!new_message) {
+        return NULL;
+    }
+
+    if (msg_copy_at_offset(new_message, message, message->data - message->buffer) != ESP_OK) {
+        mqtt_msg_destroy(new_message);
+        return NULL;
+    }
+
+    return new_message;
+}
+
+/* The copy is compacted: `data` starts at the beginning of the destination buffer, so only
+   `src->length` bytes are required in it. */
+esp_err_t mqtt_msg_copy(mqtt_message_t *message, const mqtt_message_t *src)
+{
+    if (!message || !src || !message->buffer || !src->data) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    return msg_copy_at_offset(message, src, 0);
+}
+
+esp_err_t mqtt_msg_append(mqtt_message_t *message, const uint8_t *data, size_t length)
+{
+    if (!message || !message->buffer || !message->data || !data) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    size_t data_offset = message->data - message->buffer;
+
+    if (data_offset + message->length + length > message->buffer_length) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    memcpy(message->data + message->length, data, length);
+    message->length += length;
+    return ESP_OK;
 }
