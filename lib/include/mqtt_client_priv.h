@@ -85,6 +85,7 @@ typedef struct {
     int clientkey_password_len;
     bool use_global_ca_store;
     esp_err_t ((*crt_bundle_attach)(void *conf));
+    const int *ciphersuites_list;
     const char *cacert_buf;
     size_t cacert_bytes;
     const char *clientcert_buf;
