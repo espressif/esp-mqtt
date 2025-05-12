@@ -231,6 +231,21 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
         goto esp_mqtt_set_transport_failed;
 #endif
     }
+
+    if (cfg->use_ecdsa_peripheral) {
+#ifdef MQTT_SUPPORTED_FEATURE_ECDSA_PERIPHERAL
+#ifdef CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN
+        esp_transport_ssl_set_client_key_ecdsa_peripheral(ssl, cfg->ecdsa_key_efuse_blk);
+#else
+        ESP_LOGE(TAG, "ECDSA peripheral not enabled for esp-tls in menuconfig");
+        goto esp_mqtt_set_transport_failed;
+#endif /* CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN */
+#else
+        ESP_LOGE(TAG, "ECDSA peripheral feature is not available in IDF version %s", IDF_VER);
+        goto esp_mqtt_set_transport_failed;
+#endif /* MQTT_SUPPORTED_FEATURE_ECDSA_PERIPHERAL */
+    }
+
     ESP_OK_CHECK(TAG, esp_mqtt_set_cert_key_data(ssl, MQTT_SSL_DATA_API_CLIENT_CERT, cfg->clientcert_buf, cfg->clientcert_bytes),
                  goto esp_mqtt_set_transport_failed);
     ESP_OK_CHECK(TAG, esp_mqtt_set_cert_key_data(ssl, MQTT_SSL_DATA_API_CLIENT_KEY, cfg->clientkey_buf, cfg->clientkey_bytes),
@@ -570,6 +585,8 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     client->config->common_name = config->broker.verification.common_name;
     client->config->use_secure_element = config->credentials.authentication.use_secure_element;
     client->config->ds_data = config->credentials.authentication.ds_data;
+    client->config->use_ecdsa_peripheral = config->credentials.authentication.use_ecdsa_peripheral;
+    client->config->ecdsa_key_efuse_blk = config->credentials.authentication.ecdsa_key_efuse_blk;
 
     if (config->credentials.authentication.key_password && config->credentials.authentication.key_password_len) {
         client->config->clientkey_password_len = config->credentials.authentication.key_password_len;

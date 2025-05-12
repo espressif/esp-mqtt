@@ -308,6 +308,8 @@ typedef struct esp_mqtt_client_config_t {
             bool use_secure_element; /*!< Enable secure element, available in ESP32-ROOM-32SE, for SSL connection */
             void *ds_data; /*!< Carrier of handle for digital signature parameters, digital signature peripheral is
                    available in some Espressif devices.  It's not copied nor freed by the client, user needs to clean up.*/
+            bool use_ecdsa_peripheral; /*!< Enable ECDSA peripheral, available in some Espressif devices. */
+            uint8_t ecdsa_key_efuse_blk; /*!< ECDSA key block number from efuse, available in some Espressif devices. */
         } authentication; /*!< Client authentication */
     } credentials; /*!< User credentials for broker */
     /**
