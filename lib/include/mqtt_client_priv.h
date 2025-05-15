@@ -96,6 +96,8 @@ typedef struct {
     const char *common_name;
     bool use_secure_element;
     void *ds_data;
+    bool use_ecdsa_peripheral;
+    uint8_t ecdsa_key_efuse_blk;
     int message_retransmit_timeout;
     uint64_t outbox_limit;
     esp_transport_handle_t transport;
