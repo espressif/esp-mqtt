@@ -177,4 +177,14 @@ menu "ESP-MQTT Configurations"
         help
             Messages which stays in the outbox longer than this value before being published will be discarded.
 
+    config MQTT_TOPIC_PRESENT_ALL_DATA_EVENTS
+        bool "Enable publish topic in all data events"
+        default n
+        depends on MQTT_USE_CUSTOM_CONFIG
+        help
+            Set to true to have publish topic in all data events. This changes the behaviour
+            when  the message is bigger than the receive buffer size. The first event of the sequence
+            always have the topic.
+            Note: This will allocate memory to store the topic only in case of messge bigger than the buffer size.
+
 endmenu
