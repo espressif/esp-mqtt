@@ -158,10 +158,14 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
                      goto esp_mqtt_set_transport_failed);
 
     }
-
     if(cfg->ciphersuites_list)
     {
+#if defined(MQTT_SUPPORTED_FEATURE_CIPHERSUITES_LIST)
         esp_transport_ssl_set_ciphersuites_list(ssl,cfg->ciphersuites_list);
+#else
+        ESP_LOGE(TAG, "Cipher suites list feature is not available in IDF version %s", IDF_VER);
+        goto esp_mqtt_set_transport_failed;
+#endif /* MQTT_SUPPORTED_FEATURE_CIPHERSUITES_LIST */
     }
 
     if (cfg->psk_hint_key) {
