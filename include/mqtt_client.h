@@ -274,6 +274,8 @@ typedef struct esp_mqtt_client_config_t {
                                                                If NULL, server certificate CN must match hostname.
                                                                This is ignored if skip_cert_common_name_check=true.
                                                   It's not copied nor freed by the client, user needs to clean up.*/
+            const int *ciphersuites_list;    /*!< Pointer to a zero-terminated array of IANA identifiers of TLS cipher suites. 
+                                              Please ensure the validity of the list, and note that it is not copied or freed by the client. */
         } verification; /*!< Security verification of the broker */
     } broker; /*!< Broker address and security verification */
     /**

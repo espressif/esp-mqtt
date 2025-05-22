@@ -158,6 +158,16 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
                      goto esp_mqtt_set_transport_failed);
 
     }
+    if(cfg->ciphersuites_list)
+    {
+#if defined(MQTT_SUPPORTED_FEATURE_CIPHERSUITES_LIST)
+        esp_transport_ssl_set_ciphersuites_list(ssl,cfg->ciphersuites_list);
+#else
+        ESP_LOGE(TAG, "Cipher suites list feature is not available in IDF version %s", IDF_VER);
+        goto esp_mqtt_set_transport_failed;
+#endif /* MQTT_SUPPORTED_FEATURE_CIPHERSUITES_LIST */
+    }
+
     if (cfg->psk_hint_key) {
 #if defined(MQTT_SUPPORTED_FEATURE_PSK_AUTHENTICATION) && MQTT_ENABLE_SSL
 #ifdef CONFIG_ESP_TLS_PSK_VERIFICATION
@@ -578,6 +588,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     client->config->cacert_bytes = config->broker.verification.certificate_len;
     client->config->psk_hint_key = config->broker.verification.psk_hint_key;
     client->config->crt_bundle_attach = config->broker.verification.crt_bundle_attach;
+    client->config->ciphersuites_list = config->broker.verification.ciphersuites_list;
     client->config->clientcert_buf = config->credentials.authentication.certificate;
     client->config->clientcert_bytes = config->credentials.authentication.certificate_len;
     client->config->clientkey_buf = config->credentials.authentication.key;
