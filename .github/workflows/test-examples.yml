@@ -1,52 +1,76 @@
 name: "Build example apps"
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    push:
+        branches:
+            - master
+    pull_request:
+        types: [opened, synchronize, reopened, labeled]
 
 jobs:
-    cpp-compatibility:
-        name: Cpp compatibility
+    build:
+        name: Build Apps
         strategy:
             matrix:
-                idf_version: ["release-v5.0", "release-v5.1", "latest"]
+                idf_version:
+                    [
+                        "release-v5.1",
+                        "release-v5.2",
+                        "release-v5.3",
+                        "release-v5.4",
+                        "release-v5.5",
+                        "latest",
+                    ]
                 target: ["esp32"]
-                example: [{name: cpp_compatibility, path: "build_test"}]
+                example:
+                    [
+                        { name: tcp, path: "mqtt/tcp", upload: false },
+                        { name: ssl, path: "mqtt/ssl", upload: false },
+                        {
+                            name: ssl_mutual_auth,
+                            path: "mqtt/ssl_mutual_auth",
+                            upload: false,
+                        },
+                        { name: ws, path: "mqtt/ws", upload: false },
+                        { name: wss, path: "mqtt/wss", upload: false },
+                        { name: ssl_psk, path: "mqtt/ssl_psk", upload: false },
+                        { name: ssl_ds, path: "mqtt/ssl_ds", upload: false },
+                        {
+                            name: publish_connect_test,
+                            path: "publish_connect_test",
+                            upload: true,
+                        },
+                        {
+                            name: cpp_compatibility,
+                            path: "build_test",
+                            upload: false,
+                        },
+                    ]
         uses: "./.github/workflows/build-app.yml"
         with:
             idf_version: ${{matrix.idf_version}}
             target: ${{matrix.target}}
             app_name: ${{matrix.example.name}}
             app_path: $IDF_PATH/tools/test_apps/protocols/mqtt/${{matrix.example.path}}
-            upload_artifacts: false
-    build-only-example:
-        name: Build Only Apps
-        strategy:
-            matrix:
-                idf_version: ["release-v5.0", "release-v5.1", "latest"]
-                target: ["esp32s2", "esp32c3", "esp32s3"]
-                example: [{name: ssl_psk, path: "mqtt/ssl_psk"}, {name: ssl_ds, path: "mqtt/ssl_ds"}]
-        uses: "./.github/workflows/build-app.yml"
-        with:
-            idf_version: ${{matrix.idf_version}}
-            target: ${{matrix.target}}
-            app_name: ${{matrix.example.name}}
-            app_path: $IDF_PATH/examples/protocols/${{matrix.example.path}}
+            upload_artifacts: ${{matrix.example.upload}}
 
-    build-examples:
-        name: Build and Run on target
+    publish_connect_test:
+        name: Publish and Connect test
+        needs: build
         strategy:
             matrix:
-                idf_version: ["release-v5.0", "release-v5.1", "latest"]
+                idf_version: ["latest"]
                 target: ["esp32"]
-                example: [{name: tcp, path: "mqtt/tcp"}, {name: ssl, path: "mqtt/ssl"},{name: ssl_mutual_auth, path: "mqtt/ssl_mutual_auth"},{name: ws, path: "mqtt/ws"},{name: wss, path: "mqtt/wss"}]
-        uses: "./.github/workflows/build-and-target-test.yml"
+                example:
+                    [
+                        {
+                            name: publish_connect_test,
+                            path: "publish_connect_test",
+                        },
+                    ]
+        uses: "./.github/workflows/run-on-target.yml"
         with:
             idf_version: ${{matrix.idf_version}}
             target: ${{matrix.target}}
             app_name: ${{matrix.example.name}}
-            app_path: $IDF_PATH/examples/protocols/${{matrix.example.path}}
-
+            app_path: $IDF_PATH/tools/test_apps/protocols/mqtt/${{matrix.example.path}}
