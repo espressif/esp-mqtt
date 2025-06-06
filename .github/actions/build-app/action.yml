@@ -1,0 +1,54 @@
+name: Build app
+description: Build ESP-IDF applications
+
+inputs:
+    idf_version:
+        required: true
+        description: ESP-IDF version to use
+    target:
+        required: true
+        description: Target platform
+    app_name:
+        required: true
+        description: Application name
+    app_path:
+        required: true
+        description: Path to the application
+    build_dir:
+        required: false
+        description: Directory for build artifacts
+        default: build_@t_
+
+outputs:
+    artifacts_path:
+        description: "App path"
+        value: ${{ steps.set-path.outputs.artifacts_path }}
+
+runs:
+    using: "composite"
+    steps:
+        - name: ccache
+          uses: hendrikmuhs/ccache-action@v1.2
+          with:
+              key: ${{ inputs.idf_version }}-${{ inputs.target }}
+        - name: Install dependencies
+          shell: bash
+          run: |
+              . ${IDF_PATH}/export.sh
+              python -m pip install idf-build-apps
+        - name: Build ${{ inputs.app_name }} with IDF-${{ inputs.idf_version }}
+          shell: bash
+          run: |
+              . ${IDF_PATH}/export.sh
+              export PEDANTIC_FLAGS="-DIDF_CI_BUILD -Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
+              export EXTRA_CFLAGS="${PEDANTIC_FLAGS} -Wstrict-prototypes"
+              export EXTRA_CXXFLAGS="${PEDANTIC_FLAGS}"
+              rm -rf $IDF_PATH/components/mqtt/esp-mqtt
+              cp -r . $IDF_PATH/components/mqtt/esp-mqtt
+              IDF_CCACHE_ENABLE=1 idf-build-apps build --config-rules "sdkconfig.ci.*=" "=default" --collect-app-info build_info_${{ inputs.idf_version }}.json --build-dir ${{ inputs.build_dir }} -p ${{ inputs.app_path }} -t ${{ inputs.target }}
+        - name: Set app artifact path
+          id: set-path
+          shell: bash
+          run: |
+              artifacts_path=$(eval echo "${{ inputs.app_path }}")
+              echo "artifacts_path=$artifacts_path" >> "$GITHUB_OUTPUT"

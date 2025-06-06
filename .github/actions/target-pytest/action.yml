@@ -1,0 +1,52 @@
+name: Target Pytest run
+description: Run pytest test cases
+
+inputs:
+    target:
+        required: true
+        description: Target platform
+    app_name:
+        required: true
+        description: Application name
+    app_path:
+        required: true
+        description: Path to the application
+    build_dir:
+        required: false
+        description: Directory for build artifacts
+
+runs:
+    using: "composite"
+    steps:
+        - name: Install Python packages
+          shell: bash
+          env:
+              PIP_EXTRA_INDEX_URL: "https://dl.espressif.com/pypi/"
+          run: pip install --prefer-binary cryptography pytest-embedded pytest-embedded-serial-esp pytest-embedded-idf pytest-custom_exit_code
+        - name: Run apps
+          shell: bash
+          run: |
+              pytest ${{inputs.app_path}} --ignore-glob '*/managed_components/*' --ignore=.github --target=${{ inputs.target }} --embedded-services esp,idf --build-dir build_esp32_default
+        # - name: Upload test results
+        #   uses: actions/upload-artifact@v4
+        #   if: always()
+        #   with:
+        #       name: ${{ env.TEST_RESULT_NAME }}
+        #       path: ${{ env.TEST_RESULT_FILE }}
+
+    # publish-results:
+    # name: Publish Test results
+    # needs:
+    # - run-target
+    # if: github.repository_owner == 'espressif' && always() && github.event_name == 'pull_request' && needs.prepare.outputs.build_only == '0'
+    # runs-on: ubuntu-22.04
+    # steps:
+    # - name: Download Test results
+    #     uses: actions/download-artifact@v4
+    #     with:
+    #     pattern: test_results_*
+    #     path: test_results
+    # - name: Publish Test Results
+    #     uses: EnricoMi/publish-unit-test-result-action@v2
+    #     with:
+    #     files: test_results/**/*.xml                 path: build/*.xml
