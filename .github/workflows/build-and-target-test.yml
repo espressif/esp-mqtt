@@ -16,22 +16,20 @@ on:
                 type: string
                 required: true
 
-
 jobs:
     build-app:
         uses: "./.github/workflows/build-app.yml"
         with:
-             idf_version: ${{inputs.idf_version}}
-             target: ${{inputs.target}}
-             app_name: ${{inputs.app_name}}
-             app_path: ${{inputs.app_path}}
+            idf_version: ${{inputs.idf_version}}
+            target: ${{inputs.target}}
+            app_name: ${{inputs.app_name}}
+            app_path: ${{inputs.app_path}}
 
-    # run-on-target:
-    #     needs: build-app
-    #     uses: "./.github/workflows/run-on-target.yml"
-    #     with:
-    #          idf_version: ${{inputs.idf_version}}
-    #          target: ${{inputs.target}}
-    #          app_name: ${{inputs.app_name}}
-    #          app_path: ${{inputs.app_path}}
-
+    run-on-target:
+        needs: build-app
+        uses: "./.github/workflows/run-on-target.yml"
+        with:
+            idf_version: ${{inputs.idf_version}}
+            target: ${{inputs.target}}
+            app_name: ${{inputs.app_name}}
+            app_path: ${{inputs.app_path}}

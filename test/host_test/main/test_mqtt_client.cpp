@@ -120,7 +120,7 @@ SCENARIO("MQTT Client Operation")
             SECTION("User set interface to use"){
                 http_parser_parse_url_ExpectAnyArgsAndReturn(0);
                 http_parser_parse_url_ReturnThruPtr_u(&ret_uri);
-                struct ifreq if_name = {.ifr_ifrn = {"custom"}};
+                struct ifreq if_name = {.ifr_ifrn = {"custom"}, .ifr_ifru = {} };
                 config.network.if_name = &if_name;
                 SECTION("Client is not started"){
                     REQUIRE(esp_mqtt_set_config(client.get(), &config)== ESP_OK);
@@ -142,22 +142,45 @@ SCENARIO("MQTT Client Operation")
             auto lw_msg = random_string(10);
 
             config.broker = {.address = {
+                    .uri = nullptr,
                     .hostname = host.data(),
-                    .path = path.data()
-                }
+                    .transport = MQTT_TRANSPORT_OVER_TCP,
+                    .path = path.data(),
+                    .port = 1883
+                },
+                .verification = { }
             };
             config.credentials = {
                 .username = username.data(),
                 .client_id = client_id.data(),
+                .set_null_client_id = false,
                 .authentication = {
-                    .password = password.data()
-                }
+                    .password = password.data(),
+                    .certificate = {},
+                    .certificate_len = 0,
+                    .key = nullptr,
+                    .key_len = 0,
+                    .key_password = nullptr,
+                    .key_password_len = 0,
+                    .use_secure_element = false,
+                    .ds_data = nullptr,
+                    .use_ecdsa_peripheral = false,
+                    .ecdsa_key_efuse_blk = 0
+                },
             };
             config.session = {
-                .last_will {
+                .last_will = {
                     .topic = lw_topic.data(),
-                    .msg = lw_msg.data()
-                }
+                    .msg = lw_msg.data(),
+                    .msg_len = 0,
+                    .qos = 0,
+                    .retain = 0
+                },
+                .disable_clean_session = {},
+                .keepalive = {},
+                .disable_keepalive = {},
+                .protocol_ver = MQTT_PROTOCOL_V_3_1_1,
+                .message_retransmit_timeout = 0
             };
             auto client = unique_mqtt_client{esp_mqtt_client_init(&config)};
             REQUIRE(client != nullptr);
