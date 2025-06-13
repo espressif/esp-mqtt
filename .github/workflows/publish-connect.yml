@@ -1,0 +1,142 @@
+name: "Publish connect tests"
+on:
+    push:
+        branches:
+            - master
+    pull_request:
+        types: [opened, synchronize, reopened, labeled]
+
+env:
+    target: esp32
+    idf_version: latest
+    app_name: publish_connect_test
+    app_path: $IDF_PATH/tools/test_apps/protocols/mqtt/publish_connect_test
+
+jobs:
+    build:
+        name: Build Test App
+        runs-on: ubuntu-22.04
+        env:
+            EXAMPLE_MQTT_BROKER_SSL: "mqtt.eclipseprojects.io:1883"
+            EXAMPLE_MQTT_BROKER_TCP: "mqtt.eclipseprojects.io:8883"
+            EXAMPLE_MQTT_BROKER_WS: "mqtt.eclipseprojects.io"
+            EXAMPLE_MQTT_BROKER_WSS: "mqtt.eclipseprojects.io"
+        outputs:
+            build_path: ${{steps.build.outputs.artifacts_path}}
+        container: espressif/idf:latest
+        steps:
+            - name: Add node for local tests
+              if: ${{ env.ACT }}
+              shell: bash
+              run: |
+                  curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+                  apt-get install -y nodejs
+            - name: Checkout esp-mqtt
+              uses: actions/checkout@v4
+            - name: Build App
+              id: build
+              uses: ./.github/actions/build-app
+              with:
+                  idf_version: latest
+                  target: ${{env.target}}
+                  app_name: ${{env.app_name}}
+                  app_path: ${{env.app_path}}
+                  build_dir: build_@t_@w
+            - name: Upload files to artifacts for run-target job
+              uses: actions/upload-artifact@v4
+              with:
+                  name: mqtt_bin_${{env.target}}_${{ env.idf_version }}_${{ env.app_name }}
+                  path: |
+                      ${{steps.build.outputs.artifacts_path}}/build_*/bootloader/bootloader.bin
+                      ${{steps.build.outputs.artifacts_path}}/build_*/partition_table/partition-table.bin
+                      ${{steps.build.outputs.artifacts_path}}/build_*/*.bin
+                      ${{steps.build.outputs.artifacts_path}}/build_*/flasher_args.json
+                      ${{steps.build.outputs.artifacts_path}}/build_*/config/sdkconfig.json
+                      ${{steps.build.outputs.artifacts_path}}/*.py
+                  if-no-files-found: error
+
+    run-on-target:
+        # if: github.repository == 'espressif/esp-mqtt'
+        name: Publish and Connect target test
+        needs: build
+        # strategy:
+        #     fail-fast: false
+        #     matrix:
+        #         idf_ver:
+        #         - "release-v5.0"
+        #         - "release-v5.1"
+        #         - "release-v5.2"
+        #         - "release-v5.3"
+        #         - "release-v5.4"
+        #         - "release-v5.5"
+        #         - "latest"
+        #         runner:
+        #             - runs-on: "esp32"
+        #               marker: "generic"
+        #               target: "esp32"
+        #             - runs-on: "ESP32-ETHERNET-KIT"
+        #               marker: "ethernet"
+        #               target: "esp32"
+        #             - runs-on: "spi_nand_flash"
+        #               marker: "spi_nand_flash"
+        #               target: "esp32"
+        # env:
+        #     TEST_RESULT_NAME: test_results_${{ matrix.runner.target }}_${{ matrix.runner.marker }}_${{ matrix.idf_ver }}
+        #     TEST_RESULT_FILE: test_results_${{ matrix.runner.target }}_${{ matrix.runner.marker }}_${{ matrix.idf_ver }}.xml
+        # runs-on: [self-hosted, linux, docker, "${{ matrix.runner.runs-on }}"]
+        container:
+            image: python:3.11-bookworm
+            options: --privileged # Privileged mode has access to serial ports
+        runs-on: [self-hosted, linux, docker, ESP32-ETHERNET-KIT]
+
+        strategy:
+            matrix:
+                idf_version: ["latest"]
+                target: ["esp32"]
+                example:
+                    [
+                        {
+                            name: publish_connect_test,
+                            path: "publish_connect_test",
+                        },
+                    ]
+        steps:
+            - name: Add node for local tests
+              if: ${{ env.ACT }}
+              shell: bash
+              run: |
+                  curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+                  apt-get install -y nodejs
+            - uses: actions/checkout@v4
+            - name: Download artifacts
+              uses: actions/download-artifact@v4
+              id: artifacts
+              with:
+                  name: mqtt_bin_${{env.target}}_${{ env.idf_version }}_${{ env.app_name }}
+                  path: test
+            - name: Check artifacts
+              shell: bash
+              run: ls test/
+            # - name: Checkout IDF ${{inputs.idf_version}}
+            #   uses: actions/checkout@v4
+            #   with:
+            #       repository: espressif/esp-idf
+            #       path: idf
+            #       ref: master
+            # - name: Install Python packages
+            #   shell: bash
+            #   env:
+            #       PIP_EXTRA_INDEX_URL: "https://dl.espressif.com/pypi/"
+            #   run: pip install --prefer-binary -r idf/tools/requirements/requirements.pytest.txt
+            # - name: Download artifacts
+            #   uses: actions/download-artifact@v4
+            #   id: artifacts
+            #   with:
+            #       name: mqtt_bin_${{env.target}}_${{ env.idf_version }}_${{ env.app_name }}
+            #       path: idf/tools/test_apps/protocols/mqtt/publish_connect_test
+            - name: Run app
+              uses: ./.github/actions/target-pytest
+              with:
+                  target: esp32
+                  app_name: publish_connnect_test
+                  app_path: test

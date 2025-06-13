@@ -4,6 +4,7 @@ import contextlib
 import logging
 import os
 import re
+import socket
 import socketserver
 import ssl
 import subprocess
@@ -14,12 +15,21 @@ from typing import Dict
 from typing import Optional
 
 import pytest
-from common_test_methods import get_host_ip4_by_dest_ip
 from pytest_embedded import Dut
 from pytest_embedded_idf.utils import idf_parametrize
 
 SERVER_PORT = 2222
 
+def get_host_ip4_by_dest_ip(dest_ip: str = '') -> str:
+    if not dest_ip:
+        dest_ip = '8.8.8.8'
+    s1 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s1.connect((dest_ip, 80))
+    host_ip = s1.getsockname()[0]
+    s1.close()
+    assert isinstance(host_ip, str)
+    print(f'Using host ip: {host_ip}')
+    return host_ip
 
 def _path(f):  # type: (str) -> str
     return os.path.join(os.path.dirname(os.path.realpath(__file__)), f)
@@ -249,8 +259,8 @@ def run_cases(dut: Dut, uri: str, cases: Dict[str, int]) -> None:
         dut.write('destroy')
 
 
-@pytest.mark.ethernet
-@idf_parametrize('target', ['esp32'], indirect=['target'])
+# @pytest.mark.ethernet
+# @idf_parametrize('target', ['esp32'], indirect=['target'])
 def test_mqtt_connect(
     dut: Dut,
     log_performance: Callable[[str, object], None],

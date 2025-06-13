@@ -294,11 +294,11 @@ test_cases = make_cases(transport_cases, get_scenarios())
 stress_test_cases = make_cases(transport_cases, stress_scenarios)
 
 
-@pytest.mark.ethernet
+# @pytest.mark.ethernet
 @pytest.mark.parametrize('test_case', test_cases)
-@pytest.mark.parametrize('config', ['default'], indirect=True)
-@idf_parametrize('target', ['esp32'], indirect=['target'])
-@pytest.mark.flaky(reruns=1, reruns_delay=1)
+# @pytest.mark.parametrize('config', ['default'], indirect=True)
+# @idf_parametrize('target', ['esp32'], indirect=['target'])
+# @pytest.mark.flaky(reruns=1, reruns_delay=1)
 def test_mqtt_publish(dut: Dut, test_case: Any) -> None:
     publish_cfg = get_configurations(dut, test_case)
     dut.expect(re.compile(rb'mqtt>'), timeout=30)
@@ -306,24 +306,24 @@ def test_mqtt_publish(dut: Dut, test_case: Any) -> None:
     run_publish_test_case(dut, publish_cfg)
 
 
-@pytest.mark.ethernet_stress
-@pytest.mark.nightly_run
+# @pytest.mark.ethernet_stress
+# @pytest.mark.nightly_run
 @pytest.mark.parametrize('test_case', stress_test_cases)
-@pytest.mark.parametrize('config', ['default'], indirect=True)
-@pytest.mark.flaky(reruns=1, reruns_delay=1)
-@idf_parametrize('target', ['esp32'], indirect=['target'])
-def test_mqtt_publish_stress(dut: Dut, test_case: Any) -> None:
+# @pytest.mark.parametrize('config', ['default'], indirect=True)
+# @pytest.mark.flaky(reruns=1, reruns_delay=1)
+# @idf_parametrize('target', ['esp32'], indirect=['target'])
+def test_mqtt_publish_stress(dut: Dut, test_case: Any, config) -> None:
     publish_cfg = get_configurations(dut, test_case)
     dut.expect(re.compile(rb'mqtt>'), timeout=30)
     dut.write('init')
     run_publish_test_case(dut, publish_cfg)
 
 
-@pytest.mark.ethernet
+# @pytest.mark.ethernet
 @pytest.mark.parametrize('test_case', make_cases(local_broker_supported_transports, local_broker_scenarios))
-@pytest.mark.parametrize('config', ['local_broker'], indirect=True)
-@idf_parametrize('target', ['esp32'], indirect=['target'])
-def test_mqtt_publish_local(dut: Dut, test_case: Any) -> None:
+# @pytest.mark.parametrize('config', ['local_broker'], indirect=True)
+# @idf_parametrize('target', ['esp32'], indirect=['target'])
+def test_mqtt_publish_local(dut: Dut, test_case: Any, config) -> None:
     if test_case[0] not in local_broker_supported_transports:
         pytest.skip(f'Skipping transport: {test_case[0]}...')
     dut_ip = dut.expect(r'esp_netif_handlers: .+ ip: (\d+\.\d+\.\d+\.\d+),').group(1)
