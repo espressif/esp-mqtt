@@ -44,6 +44,22 @@ static int do_free_heap(int argc, char **argv) {
     return 0;
 }
 
+static int do_get_ip(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+    esp_netif_t *netif = esp_netif_get_default_netif();
+    if (!netif) {
+        ESP_LOGE(TAG, "Failed to get default netif");
+        return 1;
+    }
+    esp_netif_ip_info_t ip_info;
+    if (esp_netif_get_ip_info(netif, &ip_info) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get IP info");
+        return 1;
+    }
+    ESP_LOGI(TAG, "Device IP Address: " IPSTR, IP2STR(&ip_info.ip));
+    return 0;
+}
 static int do_init(int argc, char **argv) {
     (void)argc;
     (void)argv;
@@ -154,7 +170,7 @@ static int do_publish_setup(int argc, char **argv) {
     ((publish_context_t*)command_context.data)->pattern_repetitions = *publish_setup_args.pattern_repetitions->ival;
     ((publish_context_t*)command_context.data)->subscribe_to = strdup(*publish_setup_args.subscribe_to->sval);
     ((publish_context_t*)command_context.data)->publish_to = strdup(*publish_setup_args.publish_to->sval);
-    publish_setup(&command_context, *publish_setup_args.transport->sval);
+    publish_setup(&command_context, *publish_setup_args.uri->sval);
     return 0;
 }
 
@@ -182,38 +198,45 @@ void register_common_commands(void) {
 
     const esp_console_cmd_t start = {
         .command = "start",
-        .help = "Run startion test\n",
+        .help = "Run start on test\n",
         .hint = NULL,
         .func = &do_start,
     };
     const esp_console_cmd_t stop = {
         .command = "stop",
-        .help = "Run stopion test\n",
+        .help = "Run stop on test\n",
         .hint = NULL,
         .func = &do_stop,
     };
     const esp_console_cmd_t destroy = {
         .command = "destroy",
-        .help = "Run destroyion test\n",
+        .help = "Run destroy on test\n",
         .hint = NULL,
         .func = &do_destroy,
     };
     const esp_console_cmd_t free_heap = {
         .command = "free_heap",
-        .help = "Run destroyion test\n",
+        .help = "Get free heap\n",
         .hint = NULL,
         .func = &do_free_heap,
+    };
+    const esp_console_cmd_t get_ip = {
+        .command = "get_ip",
+        .help = "Get device ip\n",
+        .hint = NULL,
+        .func = &do_get_ip,
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&init));
     ESP_ERROR_CHECK(esp_console_cmd_register(&start));
     ESP_ERROR_CHECK(esp_console_cmd_register(&stop));
     ESP_ERROR_CHECK(esp_console_cmd_register(&destroy));
     ESP_ERROR_CHECK(esp_console_cmd_register(&free_heap));
+    ESP_ERROR_CHECK(esp_console_cmd_register(&get_ip));
 }
 void register_publish_commands(void) {
-    publish_setup_args.transport  = arg_str1(NULL,NULL,"<transport>", "Selected transport to test");
-    publish_setup_args.publish_to  = arg_str1(NULL,NULL,"<transport>", "Selected publish_to to publish");
-    publish_setup_args.subscribe_to  = arg_str1(NULL,NULL,"<transport>", "Selected subscribe_to to publish");
+    publish_setup_args.uri  = arg_str1(NULL,NULL,"<uri>", "Selected uri to test");
+    publish_setup_args.publish_to  = arg_str1(NULL,NULL,"<publish_to>", "Selected publish_to to publish");
+    publish_setup_args.subscribe_to  = arg_str1(NULL,NULL,"<subscribe_to>", "Selected subscribe_to to publish");
     publish_setup_args.pattern  = arg_str1(NULL,NULL,"<pattern>", "Message pattern repeated to build big messages");
     publish_setup_args.pattern_repetitions  = arg_int1(NULL,NULL,"<pattern repetitions>", "How many times the pattern is repeated");
     publish_setup_args.end = arg_end(1);

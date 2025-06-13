@@ -26,7 +26,7 @@ runs:
         - name: Run apps
           shell: bash
           run: |
-              pytest ${{inputs.app_path}} --ignore-glob '*/managed_components/*' --ignore=.github --target=${{ inputs.target }} --embedded-services esp,idf --build-dir build_esp32_default -m ethernet -v
+              pytest ${{inputs.app_path}} --target=${{ inputs.target }}
         # - name: Upload test results
         #   uses: actions/upload-artifact@v4
         #   if: always()

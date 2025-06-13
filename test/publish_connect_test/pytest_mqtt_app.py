@@ -4,7 +4,6 @@ import contextlib
 import logging
 import os
 import re
-import socket
 import socketserver
 import ssl
 import subprocess
@@ -13,23 +12,13 @@ from typing import Any
 from typing import Callable
 from typing import Dict
 from typing import Optional
+from common import get_runner_ip
 
 import pytest
 from pytest_embedded import Dut
 from pytest_embedded_idf.utils import idf_parametrize
 
 SERVER_PORT = 2222
-
-def get_host_ip4_by_dest_ip(dest_ip: str = '') -> str:
-    if not dest_ip:
-        dest_ip = '8.8.8.8'
-    s1 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s1.connect((dest_ip, 80))
-    host_ip = s1.getsockname()[0]
-    s1.close()
-    assert isinstance(host_ip, str)
-    print(f'Using host ip: {host_ip}')
-    return host_ip
 
 def _path(f):  # type: (str) -> str
     return os.path.join(os.path.dirname(os.path.realpath(__file__)), f)
@@ -171,12 +160,6 @@ def get_test_cases(dut: Dut) -> Any:
     return cases
 
 
-def get_dut_ip(dut: Dut) -> Any:
-    dut_ip = dut.expect(r'IPv4 address: (\d+\.\d+\.\d+\.\d+)[^\d]', timeout=30).group(1).decode()
-    logging.info('Got IP={}'.format(dut_ip))
-    return get_host_ip4_by_dest_ip(dut_ip)
-
-
 @contextlib.contextmanager
 def connect_dut(dut: Dut, uri: str, case_id: int) -> Any:
     dut.write('connection_setup')
@@ -260,7 +243,7 @@ def run_cases(dut: Dut, uri: str, cases: Dict[str, int]) -> None:
 
 
 # @pytest.mark.ethernet
-# @idf_parametrize('target', ['esp32'], indirect=['target'])
+@idf_parametrize('target', ['esp32'], indirect=['target'])
 def test_mqtt_connect(
     dut: Dut,
     log_performance: Callable[[str, object], None],
@@ -276,7 +259,7 @@ def test_mqtt_connect(
     bin_size = os.path.getsize(binary_file)
     log_performance('mqtt_publish_connect_test_bin_size', f'{bin_size // 1024} KB')
 
-    ip = get_dut_ip(dut)
+    ip = get_runner_ip(dut)
     set_server_cert_cn(ip)
     uri = f'mqtts://{ip}:{SERVER_PORT}'
 
