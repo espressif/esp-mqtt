@@ -10,17 +10,18 @@ env:
     target: esp32
     idf_version: latest
     app_name: publish_connect_test
-    app_path: $IDF_PATH/tools/test_apps/protocols/mqtt/publish_connect_test
+    app_path: test/publish_connect_test
 
 jobs:
     build:
+        if: false
         name: Build Test App
         runs-on: ubuntu-22.04
         env:
-            EXAMPLE_MQTT_BROKER_SSL: "mqtt.eclipseprojects.io:1883"
-            EXAMPLE_MQTT_BROKER_TCP: "mqtt.eclipseprojects.io:8883"
-            EXAMPLE_MQTT_BROKER_WS: "mqtt.eclipseprojects.io"
-            EXAMPLE_MQTT_BROKER_WSS: "mqtt.eclipseprojects.io"
+            EXAMPLE_MQTT_BROKER_TCP: "mqtt.eclipseprojects.io:1883"
+            EXAMPLE_MQTT_BROKER_SSL: "mqtt.eclipseprojects.io:8883"
+            EXAMPLE_MQTT_BROKER_WS: "mqtt.eclipseprojects.io:80"
+            EXAMPLE_MQTT_BROKER_WSS: "mqtt.eclipseprojects.io:443"
         outputs:
             build_path: ${{steps.build.outputs.artifacts_path}}
         container: espressif/idf:latest
@@ -52,10 +53,39 @@ jobs:
                       ${{steps.build.outputs.artifacts_path}}/build_*/*.bin
                       ${{steps.build.outputs.artifacts_path}}/build_*/flasher_args.json
                       ${{steps.build.outputs.artifacts_path}}/build_*/config/sdkconfig.json
-                      ${{steps.build.outputs.artifacts_path}}/*.py
                   if-no-files-found: error
+            - name: Output env
+              shell: bash
+              run: |
+                  echo ${EXAMPLE_MQTT_BROKER_TCP}
+                  echo ${EXAMPLE_MQTT_BROKER_SSL}
+                  echo ${EXAMPLE_MQTT_BROKER_WS}
+                  echo ${EXAMPLE_MQTT_BROKER_WSS}
+
+    get_ip:
+        # if: github.repository == 'espressif/esp-mqtt'
+        name: Get Ip
+        runs-on: [self-hosted, linux, docker, ESP32-ETHERNET-KIT]
+        steps:
+            # - name: Add node for local tests
+            #   if: ${{ env.ACT }}
+            #   shell: bash
+            #   run: |
+            #       curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+            #       apt-get install -y nodejs
+            - name: Install iproute2
+              shell: bash
+              run: apt-get update && apt-get install -y iproute2
+            - name: Get runner IP
+              id: get_ip
+              shell: bash
+              run: |
+                  IP=$(ip route get 1| awk '{print $7; exit}')
+                  echo $IP
+                  echo "RUNNER_IP=$IP" >> $GITHUB_ENV
 
     run-on-target:
+        if: false
         # if: github.repository == 'espressif/esp-mqtt'
         name: Publish and Connect target test
         needs: build
@@ -84,10 +114,23 @@ jobs:
         #     TEST_RESULT_NAME: test_results_${{ matrix.runner.target }}_${{ matrix.runner.marker }}_${{ matrix.idf_ver }}
         #     TEST_RESULT_FILE: test_results_${{ matrix.runner.target }}_${{ matrix.runner.marker }}_${{ matrix.idf_ver }}.xml
         # runs-on: [self-hosted, linux, docker, "${{ matrix.runner.runs-on }}"]
-        container:
-            image: python:3.11-bookworm
-            options: --privileged # Privileged mode has access to serial ports
-        runs-on: [self-hosted, linux, docker, ESP32-ETHERNET-KIT]
+        # container:
+        #     image: python:3.11-bookworm
+        #     options: --privileged # Privileged mode has access to serial ports
+        # runs-on: [self-hosted, linux, docker, ESP32-ETHERNET-KIT]
+        runs-on: ubuntu-22.04
+        services:
+            mqtt-test-broker:
+                image: eclipse-mosquitto:latest
+                ports:
+                    - 42351:42351
+                    - 42352:42352
+                    - 42353:42353
+                    - 42354:42354
+                volumes:
+                    - ${{ github.workspace }}/ci/broker/config:/mosquitto/config
+                    - ${{ github.workspace }}/ci/broker/certs:/mosquitto/certfiles
+                    - ${{ github.workspace }}/ci/broker/.mosquitto.log:/var/log/mosquitto.log
 
         strategy:
             matrix:
@@ -107,22 +150,76 @@ jobs:
               run: |
                   curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
                   apt-get install -y nodejs
+            - name: Install Python packages
+              shell: bash
+              env:
+                  PIP_EXTRA_INDEX_URL: "https://dl.espressif.com/pypi/"
+              run: pip install --prefer-binary paho-mqtt
+            - name: Install dependencies
+              shell: bash
+              run: apt-get update && apt-get install -y iproute2
             - uses: actions/checkout@v4
             - name: Download artifacts
               uses: actions/download-artifact@v4
               id: artifacts
               with:
                   name: mqtt_bin_${{env.target}}_${{ env.idf_version }}_${{ env.app_name }}
-                  path: test
-            - name: Check artifacts
+                  path: test/publish_connect_test
+            - name: Get runner IP
+              id: get_ip
               shell: bash
-              run: ls test/
-            # - name: Checkout IDF ${{inputs.idf_version}}
-            #   uses: actions/checkout@v4
-            #   with:
-            #       repository: espressif/esp-idf
-            #       path: idf
-            #       ref: master
+              run: |
+                  IP=$(ip route get 1| awk '{print $7; exit}')
+                  echo "RUNNER_IP=$IP" >> $GITHUB_ENV
+            - name: Run app in Docker
+              shell: bash
+              env:
+                  RUNNER_IP: ${{ env.RUNNER_IP }}
+              run: |
+                  docker run --rm \
+                    -v "${{ github.workspace }}:/workspace" \
+                    -w /workspace \
+                    -e RUNNER_IP="${RUNNER_IP}" \
+                    python:3.11-bookworm \
+                    bash -c "
+                      pip install --prefer-binary cryptography pytest-embedded pytest-embedded-serial-esp pytest-embedded-idf pytest-custom_exit_code &&
+                      pytest test/publish_connect_test --target=esp32
+                    "
+            - name: Cleanup workspace
+              if: always()
+              shell: bash
+              run: |
+                  rm -rf test/publish_connect_test
+            - name: Add node for local tests
+              if: ${{ env.ACT }}
+              shell: bash
+              run: |
+                  curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+                  apt-get install -y nodejs
+            - name: Install Python packages
+              shell: bash
+              env:
+                  PIP_EXTRA_INDEX_URL: "https://dl.espressif.com/pypi/"
+              run: pip install --prefer-binary paho-mqtt
+            - name: Install dependencies
+              shell: bash
+              run: apt-get update && apt-get install -y iproute2
+            - uses: actions/checkout@v4
+            - name: Download artifacts
+              uses: actions/download-artifact@v4
+              id: artifacts
+              with:
+                  name: mqtt_bin_${{env.target}}_${{ env.idf_version }}_${{ env.app_name }}
+                  path: test/publish_connect_test
+            # - name: Run mosquitto
+            #   shell: bash
+            #   run: mosquitto -c ci/broker/mosquitto.conf &
+            - name: Get runner IP
+              id: get_ip
+              shell: bash
+              run: |
+                  IP=$(ip route get 1| awk '{print $7; exit}')
+                  echo "RUNNER_IP=$IP" >> $GITHUB_ENV
             # - name: Install Python packages
             #   shell: bash
             #   env:
@@ -139,4 +236,6 @@ jobs:
               with:
                   target: esp32
                   app_name: publish_connnect_test
-                  app_path: test
+                  app_path: test/publish_connect_test
+              env:
+                  RUNNER_IP: ${{ env.RUNNER_IP }}

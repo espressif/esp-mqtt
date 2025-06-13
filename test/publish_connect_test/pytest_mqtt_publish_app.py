@@ -18,7 +18,10 @@ from typing import Dict
 from typing import List
 from typing import Tuple
 from typing import no_type_check
-
+from paho.mqtt.enums import CallbackAPIVersion
+from paho.mqtt.reasoncodes import ReasonCode
+from paho.mqtt.properties import Properties
+from common import get_host_ip4_by_dest_ip
 import paho.mqtt.client as mqtt
 import pexpect
 import pytest
@@ -27,9 +30,9 @@ from pytest_embedded_idf.utils import idf_parametrize
 
 DEFAULT_MSG_SIZE = 16
 
-
 # Publisher class creating a python client to send/receive published data from esp-mqtt client
 class MqttPublisher(mqtt.Client):
+
     def __init__(self, config, log_details=False):  # type: (MqttPublisher, dict, bool) -> None
         self.log_details = log_details
         self.config = config
@@ -44,25 +47,36 @@ class MqttPublisher(mqtt.Client):
         client_id = 'MqttTestRunner' + ''.join(
             random.choice(string.ascii_uppercase + string.ascii_lowercase) for _ in range(5)
         )
-        super().__init__(client_id, userdata=0, transport=transport)
+        super().__init__(callback_api_version=CallbackAPIVersion.VERSION2, client_id=client_id, userdata=0, transport=transport)
+        self.on_subscribe = self.test_on_subscribe
+        self.on_connect = self.test_on_connect
+        self.on_connect_fail = self.test_on_connect_fail
+        self.on_message = self.test_on_message
 
     def print_details(self, text):  # type: (str) -> None
         if self.log_details:
             logging.info(text)
 
-    def on_subscribe(self, client: Any, userdata: Any, mid: Any, granted_qos: Any) -> None:
+    def test_on_subscribe(self, client, userdata, mid, reason_codes, properties=None):
         """Verify successful subscription."""
-        if mid == self.subscribe_mid:
-            logging.info(f'Subscribed to {self.config["subscribe_topic"]} successfully with QoS: {granted_qos}')
+        if mid == self.subscribe_mid and reason_codes[0] < 128:
+            logging.info(f'Subscribed to {self.config["subscribe_topic"]} successfully')
             self.event_client_subscribed.set()
+            return
 
-    def on_connect(self, mqttc: Any, obj: Any, flags: Any, rc: int) -> None:
+        logging.error(f'SUBSCRIBE failed for mid {mid} with reason code {reason_codes[0]}')
+
+    def test_on_connect(self, client: mqtt.Client, userdata, flags, reason_code: ReasonCode, properties):
+        if reason_code != 0:
+            logging.error(f'Connect failed with reason code: {reason_code}')
+            return
         self.event_client_connected.set()
 
-    def on_connect_fail(self, mqttc: Any, obj: Any) -> None:
+    def test_on_connect_fail(self, client, userdata):
         logging.error('Connect failed')
 
-    def on_message(self, mqttc: mqtt.Client, obj: Any, msg: mqtt.MQTTMessage) -> None:
+
+    def test_on_message(self, client, userdata, msg):
         payload = msg.payload.decode('utf-8')
         if payload == self.expected_data:
             self.received += 1
@@ -118,35 +132,29 @@ class MqttPublisher(mqtt.Client):
 
 
 def get_configurations(dut: Dut, test_case: Any) -> Dict[str, Any]:
-    publish_cfg = {}
-    try:
-
-        @no_type_check
-        def get_config_from_dut(dut, config_option):
-            # logging.info('Option:', config_option, dut.app.sdkconfig.get(config_option))
-            value = re.search(r'\:\/\/([^:]+)\:([0-9]+)', dut.app.sdkconfig.get(config_option))
-            if value is None:
-                return None, None
-            return value.group(1), int(value.group(2))
-
-        # Get publish test configuration
-        publish_cfg['broker_host_ssl'], publish_cfg['broker_port_ssl'] = get_config_from_dut(
-            dut, 'EXAMPLE_BROKER_SSL_URI'
-        )
-        publish_cfg['broker_host_tcp'], publish_cfg['broker_port_tcp'] = get_config_from_dut(
-            dut, 'EXAMPLE_BROKER_TCP_URI'
-        )
-        publish_cfg['broker_host_ws'], publish_cfg['broker_port_ws'] = get_config_from_dut(dut, 'EXAMPLE_BROKER_WS_URI')
-        publish_cfg['broker_host_wss'], publish_cfg['broker_port_wss'] = get_config_from_dut(
-            dut, 'EXAMPLE_BROKER_WSS_URI'
-        )
-
-    except Exception:
-        logging.info('ENV_TEST_FAILURE: Some mandatory PUBLISH test case not found in sdkconfig')
-        raise
     transport, qos, enqueue, scenario = test_case
-    if publish_cfg['broker_host_' + transport] is None:
-        pytest.skip(f'Skipping transport: {transport}...')
+    publish_cfg = {}
+    transport_map = {'tcp': 'mqtt', 'ssl': 'mqtts', 'ws': 'ws', 'wss': 'wss'}
+    port_map = {'tcp': 42351, 'ssl': 42352, 'ws': 42353, 'wss': 42354}
+
+    def get_broker_address(transport: str) -> Tuple[str, int]:
+        dut.write('get_ip')
+        dut_ip = dut.expect(r'Device IP Address: (\d+\.\d+\.\d+\.\d+)[^\d]', timeout=30).group(1).decode()
+        logging.info(f'Got IP={dut_ip} for transport {transport}')
+        host_ip = get_host_ip4_by_dest_ip(dut_ip)
+        logging.info(f'Using host IP={host_ip} for transport {transport}')
+        return host_ip, port_map.get(transport, 1883)
+
+    publish_cfg['broker_host_ssl'], publish_cfg['broker_port_ssl'] = get_broker_address('ssl')
+    publish_cfg['broker_host_tcp'], publish_cfg['broker_port_tcp'] = get_broker_address('tcp')
+    publish_cfg['broker_host_ws'], publish_cfg['broker_port_ws'] =  get_broker_address('ws')
+    publish_cfg['broker_host_wss'], publish_cfg['broker_port_wss'] = get_broker_address('wss')
+
+    uri = f"{transport_map.get(transport)}://{publish_cfg['broker_host_' + transport]}:{publish_cfg['broker_port_' + transport]}"
+    if transport in ['ws', 'wss']:
+        uri = uri + "/mqtt"
+    publish_cfg['uri'] = uri
+
     publish_cfg['scenario'] = scenario
     publish_cfg['qos'] = qos
     publish_cfg['enqueue'] = enqueue
@@ -216,7 +224,7 @@ def run_publish_test_case(dut: Dut, config: Any) -> None:
         f' msg_size:{config["scenario"]["msg_len"]}, enqueue:{config["enqueue"]}'
     )
     dut.write(
-        f'publish_setup {config["transport"]} {config["publish_topic"]}'
+        f'publish_setup {config["uri"]} {config["publish_topic"]}'
         f' {config["subscribe_topic"]} {config["pattern"]} {config["scenario"]["msg_len"]}'
     )
     with MqttPublisher(config) as publisher, connected_and_subscribed(dut, config):
@@ -296,12 +304,12 @@ stress_test_cases = make_cases(transport_cases, stress_scenarios)
 
 # @pytest.mark.ethernet
 @pytest.mark.parametrize('test_case', test_cases)
-# @pytest.mark.parametrize('config', ['default'], indirect=True)
-# @idf_parametrize('target', ['esp32'], indirect=['target'])
+@pytest.mark.parametrize('config', ['default'], indirect=True)
+@idf_parametrize('target', ['esp32'], indirect=['target'])
 # @pytest.mark.flaky(reruns=1, reruns_delay=1)
 def test_mqtt_publish(dut: Dut, test_case: Any) -> None:
-    publish_cfg = get_configurations(dut, test_case)
     dut.expect(re.compile(rb'mqtt>'), timeout=30)
+    publish_cfg = get_configurations(dut, test_case)
     dut.confirm_write('init', expect_pattern='init', timeout=30)
     run_publish_test_case(dut, publish_cfg)
 
@@ -313,8 +321,8 @@ def test_mqtt_publish(dut: Dut, test_case: Any) -> None:
 # @pytest.mark.flaky(reruns=1, reruns_delay=1)
 # @idf_parametrize('target', ['esp32'], indirect=['target'])
 def test_mqtt_publish_stress(dut: Dut, test_case: Any, config) -> None:
-    publish_cfg = get_configurations(dut, test_case)
     dut.expect(re.compile(rb'mqtt>'), timeout=30)
+    publish_cfg = get_configurations(dut, test_case)
     dut.write('init')
     run_publish_test_case(dut, publish_cfg)
 
@@ -324,12 +332,12 @@ def test_mqtt_publish_stress(dut: Dut, test_case: Any, config) -> None:
 # @pytest.mark.parametrize('config', ['local_broker'], indirect=True)
 # @idf_parametrize('target', ['esp32'], indirect=['target'])
 def test_mqtt_publish_local(dut: Dut, test_case: Any, config) -> None:
+    dut.expect(re.compile(rb'mqtt>'), timeout=30)
     if test_case[0] not in local_broker_supported_transports:
         pytest.skip(f'Skipping transport: {test_case[0]}...')
     dut_ip = dut.expect(r'esp_netif_handlers: .+ ip: (\d+\.\d+\.\d+\.\d+),').group(1)
     publish_cfg = get_configurations(dut, test_case)
     publish_cfg['broker_host_tcp'] = dut_ip
     publish_cfg['broker_port_tcp'] = 1234
-    dut.expect(re.compile(rb'mqtt>'), timeout=30)
     dut.confirm_write('init', expect_pattern='init', timeout=30)
     run_publish_test_case(dut, publish_cfg)

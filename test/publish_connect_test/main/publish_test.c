@@ -25,13 +25,13 @@ static const char *TAG = "publish_test";
 
 static EventGroupHandle_t mqtt_event_group;
 const static int CONNECTED_BIT = BIT0;
-#define CLIENT_ID_SUFFIX_SIZE 12
+#define CLIENT_ID_SUFFIX_SIZE 15
 #if CONFIG_EXAMPLE_BROKER_CERTIFICATE_OVERRIDDEN == 1
 static const uint8_t mqtt_eclipseprojects_io_pem_start[]  = "-----BEGIN CERTIFICATE-----\n" CONFIG_EXAMPLE_BROKER_CERTIFICATE_OVERRIDE "\n-----END CERTIFICATE-----";
 #else
-extern const uint8_t mqtt_eclipseprojects_io_pem_start[]   asm("_binary_mqtt_eclipseprojects_io_pem_start");
+extern const uint8_t mqtt_eclipseprojects_io_pem_start[]   asm("_binary_server_crt_start");
 #endif
-extern const uint8_t mqtt_eclipseprojects_io_pem_end[]   asm("_binary_mqtt_eclipseprojects_io_pem_end");
+extern const uint8_t mqtt_eclipseprojects_io_pem_end[]   asm("_binary_server_crt_end");
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
@@ -135,69 +135,30 @@ void pattern_setup(publish_context_t * test_data)
     ESP_LOGI(TAG, "EXPECTED STRING %.*s, SIZE:%d", test_data->expected_size, test_data->expected, test_data->expected_size);
 }
 
-static void configure_client(command_context_t * ctx, const char *transport)
+static void configure_client(command_context_t * ctx, const char *uri)
 {
-    publish_context_t * test_data = ctx->data;
-    ESP_LOGI(TAG, "Configuration");
-    transport_t selected_transport;
-    if (0 == strcmp(transport, "tcp")) {
-        selected_transport = TCP;
-    } else if (0 == strcmp(transport, "ssl")) {
-        selected_transport = SSL;
-    } else if (0 == strcmp(transport, "ws")) {
-        selected_transport = WS;
-    } else if (0 == strcmp(transport, "wss")) {
-        selected_transport = WSS;
-    } else {
-        ESP_LOGE(TAG, "Unexpected transport %s", transport);
-        abort();
-    }
-
-
-    if (selected_transport != test_data->selected_transport) {
-        test_data->selected_transport = selected_transport;
-        esp_mqtt_client_config_t config = {0};
-        switch (selected_transport) {
-        case NONE:
-            break;
-        case TCP:
-            ESP_LOGI(TAG, "[TCP transport] Startup..");
-            config.broker.address.uri = CONFIG_EXAMPLE_BROKER_TCP_URI;
-            break;
-        case SSL:
-            ESP_LOGI(TAG, "[SSL transport] Startup..");
-            config.broker.address.uri = CONFIG_EXAMPLE_BROKER_SSL_URI;
-            break;
-        case WS:
-            ESP_LOGI(TAG, "[WS transport] Startup..");
-            config.broker.address.uri = CONFIG_EXAMPLE_BROKER_WS_URI;
-            break;
-        case WSS:
-            ESP_LOGI(TAG, "[WSS transport] Startup..");
-            config.broker.address.uri = CONFIG_EXAMPLE_BROKER_WSS_URI;
-            break;
-        }
-        if (selected_transport == SSL || selected_transport == WSS) {
+     esp_mqtt_client_config_t config = {0};
+     config.broker.address.uri = uri;
+        if ((0 == strcmp(uri, "mqtts"))|| (0 == strcmp(uri, "wss"))) {
             ESP_LOGI(TAG, "Set certificate");
             config.broker.verification.certificate = (const char *)mqtt_eclipseprojects_io_pem_start;
         }
         // Generate a random client id for each iteration
         char client_id[CLIENT_ID_SUFFIX_SIZE] = {0};
-        snprintf(client_id, sizeof(client_id), "esp32-%08X", esp_random());
+        snprintf(client_id, sizeof(client_id), "esp32-%08lX", esp_random());
         config.credentials.client_id = client_id;
         esp_mqtt_set_config(ctx->mqtt_client, &config);
-    }
 }
 
 void publish_init_flags(void) {
     mqtt_event_group = xEventGroupCreate();
 }
 
-void publish_setup(command_context_t * ctx, char const * const transport) {
+void publish_setup(command_context_t * ctx, char const * const uri) {
     xEventGroupClearBits(mqtt_event_group, CONNECTED_BIT);
     publish_context_t * data = (publish_context_t*)ctx->data;
     pattern_setup(data);
-    configure_client(ctx, transport);
+    configure_client(ctx, uri);
     esp_mqtt_client_register_event(ctx->mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, data);
 }
 

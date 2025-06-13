@@ -6,8 +6,9 @@
 #pragma once
 
 #include "mqtt_client.h"
+#include <stddef.h>
 
-typedef enum {NONE, TCP, SSL, WS, WSS} transport_t;
+// typedef enum {NONE, TCP, SSL, WS, WSS} transport_t;
 
 typedef struct {
     esp_mqtt_client_handle_t mqtt_client;
@@ -15,7 +16,7 @@ typedef struct {
 } command_context_t;
 
 typedef struct {
-    transport_t selected_transport;
+    // transport_t selected_transport;
     char *pattern;
     char *subscribe_to;
     char *publish_to;
@@ -42,7 +43,7 @@ typedef struct {
 } publish_args_t;
 
 typedef struct {
-    struct arg_str *transport;
+    struct arg_str *uri;
     struct arg_str *subscribe_to;
     struct arg_str *publish_to;
     struct arg_str *pattern;
@@ -51,7 +52,7 @@ typedef struct {
 } publish_setup_args_t;
 
 void publish_init_flags(void);
-void publish_setup(command_context_t * ctx, char const *  transport);
+void publish_setup(command_context_t * ctx, char const *  uri);
 void publish_teardown(command_context_t * ctx);
 void publish_test(command_context_t * ctx, int expect_to_publish, int qos, bool enqueue);
 void connection_test(command_context_t * ctx, const char *uri, int test_case);
