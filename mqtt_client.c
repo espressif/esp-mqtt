@@ -1946,8 +1946,10 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
     }
 
     ESP_LOGD(TAG, "Sent subscribe, first topic=%s, id: %d", topic_list[0].filter, client->mqtt_state.pending_msg_id);
+
+    int pending_msg_id = client->mqtt_state.pending_msg_id;
     MQTT_API_UNLOCK(client);
-    return client->mqtt_state.pending_msg_id;
+    return pending_msg_id;
 
 }
 int esp_mqtt_client_subscribe_single(esp_mqtt_client_handle_t client, const char *topic, int qos)
@@ -2002,8 +2004,10 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
     }
 
     ESP_LOGD(TAG, "Sent Unsubscribe topic=%s, id: %d, successful", topic, client->mqtt_state.pending_msg_id);
+
+    int pending_msg_id = client->mqtt_state.pending_msg_id;
     MQTT_API_UNLOCK(client);
-    return client->mqtt_state.pending_msg_id;
+    return pending_msg_id;
 }
 
 static int make_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data,
