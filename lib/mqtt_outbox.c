@@ -96,6 +96,7 @@ esp_err_t outbox_delete_item(outbox_handle_t outbox, outbox_item_handle_t item_t
         if (item == item_to_delete) {
             STAILQ_REMOVE(outbox->list, item, outbox_item, next);
             outbox->size -= item->len;
+            ESP_LOGD(TAG, "DELETE_ITEM msgid=%d, msg_type=%d, remain size=%"PRIu64, item_to_delete->msg_id, item_to_delete->msg_type, outbox_get_size(outbox));
             free(item->buffer);
             free(item);
             return ESP_OK;
@@ -123,9 +124,9 @@ esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type)
         if (item->msg_id == msg_id && (0xFF & (item->msg_type)) == msg_type) {
             STAILQ_REMOVE(outbox->list, item, outbox_item, next);
             outbox->size -= item->len;
+            ESP_LOGD(TAG, "DELETE msgid=%d, msg_type=%d, remain size=%"PRIu64, msg_id, msg_type, outbox_get_size(outbox));
             free(item->buffer);
             free(item);
-            ESP_LOGD(TAG, "DELETED msgid=%d, msg_type=%d, remain size=%"PRIu64, msg_id, msg_type, outbox_get_size(outbox));
             return ESP_OK;
         }
 
@@ -172,6 +173,7 @@ int outbox_delete_single_expired(outbox_handle_t outbox, outbox_tick_t current_t
             outbox->size -= item->len;
             msg_id = item->msg_id;
             free(item);
+            ESP_LOGD(TAG, "DELETE_SINGLE_EXPIRED msgid=%d, remain size=%"PRIu64, msg_id, outbox_get_size(outbox));
             return msg_id;
         }
 
@@ -188,6 +190,7 @@ int outbox_delete_expired(outbox_handle_t outbox, outbox_tick_t current_tick, ou
             STAILQ_REMOVE(outbox->list, item, outbox_item, next);
             free(item->buffer);
             outbox->size -= item->len;
+            ESP_LOGD(TAG, "DELETE_EXPIRED msgid=%d, remain size=%"PRIu64, item->msg_id, outbox_get_size(outbox));
             free(item);
             deleted_items ++;
         }
@@ -207,6 +210,7 @@ void outbox_delete_all_items(outbox_handle_t outbox)
     STAILQ_FOREACH_SAFE(item, outbox->list, next, tmp) {
         STAILQ_REMOVE(outbox->list, item, outbox_item, next);
         outbox->size -= item->len;
+        ESP_LOGD(TAG, "DELETE_ALL_ITEMS msgid=%d, msg_type=%d, remain size=%"PRIu64, item->msg_id, item->msg_type, outbox_get_size(outbox));
         free(item->buffer);
         free(item);
     }
