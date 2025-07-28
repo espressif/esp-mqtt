@@ -1217,11 +1217,11 @@ static esp_err_t deliver_suback(esp_mqtt_client_handle_t client)
 static bool remove_initiator_message(esp_mqtt_client_handle_t client, int msg_type, int msg_id)
 {
     if (outbox_delete(client->outbox, msg_id, msg_type) == ESP_OK) {
-        ESP_LOGD(TAG, "Removed pending_id=%d", client->mqtt_state.pending_msg_id);
+        ESP_LOGD(TAG, "Removed pending_id=%d", msg_id);
         return true;
     }
 
-    ESP_LOGD(TAG, "Failed to remove pending_id=%d", client->mqtt_state.pending_msg_id);
+    ESP_LOGD(TAG, "Failed to remove pending_id=%d", msg_id);
     return false;
 }
 
