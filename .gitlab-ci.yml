@@ -63,6 +63,9 @@ build_idf_latest:
 build_and_host_test:
     stage: build
     image: espressif/idf:latest
+    tags:
+        - build
+        - internet
     script:
         # Replace the IDF's default esp-mqtt with this version
         - rm -rf $IDF_PATH/components/mqtt/esp-mqtt && cp -r $MQTT_PATH $IDF_PATH/components/mqtt/
@@ -75,7 +78,7 @@ build_and_test_qemu:
     image: ${CI_DOCKER_REGISTRY}/qemu-v5.1:1-20220802
     tags:
         - build
-        - shiny
+        - internet
     dependencies: []
     script:
         - export IDF_PATH=$CI_PROJECT_DIR/esp-idf
@@ -104,6 +107,9 @@ build_and_test_qemu:
 
 check_remotes_sync:
     stage: test
+    tags:
+        - build
+        - internet
     except:
         - master
         - idf
