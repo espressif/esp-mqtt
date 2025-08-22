@@ -1022,8 +1022,10 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
         if (pass) {
             pass[0] = 0; //terminal username
             pass ++;
+            free(client->mqtt_state.connection.information.password);
             client->mqtt_state.connection.information.password = strdup(pass);
         }
+        free(client->mqtt_state.connection.information.username);
         client->mqtt_state.connection.information.username = strdup(user_info);
 
         free(user_info);
