@@ -42,7 +42,16 @@ int platform_random(int max)
 
 uint64_t platform_tick_get_ms(void)
 {
+#ifdef __linux__
+#include <sys/time.h>
+#include <stdint.h>
+#include <stddef.h> // For NULL
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (int64_t)tv.tv_sec * 1000000 + tv.tv_usec;
+#else
     return esp_timer_get_time()/(int64_t)1000;
+#endif
 }
 
 #endif
