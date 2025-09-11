@@ -107,6 +107,7 @@ build_and_test_qemu:
 
 check_remotes_sync:
     stage: test
+    image: espressif/idf:latest
     tags:
         - build
         - internet
