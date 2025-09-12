@@ -1942,10 +1942,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 
         // Only send the disconnect message if the client is connected
         if (client->state == MQTT_STATE_CONNECTED) {
-            if (send_disconnect_msg(client) != ESP_OK) {
-                MQTT_API_UNLOCK(client);
-                return ESP_FAIL;
-            }
+            send_disconnect_msg(client);
         }
 
         client->run = false;
