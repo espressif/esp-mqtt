@@ -1,52 +1,136 @@
 name: "Build example apps"
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    push:
+        branches:
+            - master
+    pull_request:
+        types: [opened, synchronize, reopened, labeled]
 
 jobs:
-    cpp-compatibility:
-        name: Cpp compatibility
+    build:
+        name: Build Examples
         strategy:
             matrix:
-                idf_version: ["release-v5.0", "release-v5.1", "latest"]
-                target: ["esp32"]
-                example: [{name: cpp_compatibility, path: "build_test"}]
-        uses: "./.github/workflows/build-app.yml"
-        with:
-            idf_version: ${{matrix.idf_version}}
-            target: ${{matrix.target}}
-            app_name: ${{matrix.example.name}}
-            app_path: $IDF_PATH/tools/test_apps/protocols/mqtt/${{matrix.example.path}}
-            upload_artifacts: false
-    build-only-example:
-        name: Build Only Apps
-        strategy:
-            matrix:
-                idf_version: ["release-v5.0", "release-v5.1", "latest"]
-                target: ["esp32s2", "esp32c3", "esp32s3"]
-                example: [{name: ssl_psk, path: "mqtt/ssl_psk"}, {name: ssl_ds, path: "mqtt/ssl_ds"}]
-        uses: "./.github/workflows/build-app.yml"
-        with:
-            idf_version: ${{matrix.idf_version}}
-            target: ${{matrix.target}}
-            app_name: ${{matrix.example.name}}
-            app_path: $IDF_PATH/examples/protocols/${{matrix.example.path}}
+                idf_version:
+                    [
+                        "release-v5.1",
+                        "release-v5.2",
+                        "release-v5.3",
+                        "release-v5.4",
+                        "release-v5.5",
+                        "latest",
+                    ]
+                target: ["esp32", "esp32c6"]
+                example:
+                    [
+                        {
+                            name: tcp,
+                            path: "mqtt/tcp",
+                            base_path: "examples/protocols",
+                        },
+                        {
+                            name: ssl,
+                            path: "mqtt/ssl",
+                            base_path: "examples/protocols",
+                        },
+                        {
+                            name: ssl_mutual_auth,
+                            path: "mqtt/ssl_mutual_auth",
+                            base_path: "examples/protocols",
+                        },
+                        {
+                            name: ws,
+                            path: "mqtt/ws",
+                            base_path: "examples/protocols",
+                        },
+                        {
+                            name: wss,
+                            path: "mqtt/wss",
+                            base_path: "examples/protocols",
+                        },
+                        {
+                            name: ssl_psk,
+                            path: "mqtt/ssl_psk",
+                            base_path: "examples/protocols",
+                        },
+                        {
+                            name: ssl_ds,
+                            path: "mqtt/ssl_ds",
+                            base_path: "examples/protocols",
+                        },
+                        {
+                            name: cpp_compatibility,
+                            path: "build_test",
+                            base_path: "tools/test_apps/protocols/mqtt",
+                        },
+                    ]
+        runs-on: ubuntu-22.04
+        container: espressif/idf:${{ matrix.idf_version }}
+        steps:
+            - name: Use Build App Composite Action
+              uses: "./.github/actions/build-app"
+              with:
+                  idf_version: ${{matrix.idf_version}}
+                  target: ${{matrix.target}}
+                  app_name: ${{matrix.example.name}}
+                  app_path: $IDF_PATH/${{matrix.example.base_path}}/${{matrix.example.path}}
 
-    build-examples:
-        name: Build and Run on target
+    build_publish_connect:
+        name: Build Publish Connect Test
         strategy:
             matrix:
-                idf_version: ["release-v5.0", "release-v5.1", "latest"]
+                idf_version: ["latest"]
                 target: ["esp32"]
-                example: [{name: tcp, path: "mqtt/tcp"}, {name: ssl, path: "mqtt/ssl"},{name: ssl_mutual_auth, path: "mqtt/ssl_mutual_auth"},{name: ws, path: "mqtt/ws"},{name: wss, path: "mqtt/wss"}]
-        uses: "./.github/workflows/build-and-target-test.yml"
-        with:
-            idf_version: ${{matrix.idf_version}}
-            target: ${{matrix.target}}
-            app_name: ${{matrix.example.name}}
-            app_path: $IDF_PATH/examples/protocols/${{matrix.example.path}}
+                app:
+                    [
+                        {
+                            name: publish_connect_test,
+                            path: "publish_connect_test",
+                        },
+                    ]
+        runs-on: ubuntu-22.04
+        container: espressif/idf:${{ matrix.idf_version }}
+        steps:
+            - name: Use Build App Composite Action
+              uses: "./.github/actions/build-app"
+              with:
+                  idf_version: ${{matrix.idf_version}}
+                  target: ${{matrix.target}}
+                  app_name: ${{matrix.app.name}}
+                  app_path: $IDF_PATH/tools/test_apps/protocols/mqtt/${{matrix.app.path}}
+            - name: Upload files to artifacts for run-target job
+              if: ${{ inputs.upload_artifacts }}
+              uses: actions/upload-artifact@v4
+              with:
+                  name: mqtt_bin_${{ inputs.target }}_${{ inputs.idf_version }}_${{ inputs.app_name }}
+                  path: |
+                      build_${{ inputs.target }}_${{ inputs.app_name }}/bootloader/bootloader.bin
+                      build_${{ inputs.target }}_${{ inputs.app_name }}/partition_table/partition-table.bin
+                      build_${{ inputs.target }}_${{ inputs.app_name }}/*.bin
+                      build_${{ inputs.target }}_${{ inputs.app_name }}/*.elf
+                      build_${{ inputs.target }}_${{ inputs.app_name }}/flasher_args.json
+                  if-no-files-found: error
 
+    publish_connect_test:
+        name: Publish and Connect test
+        needs: build_publish_connect
+        strategy:
+            matrix:
+                idf_version: ["latest"]
+                target: ["esp32"]
+                example:
+                    [
+                        {
+                            name: publish_connect_test,
+                            path: "publish_connect_test",
+                        },
+                    ]
+        steps:
+            - name: Use Run on Target Composite Action
+              uses: "./.github/workflows/run-on-target.yml"
+              with:
+                  idf_version: ${{matrix.idf_version}}
+                  target: ${{matrix.target}}
+                  app_name: ${{matrix.example.name}}
+                  app_path: $IDF_PATH/tools/test_apps/protocols/mqtt/${{matrix.example.path}}

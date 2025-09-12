@@ -1,0 +1,14 @@
+version: "3"
+services:
+  mqtt-test-broker:
+    image: eclipse-mosquitto:latest
+    container_name: mqtt-test-broker
+    ports:
+      - 42351:42351
+      - 42352:42352
+      - 42353:42353
+      - 42354:42354
+    volumes:
+      - ./config/:/mosquitto/config
+      - ./certs/:/mosquitto/certfiles
+      - .mosquitto.log:/var/log/mosquitto.log
