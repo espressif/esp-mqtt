@@ -69,7 +69,7 @@ build_and_host_test:
     script:
         # Replace the IDF's default esp-mqtt with this version
         - rm -rf $IDF_PATH/components/mqtt/esp-mqtt && cp -r $MQTT_PATH $IDF_PATH/components/mqtt/
-        - cd $IDF_PATH/components/mqtt/esp-mqtt/host_test
+        - cd $IDF_PATH/components/mqtt/esp-mqtt/test/host
         - idf.py build
         - build/host_mqtt_client_test.elf
 
