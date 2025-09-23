@@ -31,6 +31,82 @@
 # Debug files
 *.dSYM/
 *.su
-build
-examples/**/build
-examples/**/sdkconfig*
+
+# ESP-IDF Build System
+build/
+sdkconfig
+sdkconfig.old
+dependencies.lock
+managed_components/
+
+# ESP-IDF build directories (but not source directories like build_test)
+**/build/
+**/build_esp32*/
+**/build_esp32c*/
+**/build_esp32s*/
+**/build_esp32h*/
+**/build_esp32p*/
+**/build_linux*/
+
+# Examples and test app builds
+examples/**/build/
+examples/**/build_esp32*/
+examples/**/build_esp32c*/
+examples/**/build_esp32s*/
+examples/**/build_esp32h*/
+examples/**/build_esp32p*/
+examples/**/sdkconfig
+examples/**/sdkconfig.old
+examples/**/dependencies.lock
+examples/**/managed_components/
+
+# Test application builds (specific build directories, not source)
+test/apps/**/build/
+test/apps/**/build_esp32*/
+test/apps/**/build_esp32c*/
+test/apps/**/build_esp32s*/
+test/apps/**/build_esp32h*/
+test/apps/**/build_esp32p*/
+test/apps/**/sdkconfig
+test/apps/**/sdkconfig.old
+test/apps/**/dependencies.lock
+test/apps/**/managed_components/
+
+# Host test builds
+test/host/build/
+test/host/sdkconfig
+test/host/sdkconfig.old
+test/host/dependencies.lock
+test/host/managed_components/
+
+# idf-ci generated files
+app_info_*.txt
+size_info_*.txt
+compile_commands.json
+*.log
+
+# Python cache and environments
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.cache/
+
+# Coverage and test results
+**/coverage.xml
+**/coverage.html
+**/junit.xml
+**/pytest_*.xml
+**/test_results_*.xml
+
+# Documentation builds
+docs/_build/
+docs/build/
+
+# Distribution/packaging
+dist/
+build/
+*.egg-info/
+
+# CI/CD artifacts
+build_child_pipeline.yml

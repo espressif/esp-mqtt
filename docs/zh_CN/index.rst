@@ -21,23 +21,23 @@ ESP-MQTT 是 `MQTT <https://mqtt.org/>`__ 协议客户端的实现，MQTT 是一
 应用示例
 -------------------
 
-   - :example:`protocols/mqtt/tcp` 演示了如何通过 TCP 实现 MQTT 通信（默认端口 1883）。
+   - :example:`tcp` 演示了如何通过 TCP 实现 MQTT 通信（默认端口 1883）。
 
-   - :example:`protocols/mqtt/ssl` 演示了如何使用 SSL 传输来实现基于 TLS 的 MQTT 通信（默认端口 8883）。
+   - :example:`ssl` 演示了如何使用 SSL 传输来实现基于 TLS 的 MQTT 通信（默认端口 8883）。
 
-   - :example:`protocols/mqtt/ssl_ds` 演示了如何使用数字签名外设进行身份验证，以实现基于 TLS 的 MQTT 通信（默认端口 8883）。
+   - :example:`ssl_ds` 演示了如何使用数字签名外设进行身份验证，以实现基于 TLS 的 MQTT 通信（默认端口 8883）。
 
-   - :example:`protocols/mqtt/ssl_mutual_auth` 演示了如何使用证书进行身份验证实现 MQTT 通信（默认端口 8883）。
+   - :example:`ssl_mutual_auth` 演示了如何使用证书进行身份验证实现 MQTT 通信（默认端口 8883）。
 
-   - :example:`protocols/mqtt/ssl_psk` 演示了如何使用预共享密钥进行身份验证，以实现基于 TLS 的 MQTT 通信（默认端口 8883）。
+   - :example:`ssl_psk` 演示了如何使用预共享密钥进行身份验证，以实现基于 TLS 的 MQTT 通信（默认端口 8883）。
 
-   - :example:`protocols/mqtt/ws` 演示了如何通过 WebSocket 实现 MQTT 通信（默认端口 80）。
+   - :example:`ws` 演示了如何通过 WebSocket 实现 MQTT 通信（默认端口 80）。
 
-   - :example:`protocols/mqtt/wss` 演示了如何通过 WebSocket Secure 实现 MQTT 通信（默认端口 443）。
+   - :example:`wss` 演示了如何通过 WebSocket Secure 实现 MQTT 通信（默认端口 443）。
 
-   - :example:`protocols/mqtt5` 演示了如何使用 ESP-MQTT 库通过 MQTT v5.0 连接到代理。
+   - :example:`mqtt5` 演示了如何使用 ESP-MQTT 库通过 MQTT v5.0 连接到代理。
 
-   - :example:`protocols/mqtt/custom_outbox` 演示了如何自定义 ESP-MQTT 库中的 outbox。
+   - :example:`custom_outbox` 演示了如何自定义 ESP-MQTT 库中的 outbox。
 
 MQTT 消息重传
 --------------------------
@@ -124,7 +124,7 @@ ESP-MQTT 库将始终重新传输未确认的 QoS 1 和 2 发布消息，以避�
        openssl s_client -showcerts -connect mqtt.eclipseprojects.io:8883 < /dev/null \
        2> /dev/null | openssl x509 -outform PEM > mqtt_eclipse_org.pem
 
--  检查示例应用程序：:example:`protocols/mqtt/ssl`
+-  检查示例应用程序：:example:`ssl`
 -  配置：
 
 .. code:: c

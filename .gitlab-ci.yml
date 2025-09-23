@@ -1,6 +1,7 @@
 stages:
     - build
     - test
+    - test_deploy
     - deploy
 
 variables:
@@ -73,40 +74,8 @@ build_and_host_test:
         - idf.py build
         - build/host_mqtt_client_test.elf
 
-build_and_test_qemu:
-    stage: build
-    image: ${CI_DOCKER_REGISTRY}/qemu-v5.1:1-20220802
-    tags:
-        - build
-        - internet
-    dependencies: []
-    script:
-        - export IDF_PATH=$CI_PROJECT_DIR/esp-idf
-        - git clone "${IDF_REPO}"
-        # switch to IDF and setup the tools
-        - $MQTT_PATH/ci/set_idf.sh release/v5.1
-        - $IDF_PATH/tools/idf_tools.py install-python-env
-        - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-        # Remove `debug_backend` and Add `paho-mqtt` to the required packages
-        - sed '/debug_backend/d;/pygobject/d' $IDF_PATH/tools/requirements/requirements.ttfw.txt > requirements.txt
-        - python -m pip install -r requirements.txt
-        - python -m pip install paho-mqtt
-        - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-        # build publish-connect stress test, setup test parameters
-        - cd tools/test_apps/protocols/mqtt/publish_connect_test && cat sdkconfig.qemu | $IDF_PATH/tools/ci/envsubst.py > sdkconfig.defaults && idf.py build
-        - export TEST_PATH=`pwd` && export MQTT_PUBLISH_TEST=1
-        - export PYTHONPATH="$IDF_PATH/tools:$IDF_PATH/tools/ci/python_packages"
-        # run test (with environment->qemu)
-        - cd $IDF_PATH/tools/ci/python_packages/tiny_test_fw/bin
-        # use more relaxed criteria with QEMU tests
-        - export MQTT_PUBLISH_MSG_len_0=0   MQTT_PUBLISH_MSG_repeat_0=5
-        - export MQTT_PUBLISH_MSG_len_1=2   MQTT_PUBLISH_MSG_repeat_1=50
-        - export MQTT_PUBLISH_MSG_len_2=128 MQTT_PUBLISH_MSG_repeat_2=2
-        - export MQTT_PUBLISH_MSG_len_3=20  MQTT_PUBLISH_MSG_repeat_3=20
-        - python Runner.py $TEST_PATH -c $MQTT_PATH/ci/publish_connect_mqtt_qemu.yml -e $TEST_PATH/env.yml
-
 check_remotes_sync:
-    stage: test
+    stage: test_deploy
     image: espressif/idf:latest
     tags:
         - build
@@ -134,3 +103,6 @@ push_master_to_github:
     script:
         - *add_gh_key_remote
         - git push github HEAD:${CI_COMMIT_REF_NAME}
+
+include:
+    - local: ".gitlab/ci/docs.yml"
