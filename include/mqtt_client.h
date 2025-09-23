@@ -441,7 +441,7 @@ esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client);
 esp_err_t esp_mqtt_client_disconnect(esp_mqtt_client_handle_t client);
 
 /**
- * @brief Stops *MQTT* client tasks
+ * @brief Stops *MQTT* client tasks (blocking, waits until stopped)
  *
  *  * Notes:
  *  - Cannot be called from the *MQTT* event handler
@@ -453,6 +453,33 @@ esp_err_t esp_mqtt_client_disconnect(esp_mqtt_client_handle_t client);
  *         ESP_FAIL if client is in invalid state
  */
 esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
+
+/**
+ * @brief Stops *MQTT* client tasks non-blocking in the background
+ * Use esp_mqtt_client_is_stopped() to find out if its already
+ * stopped.
+ *
+ *  * Notes:
+ *  - Cannot be called from the *MQTT* event handler
+ *
+ * @param client    *MQTT* client handle
+ *
+ * @return ESP_OK on success
+ *         ESP_ERR_INVALID_ARG on wrong initialization
+ *         ESP_FAIL if client is in invalid state
+ */
+esp_err_t esp_mqtt_client_initiate_stop(esp_mqtt_client_handle_t client);
+
+/**
+ * @brief Returns if the *MQTT* client has already stopped
+ * This api should be used after esp_mqtt_client_initiate_stop()
+ * has been called.
+ *
+ * @param client    *MQTT* client handle
+ *
+ * @return if its stopped or not
+ */
+bool esp_mqtt_client_is_stopped(esp_mqtt_client_handle_t client);
 
 #ifdef __cplusplus
 
