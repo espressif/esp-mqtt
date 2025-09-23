@@ -1,0 +1,27 @@
+# Note: No need to run build and test on master branch since we use FastForward merge strategy and so each merge request
+# is tested and then merged onto top of master branch.
+
+.build_template:
+    stage: build
+    tags:
+        - build
+        - internet
+    script:
+        - pip install -U 'idf-ci<1'
+        - idf-ci build run
+
+build_idf_v5.3:
+    extends: .build_template
+    image: espressif/idf:release-v5.3
+
+build_idf_v5.4:
+    extends: .build_template
+    image: espressif/idf:release-v5.4
+
+build_idf_v5.5:
+    extends: .build_template
+    image: espressif/idf:release-v5.5
+
+build_idf_latest:
+    extends: .build_template
+    image: espressif/idf:latest

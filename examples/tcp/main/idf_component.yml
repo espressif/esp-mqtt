@@ -1,7 +1,14 @@
 dependencies:
-  protocol_examples_common:
-    path: ${IDF_PATH}/examples/common_components/protocol_examples_common
-  espressif/esp_wifi_remote:
-    version: ">=0.10,<2.0"
-    rules:
-      - if: "target in [esp32p4, esp32h2]"
+    protocol_examples_common:
+        path: ${IDF_PATH}/examples/common_components/protocol_examples_common
+    espressif/mqtt:
+        version: "*"
+        override_path: ../../..
+    espressif/esp_wifi_remote:
+        version: ">=0.10,<2.0"
+        rules:
+            - if: target in [esp32p4, esp32h2]
+    espressif/esp_hosted:
+        version: "2.5.1"
+        rules:
+            - if: target in [esp32p4, esp32h2]

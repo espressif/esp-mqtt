@@ -1,0 +1,4 @@
+dependencies:
+  espressif/mqtt:
+    version: "*"
+    override_path: "../../../.."

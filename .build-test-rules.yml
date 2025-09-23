@@ -1,0 +1,106 @@
+# ESP-MQTT Build Test Rules
+# Consolidated manifest covering all examples and test apps
+
+.default_rules: &default_rules
+    disable:
+        - if: IDF_TARGET in ["esp32h21", "esp32h4"]
+          temporary: true
+          reason: not supported yet
+        - if: IDF_TARGET in ["esp32p4", "esp32h2"] and IDF_VERSION_MAJOR == 5 and IDF_VERSION_MINOR == 3
+          temporary: true
+          reason: esp32p4/esp32h2 example dependencies require IDF versions other than 5.3
+    disable_test:
+        - if: IDF_TARGET not in ["esp32"]
+          reason: Tests run only on ESP32 with ethernet runners
+
+# Basic TCP MQTT example
+examples/tcp:
+    <<: *default_rules
+
+# SSL/TLS MQTT example
+examples/ssl:
+    <<: *default_rules
+    disable_test:
+        - if: IDF_TARGET == IDF_TARGET
+          reason: CN verification enabled, tests disabled during server migration
+
+# WebSocket MQTT example
+examples/ws:
+    <<: *default_rules
+
+# WebSocket Secure MQTT example
+examples/wss:
+    <<: *default_rules
+    disable_test:
+        - if: IDF_TARGET == IDF_TARGET
+          reason: CN verification enabled, tests disabled during server migration
+
+# MQTT 5.0 protocol example
+examples/mqtt5:
+    <<: *default_rules
+
+# SSL with mutual authentication
+examples/ssl_mutual_auth:
+    <<: *default_rules
+    disable_test:
+        - if: IDF_TARGET == IDF_TARGET
+          reason: Advanced feature demonstration, only build
+
+# SSL with pre-shared keys
+examples/ssl_psk:
+    <<: *default_rules
+    disable_test:
+        - if: IDF_TARGET == IDF_TARGET
+          reason: Advanced feature demonstration, only build
+
+# SSL with Digital Signature peripheral
+examples/ssl_ds:
+    <<: *default_rules
+    disable:
+        - if: SOC_DIG_SIGN_SUPPORTED != 1
+          reason: DS not present
+    disable_test:
+        - if: IDF_TARGET == IDF_TARGET
+          reason: Advanced feature demonstration, only build
+
+# Custom outbox implementation example
+examples/custom_outbox:
+    <<: *default_rules
+    disable_test:
+        - if: IDF_TARGET == IDF_TARGET
+          reason: Advanced feature demonstration, only build
+
+test/apps:
+    disable:
+        - if: IDF_TARGET not in ["esp32"]
+          reason: Test apps build only for esp32
+    disable_test:
+        - if: IDF_TARGET != "esp32"
+          temporary: false
+          reason: Only esp32 target has ethernet runners for integration tests
+
+# C++ compatibility build test
+test/apps/build_test:
+    enable:
+        - if: IDF_TARGET in ["esp32", "esp32c3"]
+          reason: C++ compatibility build test
+    disable_test:
+        - if: IDF_TARGET != IDF_TARGET
+          temporary: false
+          reason: Build only test
+
+# Publish/Connect integration test
+test/apps/publish_connect_test:
+    enable:
+        - if: IDF_TARGET in ["esp32"]
+          reason: Integration test for publish/connect functionality
+    disable_test:
+        - if: IDF_TARGET != "esp32"
+          temporary: false
+          reason: Only esp32 target has ethernet runners for integration tests
+
+# Host tests (unit tests with mocks)
+test/host:
+    enable:
+        - if: IDF_TARGET in ["linux"]
+          reason: Host-based unit tests with mocked ESP-IDF components
