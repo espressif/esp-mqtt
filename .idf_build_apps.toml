@@ -1,0 +1,18 @@
+# check the latest documentation at
+# https://docs.espressif.com/projects/idf-build-apps/en/latest/references/config_file.html
+
+config_rules = ['sdkconfig.ci=default', 'sdkconfig.ci.*=', '=default']
+
+recursive = true
+check_warnings = true
+keep_going = true
+
+build_dir = "build_@t_@w"
+build_log_filename = "build.log"
+size_json_filename = "size.json"
+
+collect_app_info_filename = "app_info_@p.txt"
+
+check_manifest_rules = true
+manifest_filepatterns = ['**/.build-test-rules.yml']
+ignore_warning_files = ['.gitlab/ci/ignore_build_warnings.txt']

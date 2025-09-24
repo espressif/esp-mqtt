@@ -21,23 +21,23 @@ Features
 Application Examples
 --------------------
 
-   - :example:`protocols/mqtt/tcp` demonstrates how to implement MQTT communication over TCP (default port 1883).
+   - :example:`tcp` demonstrates how to implement MQTT communication over TCP (default port 1883).
 
-   - :example:`protocols/mqtt/ssl` demonstrates how to use SSL transport to implement MQTT communication over TLS (default port 8883).
+   - :example:`ssl` demonstrates how to use SSL transport to implement MQTT communication over TLS (default port 8883).
 
-   - :example:`protocols/mqtt/ssl_ds` demonstrates how to use digital signature peripheral for authentication to implement MQTT communication over TLS (default port 8883).
+   - :example:`ssl_ds` demonstrates how to use digital signature peripheral for authentication to implement MQTT communication over TLS (default port 8883).
 
-   - :example:`protocols/mqtt/ssl_mutual_auth` demonstrates how to use certificates for authentication to implement MQTT communication (default port 8883).
+   - :example:`ssl_mutual_auth` demonstrates how to use certificates for authentication to implement MQTT communication (default port 8883).
 
-   - :example:`protocols/mqtt/ssl_psk` demonstrates how to use pre-shared keys for authentication to implement MQTT communication over TLS (default port 8883).
+   - :example:`ssl_psk` demonstrates how to use pre-shared keys for authentication to implement MQTT communication over TLS (default port 8883).
 
-   - :example:`protocols/mqtt/ws` demonstrates how to implement MQTT communication over WebSocket (default port 80).
+   - :example:`ws` demonstrates how to implement MQTT communication over WebSocket (default port 80).
 
-   - :example:`protocols/mqtt/wss` demonstrates how to implement MQTT communication over WebSocket Secure (default port 443).
+   - :example:`wss` demonstrates how to implement MQTT communication over WebSocket Secure (default port 443).
 
-   - :example:`protocols/mqtt5` demonstrates how to use ESP-MQTT library to connect to broker with MQTT v5.0.
+   - :example:`mqtt5` demonstrates how to use ESP-MQTT library to connect to broker with MQTT v5.0.
 
-   - :example:`protocols/mqtt/custom_outbox` demonstrates how to customize the outbox in the ESP-MQTT library.
+   - :example:`custom_outbox` demonstrates how to customize the outbox in the ESP-MQTT library.
 
 MQTT Message Retransmission
 ---------------------------
@@ -124,7 +124,7 @@ The broker certificate may be set in PEM or DER format. To select DER, the equiv
        openssl s_client -showcerts -connect mqtt.eclipseprojects.io:8883 < /dev/null \
        2> /dev/null | openssl x509 -outform PEM > mqtt_eclipse_org.pem
 
--  Check the sample application: :example:`protocols/mqtt/ssl`
+-  Check the sample application: :example:`ssl`
 -  Configuration:
 
 .. code:: c

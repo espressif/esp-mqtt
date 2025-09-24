@@ -1,2 +1,0 @@
-build_dir = "$GITHUB_WORKSPACE/build_@t_@n"
-config="sdkconfig.ci"

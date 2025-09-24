@@ -1,0 +1,21 @@
+# ESP-MQTT idf-ci Configuration
+[gitlab.artifacts]
+build_job_filepatterns = [
+    "**/build*/partition_table/*.bin",
+    "**/build*/bootloader/*.bin",
+    "**/build*/bootloader/*.map",
+    "**/build*/bootloader/*.elf",
+    "**/build*/config/sdkconfig.json",
+    "**/build*/*.map",
+    "**/build*/*.bin",
+    "**/build*/*.elf",
+    "**/build*/flasher_args.json",
+]
+
+test_job_filepatterns = [
+    "**/test_logs",
+    "**/XUNIT_RESULT_*.xml",
+]
+
+[gitlab.build_pipeline]
+runs_per_job = 15

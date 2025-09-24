@@ -1,0 +1,50 @@
+.add_gh_key_remote: &add_gh_key_remote |
+    curl -sSL ${CIT_LOADER_URL} | sh
+    source citools/import_functions
+    cit_add_ssh_key "${GH_PUSH_KEY}"
+    git remote remove github || true
+    git remote add github ${GH_PUSH_REPO}
+
+host_tests:
+    image: espressif/idf:latest
+    stage: test
+    tags: [build]
+    timeout: 1h
+    variables:
+        GIT_DEPTH: 1
+    needs: []
+    artifacts:
+        paths:
+            - "**/coverage.xml"
+            - "**/coverage.html"
+        expire_in: 1 week
+        when: always
+        reports:
+            junit: "**/junit.xml"
+            coverage_report:
+                coverage_format: cobertura
+                path: "**/coverage.xml"
+    before_script:
+        - pip install -U gcovr 'idf-ci<1'
+    script:
+        - idf-ci build run -t linux -p test/host
+        - cd test/host
+        - ./build_linux_coverage/host_mqtt_client_test.elf -r junit -o junit.xml
+        - cd ../..
+        - gcovr --gcov-ignore-parse-errors -g -k -r . --html coverage.html -x coverage.xml
+
+check_remotes_sync:
+    stage: test_deploy
+    image: espressif/idf:latest
+    tags:
+        - build
+        - internet
+    needs: []
+    except:
+        - master
+        - idf
+    script:
+        - *add_gh_key_remote
+        - git fetch --depth=1 origin master
+        - git fetch --depth=1 github master
+        - test "$(git rev-parse origin/master)" == "$(git rev-parse github/master)"

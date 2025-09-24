@@ -15,22 +15,33 @@
 
 ## How to use
 
-[ESP-MQTT](https://github.com/espressif/esp-mqtt) is a standard [ESP-IDF](https://github.com/espressif/esp-idf) component.
-Please refer to instructions in [ESP-IDF](https://github.com/espressif/esp-idf)
+ESP-MQTT is available through the [ESP-IDF Component Manager](https://components.espressif.com/) and ships as a standard [ESP-IDF](https://github.com/espressif/esp-idf) component.
+
+- To add it via the Component Manager (recommended), declare the dependency in your project's `idf_component.yml`, for example:
+
+  ```yaml
+  dependencies:
+    espressif/mqtt: "*"
+  ```
+
+  Replace `*` with the version constraint you want to track, or run `idf.py add-dependency espressif/mqtt`.
+- For local development, clone this repository as `mqtt` so the component name matches:
+
+  ```bash
+  git clone https://github.com/espressif/esp-mqtt.git mqtt
+  ```
 
 ## Documentation
 
-- Please refer to the standard [ESP-IDF](https://github.com/espressif/esp-idf), documentation for the latest version: <https://docs.espressif.com/projects/esp-idf/>
-
-- Documentation of ESP-MQTT API: <https://docs.espressif.com/projects/esp-idf/en/latest/api-reference/protocols/mqtt.html>
+- Documentation of ESP-MQTT API: <https://docs.espressif.com/projects/esp-mqtt/en/master/esp32/index.html>
 
 ## License
 
-- MQTT Package - [Stephen Robinson - contiki-mqtt](https://github.com/esar/contiki-mqtt)
-- Others [@tuanpmt](https://twitter.com/tuanpmt)
-Apache License
+- Apache License 2.0
+- MQTT package origin: [Stephen Robinson - contiki-mqtt](https://github.com/esar/contiki-mqtt)
+- Additional contributions by [@tuanpmt](https://twitter.com/tuanpmt)
 
-## Older IDF verisons
+## Older IDF versions
 
 For [ESP-IDF](https://github.com/espressif/esp-idf) versions prior to IDFv3.2, please  clone as a component of [ESP-IDF](https://github.com/espressif/esp-idf):
 

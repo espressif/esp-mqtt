@@ -1,0 +1,29 @@
+push_master_to_github:
+    stage: deploy
+    image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
+    tags:
+        - build
+    only:
+        refs:
+            - master
+            - idf
+    when: on_success
+    variables:
+        GIT_STRATEGY: clone
+    script:
+        - source ${CI_PROJECT_DIR}/.gitlab/ci/utils.sh
+        - add_github_remote "$GH_PUSH_KEY" "$GH_PUSH_REPO"
+        - git push github HEAD:${CI_COMMIT_REF_NAME}
+
+upload_to_component_manager:
+    stage: deploy
+    image: python:3.10-alpine
+    tags:
+        - deploy
+    rules:
+        - if: '$CI_COMMIT_BRANCH == "master"'
+    script:
+        - pip install idf-component-manager
+        - export IDF_COMPONENT_API_TOKEN=${MQTT_COMPONENT_API_KEY}
+        - export COMP_VERSION=$(grep 'version:' idf_component.yml | head -n 1 | awk '{print $2}' | tr -d '"')
+        - compote component upload --namespace=espressif --name=mqtt --allow-existing --version=${COMP_VERSION}

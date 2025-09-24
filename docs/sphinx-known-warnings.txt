@@ -1,0 +1,37 @@
+mqtt_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
+Declaration is '.. cpp:type:: struct esp_mqtt_event_t esp_mqtt_event_t'.
+mqtt_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
+Declaration is '.. cpp:type:: struct esp_mqtt_client_config_t esp_mqtt_client_config_t'.
+mqtt_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
+Declaration is '.. cpp:enum:: esp_mqtt_event_id_t'.
+mqtt_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
+Declaration is '.. cpp:enum:: esp_mqtt_connect_return_code_t'.
+mqtt_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
+Declaration is '.. cpp:enum:: esp_mqtt_error_type_t'.
+mqtt_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
+Declaration is '.. cpp:enum:: esp_mqtt_transport_t'.
+mqtt_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
+Declaration is '.. cpp:enum:: esp_mqtt_protocol_ver_t'.
+mqtt5_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
+Declaration is '.. cpp:enumerator:: __attribute__'.
+index.rst:line: CRITICAL: Duplicate ID: "mqtt5__client_8h_1a4504a6557b6b27d66613101e758693f4a8c1dfc1ccf00a08192611433ee7f17b4".
+index.rst:line: WARNING: Duplicate explicit target name: "mqtt5__client_8h_1a4504a6557b6b27d66613101e758693f4a8c1dfc1ccf00a08192611433ee7f17b4".
+mqtt5_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
+Declaration is '.. cpp:enumerator:: __attribute__'.
+index.rst:line: CRITICAL: Duplicate ID: "mqtt5__client_8h_1a4504a6557b6b27d66613101e758693f4a8c1dfc1ccf00a08192611433ee7f17b4".
+index.rst:line: WARNING: Duplicate explicit target name: "mqtt5__client_8h_1a4504a6557b6b27d66613101e758693f4a8c1dfc1ccf00a08192611433ee7f17b4".
+mqtt5_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
+Declaration is '.. cpp:enumerator:: __attribute__'.
+index.rst:line: CRITICAL: Duplicate ID: "mqtt5__client_8h_1a4504a6557b6b27d66613101e758693f4a8c1dfc1ccf00a08192611433ee7f17b4".
+index.rst:line: WARNING: Duplicate explicit target name: "mqtt5__client_8h_1a4504a6557b6b27d66613101e758693f4a8c1dfc1ccf00a08192611433ee7f17b4".
+mqtt5_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
+Declaration is '.. cpp:enumerator:: __attribute__'.
+index.rst:line: CRITICAL: Duplicate ID: "mqtt5__client_8h_1a4504a6557b6b27d66613101e758693f4a8c1dfc1ccf00a08192611433ee7f17b4".
+index.rst:line: WARNING: Duplicate explicit target name: "mqtt5__client_8h_1a4504a6557b6b27d66613101e758693f4a8c1dfc1ccf00a08192611433ee7f17b4".
+index.rst:line: WARNING: undefined label: 'config_mqtt_outbox_expired_timeout_ms'
+index.rst:line: WARNING: undefined label: 'config_mqtt_report_deleted_messages'
+index.rst:line: WARNING: undefined label: 'esp_tls_server_verification'
+index.rst:line: WARNING: undefined label: 'config_mqtt_protocol_311'
+index.rst:line: WARNING: undefined label: 'config_mqtt_transport_ssl'
+index.rst:line: WARNING: undefined label: 'config_mqtt_transport_websocket'
+index.rst:line: WARNING: undefined label: 'config_mqtt_custom_outbox'

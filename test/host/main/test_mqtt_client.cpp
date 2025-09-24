@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <algorithm>
 #include <memory>
 #include <net/if.h>
 #include <random>
@@ -120,7 +121,9 @@ SCENARIO("MQTT Client Operation")
             SECTION("User set interface to use"){
                 http_parser_parse_url_ExpectAnyArgsAndReturn(0);
                 http_parser_parse_url_ReturnThruPtr_u(&ret_uri);
-                struct ifreq if_name = {.ifr_ifrn = {"custom"}};
+                struct ifreq if_name = {};
+                strncpy(if_name.ifr_name, "custom", IFNAMSIZ - 1);
+                if_name.ifr_name[IFNAMSIZ - 1] = '\0';;
                 config.network.if_name = &if_name;
                 SECTION("Client is not started"){
                     REQUIRE(esp_mqtt_set_config(client.get(), &config)== ESP_OK);
