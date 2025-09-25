@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+# SPDX-License-Identifier: Apache-2.0
 # -*- coding: utf-8 -*-
 #
 # Common (non-language-specific) configuration for Sphinx
@@ -6,6 +8,7 @@
 # type: ignore
 # pylint: disable=wildcard-import
 # pylint: disable=undefined-variable
+# ruff: noqa: F405
 
 from __future__ import print_function, unicode_literals
 
@@ -15,7 +18,7 @@ from esp_docs.conf_docs import *  # noqa: F403,F401
 # Only required when using ESP-IDF extensions that depend on IDF environment
 
 
-extensions += ['sphinx_copybutton',
+extensions += ['sphinx_copybutton',  # noqa: F405
                # Needed as a trigger for running doxygen
                'esp_docs.esp_extensions.dummy_build_system',
                'esp_docs.esp_extensions.run_doxygen'
@@ -25,8 +28,8 @@ extensions += ['sphinx_copybutton',
 github_repo = 'espressif/esp-mqtt'
 
 # context used by sphinx_idf_theme
-html_context['github_user'] = 'espressif'
-html_context['github_repo'] = 'esp-mqtt'
+html_context['github_user'] = 'espressif'  # noqa: F405
+html_context['github_repo'] = 'esp-mqtt'  # noqa: F405
 
 # Extra options required by sphinx_idf_theme
 project_slug = 'esp-mqtt'
@@ -34,6 +37,3 @@ versions_url = './_static/mqtt_docs_versions.js'
 
 idf_targets = [ 'esp32' ]
 languages = ['en']
-
-
-

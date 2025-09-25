@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include "mqtt_outbox.h"
 #include <stdint.h>
 #include <stdlib.h>
@@ -55,12 +60,15 @@ outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, outbox_message_handl
         return NULL;
     });
     memcpy(item->buffer, message->data, message->len);
+
     if (message->remaining_data) {
         memcpy(item->buffer + message->len, message->remaining_data, message->remaining_len);
     }
+
     STAILQ_INSERT_TAIL(outbox->list, item, next);
     outbox->size += item->len;
-    ESP_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%d, size=%"PRIu64, message->msg_id, message->msg_type, message->len + message->remaining_len, outbox_get_size(outbox));
+    ESP_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%d, size=%"PRIu64, message->msg_id, message->msg_type,
+             message->len + message->remaining_len, outbox_get_size(outbox));
     return item;
 }
 
@@ -83,6 +91,7 @@ outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox, pending_state_t pend
             if (tick) {
                 *tick = item->tick;
             }
+
             return item;
         }
     }
@@ -96,7 +105,8 @@ esp_err_t outbox_delete_item(outbox_handle_t outbox, outbox_item_handle_t item_t
         if (item == item_to_delete) {
             STAILQ_REMOVE(outbox->list, item, outbox_item, next);
             outbox->size -= item->len;
-            ESP_LOGD(TAG, "DELETE_ITEM msgid=%d, msg_type=%d, remain size=%"PRIu64, item_to_delete->msg_id, item_to_delete->msg_type, outbox_get_size(outbox));
+            ESP_LOGD(TAG, "DELETE_ITEM msgid=%d, msg_type=%d, remain size=%"PRIu64, item_to_delete->msg_id,
+                     item_to_delete->msg_type, outbox_get_size(outbox));
             free(item->buffer);
             free(item);
             return ESP_OK;
@@ -114,6 +124,7 @@ uint8_t *outbox_item_get_data(outbox_item_handle_t item,  size_t *len, uint16_t 
         *qos = item->msg_qos;
         return (uint8_t *)item->buffer;
     }
+
     return NULL;
 }
 
@@ -129,7 +140,6 @@ esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type)
             free(item);
             return ESP_OK;
         }
-
     }
     return ESP_FAIL;
 }
@@ -137,10 +147,12 @@ esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type)
 esp_err_t outbox_set_pending(outbox_handle_t outbox, int msg_id, pending_state_t pending)
 {
     outbox_item_handle_t item = outbox_get(outbox, msg_id);
+
     if (item) {
         item->pending = pending;
         return ESP_OK;
     }
+
     return ESP_FAIL;
 }
 
@@ -149,16 +161,19 @@ pending_state_t outbox_item_get_pending(outbox_item_handle_t item)
     if (item) {
         return item->pending;
     }
+
     return QUEUED;
 }
 
 esp_err_t outbox_set_tick(outbox_handle_t outbox, int msg_id, outbox_tick_t tick)
 {
     outbox_item_handle_t item = outbox_get(outbox, msg_id);
+
     if (item) {
         item->tick = tick;
         return ESP_OK;
     }
+
     return ESP_FAIL;
 }
 
@@ -176,7 +191,6 @@ int outbox_delete_single_expired(outbox_handle_t outbox, outbox_tick_t current_t
             ESP_LOGD(TAG, "DELETE_SINGLE_EXPIRED msgid=%d, remain size=%"PRIu64, msg_id, outbox_get_size(outbox));
             return msg_id;
         }
-
     }
     return msg_id;
 }
@@ -194,7 +208,6 @@ int outbox_delete_expired(outbox_handle_t outbox, outbox_tick_t current_tick, ou
             free(item);
             deleted_items ++;
         }
-
     }
     return deleted_items;
 }
@@ -210,7 +223,8 @@ void outbox_delete_all_items(outbox_handle_t outbox)
     STAILQ_FOREACH_SAFE(item, outbox->list, next, tmp) {
         STAILQ_REMOVE(outbox->list, item, outbox_item, next);
         outbox->size -= item->len;
-        ESP_LOGD(TAG, "DELETE_ALL_ITEMS msgid=%d, msg_type=%d, remain size=%"PRIu64, item->msg_id, item->msg_type, outbox_get_size(outbox));
+        ESP_LOGD(TAG, "DELETE_ALL_ITEMS msgid=%d, msg_type=%d, remain size=%"PRIu64, item->msg_id, item->msg_type,
+                 outbox_get_size(outbox));
         free(item->buffer);
         free(item);
     }

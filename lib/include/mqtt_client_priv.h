@@ -102,7 +102,7 @@ typedef struct {
     int message_retransmit_timeout;
     uint64_t outbox_limit;
     esp_transport_handle_t transport;
-    struct ifreq * if_name;
+    struct ifreq *if_name;
     esp_transport_keep_alive_t tcp_keep_alive_cfg;
 } mqtt_config_storage_t;
 

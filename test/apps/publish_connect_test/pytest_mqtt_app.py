@@ -181,8 +181,8 @@ def connect_dut(dut: Dut, uri: str, case_id: int) -> Any:
 def run_cases(dut: Dut, uri: str, cases: Dict[str, int]) -> None:
     try:
         dut.write('init')
-        dut.write(f'start')
-        dut.write(f'disconnect')
+        dut.write('start')
+        dut.write('disconnect')
         for case in [
             'EXAMPLE_CONNECT_CASE_NO_CERT',
             'EXAMPLE_CONNECT_CASE_SERVER_CERT',

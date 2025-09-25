@@ -49,4 +49,3 @@ jobs:
             target: ${{matrix.target}}
             app_name: ${{matrix.example.name}}
             app_path: $IDF_PATH/examples/protocols/${{matrix.example.path}}
-

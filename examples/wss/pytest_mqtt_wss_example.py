@@ -13,7 +13,7 @@ from threading import Thread
 import paho.mqtt.client as mqtt
 import pexpect
 import pytest
-from pytest_embedded import Dut
+from pytest_embedded import Dut  # noqa: F401
 from pytest_embedded_idf.utils import idf_parametrize
 
 event_client_connected = Event()
@@ -49,7 +49,7 @@ def on_message(client, userdata, msg):  # type: (mqtt.Client, tuple, mqtt.client
 
 @pytest.mark.ethernet
 @idf_parametrize('target', ['esp32'], indirect=['target'])
-def test_examples_protocol_mqtt_wss(dut):  # type: (Dut) -> None
+def test_examples_protocol_mqtt_wss(dut):  # type: (Dut) -> None  # type: ignore
     broker_url = ''
     broker_port = 0
     """

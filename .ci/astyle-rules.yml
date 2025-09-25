@@ -1,0 +1,31 @@
+DEFAULT:
+  options: >-
+    --style=otbs
+    --indent=spaces=4
+    --break-blocks
+    --pad-oper
+    --pad-comma
+    --pad-header
+    --unpad-paren
+    --delete-empty-lines
+    --add-braces
+    --align-pointer=name
+    --align-reference=name
+    --max-continuation-indent=120
+    --keep-one-line-statements
+    --break-after-logical
+  include:
+    - "*.c"
+    - "*.h"
+    - "*.cpp"
+    - "*.hpp"
+
+# Exclude mocked components and generated files
+mocks_and_generated:
+  check: false
+  include:
+    - "build*/"
+    - "components/mocks/"
+    - "managed_components/"
+    - "*.pb.h"
+    - "*.pb.c"

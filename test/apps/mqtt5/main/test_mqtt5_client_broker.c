@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2022-2023 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2022-2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -23,7 +23,6 @@
             } \
     } while(0)
 
-
 static const int COMMON_OPERATION_TIMEOUT = 10000;
 static const int CONNECT_BIT = BIT0;
 static const int DISCONNECT_BIT = BIT1;
@@ -37,7 +36,7 @@ static esp_mqtt5_user_property_item_t user_property_arr[3] = {
     {"p", "password"}
 };
 
-static char* append_mac(const char* string)
+static char *append_mac(const char *string)
 {
     uint8_t mac[6];
     char *id_string = NULL;
@@ -50,7 +49,7 @@ static void mqtt5_data_handler_qos(void *handler_args, esp_event_base_t base, in
 {
     if (event_id == MQTT_EVENT_DATA) {
         esp_mqtt_event_handle_t event = event_data;
-        int * qos  = handler_args;
+        int *qos  = handler_args;
         *qos = event->qos;
         xEventGroupSetBits(s_event_group, DATA_BIT);
     }
@@ -63,12 +62,13 @@ static void mqtt5_data_handler_lwt(void *handler_args, esp_event_base_t base, in
         ESP_LOGI("mqtt-lwt", "MQTT_EVENT_DATA");
         ESP_LOGI("mqtt-lwt", "TOPIC=%.*s", event->topic_len, event->topic);
         ESP_LOGI("mqtt-lwt", "DATA=%.*s", event->data_len, event->data);
+
         if (strncmp(event->data, "no-lwt", event->data_len) == 0) {
             // no lwt, just to indicate the test has finished
             xEventGroupSetBits(s_event_group, DATA_BIT);
         } else {
             // count up any potential lwt message
-            int * count  = handler_args;
+            int *count  = handler_args;
             *count = *count + 1;
             ESP_LOGE("mqtt5-lwt", "count=%d", *count);
         }
@@ -80,37 +80,39 @@ static void mqtt5_data_handler_subscribe(void *handler_args, esp_event_base_t ba
     if (event_id == MQTT_EVENT_SUBSCRIBED) {
         esp_mqtt_event_handle_t event = event_data;
         ESP_LOGI("mqtt5-subscribe", "MQTT_EVENT_SUBSCRIBED, data size=%d", event->data_len);
-        int * sub_payload  = handler_args;
+        int *sub_payload  = handler_args;
+
         if (event->data_len == 1) {
-            ESP_LOGI("mqtt5-subscribe", "DATA=%d", *(uint8_t*)event->data);
-            *sub_payload = *(uint8_t*)event->data;
+            ESP_LOGI("mqtt5-subscribe", "DATA=%d", *(uint8_t *)event->data);
+            *sub_payload = *(uint8_t *)event->data;
         }
+
         xEventGroupSetBits(s_event_group, DATA_BIT);
     }
 }
 
-
 static void mqtt5_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     switch ((esp_mqtt_event_id_t)event_id) {
-        case MQTT_EVENT_CONNECTED:
-            xEventGroupSetBits(s_event_group, CONNECT_BIT);
-            break;
+    case MQTT_EVENT_CONNECTED:
+        xEventGroupSetBits(s_event_group, CONNECT_BIT);
+        break;
 
-        case MQTT_EVENT_DISCONNECTED:
-            xEventGroupSetBits(s_event_group, DISCONNECT_BIT);
-            break;
-        default:
-            break;
+    case MQTT_EVENT_DISCONNECTED:
+        xEventGroupSetBits(s_event_group, DISCONNECT_BIT);
+        break;
+
+    default:
+        break;
     }
 }
 
 bool mqtt5_connect_disconnect(void)
 {
     const esp_mqtt_client_config_t mqtt5_cfg = {
-            .broker.address.uri = CONFIG_MQTT5_TEST_BROKER_URI,
-            .network.disable_auto_reconnect = true,
-            .session.protocol_ver = MQTT_PROTOCOL_V_5,
+        .broker.address.uri = CONFIG_MQTT5_TEST_BROKER_URI,
+        .network.disable_auto_reconnect = true,
+        .session.protocol_ver = MQTT_PROTOCOL_V_5,
     };
     esp_mqtt5_connection_property_config_t connect_property = {
         .session_expiry_interval = 10,
@@ -126,14 +128,15 @@ bool mqtt5_connect_disconnect(void)
     };
     s_event_group = xEventGroupCreate();
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt5_cfg);
-    TEST_ASSERT_TRUE(NULL != client );
+    TEST_ASSERT_TRUE(NULL != client);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt5_event_handler, NULL);
     TEST_ASSERT_TRUE(ESP_OK == esp_mqtt5_client_set_user_property(&connect_property.user_property, user_property_arr, 3));
     TEST_ASSERT_TRUE(ESP_OK == esp_mqtt5_client_set_connect_property(client, &connect_property));
     esp_mqtt5_client_delete_user_property(connect_property.user_property);
     TEST_ASSERT_TRUE(ESP_OK == esp_mqtt_client_start(client));
     WAIT_FOR_EVENT(CONNECT_BIT);
-    TEST_ASSERT_TRUE(ESP_OK == esp_mqtt5_client_set_user_property(&disconnect_property.user_property, user_property_arr, 3));
+    TEST_ASSERT_TRUE(ESP_OK == esp_mqtt5_client_set_user_property(&disconnect_property.user_property, user_property_arr,
+                                                                  3));
     TEST_ASSERT_TRUE(ESP_OK == esp_mqtt5_client_set_disconnect_property(client, &disconnect_property));
     esp_mqtt5_client_delete_user_property(disconnect_property.user_property);
     esp_mqtt_client_disconnect(client);
@@ -148,8 +151,8 @@ bool mqtt5_connect_disconnect(void)
 bool mqtt5_subscribe_publish(void)
 {
     const esp_mqtt_client_config_t mqtt5_cfg = {
-            .broker.address.uri = CONFIG_MQTT5_TEST_BROKER_URI,
-            .session.protocol_ver = MQTT_PROTOCOL_V_5,
+        .broker.address.uri = CONFIG_MQTT5_TEST_BROKER_URI,
+        .session.protocol_ver = MQTT_PROTOCOL_V_5,
     };
     esp_mqtt5_publish_property_config_t publish_property = {
         .payload_format_indicator = 1,
@@ -166,11 +169,11 @@ bool mqtt5_subscribe_publish(void)
         .retain_as_published_flag = true,
         .retain_handle = 0,
     };
-    char* topic = append_mac("topic");
+    char *topic = append_mac("topic");
     TEST_ASSERT_TRUE(NULL != topic);
     s_event_group = xEventGroupCreate();
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt5_cfg);
-    TEST_ASSERT_TRUE(NULL != client );
+    TEST_ASSERT_TRUE(NULL != client);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt5_event_handler, NULL);
     TEST_ASSERT_TRUE(ESP_OK == esp_mqtt_client_start(client));
     WAIT_FOR_EVENT(CONNECT_BIT);
@@ -193,21 +196,21 @@ bool mqtt5_subscribe_publish(void)
 
 bool mqtt5_lwt_clean_disconnect(void)
 {
-    char* lwt = append_mac("lwt");
+    char *lwt = append_mac("lwt");
     TEST_ASSERT_TRUE(lwt);
     const esp_mqtt_client_config_t mqtt5_cfg1 = {
-            .broker.address.uri = CONFIG_MQTT5_TEST_BROKER_URI,
-            .credentials.set_null_client_id = true,
-            .session.last_will.topic = lwt,
-            .session.last_will.msg = "lwt_msg",
-            .session.protocol_ver = MQTT_PROTOCOL_V_5,
+        .broker.address.uri = CONFIG_MQTT5_TEST_BROKER_URI,
+        .credentials.set_null_client_id = true,
+        .session.last_will.topic = lwt,
+        .session.last_will.msg = "lwt_msg",
+        .session.protocol_ver = MQTT_PROTOCOL_V_5,
     };
     const esp_mqtt_client_config_t mqtt5_cfg2 = {
-            .broker.address.uri = CONFIG_MQTT5_TEST_BROKER_URI,
-            .credentials.set_null_client_id = true,
-            .session.last_will.topic = lwt,
-            .session.last_will.msg = "lwt_msg",
-            .session.protocol_ver = MQTT_PROTOCOL_V_5,
+        .broker.address.uri = CONFIG_MQTT5_TEST_BROKER_URI,
+        .credentials.set_null_client_id = true,
+        .session.last_will.topic = lwt,
+        .session.last_will.msg = "lwt_msg",
+        .session.protocol_ver = MQTT_PROTOCOL_V_5,
     };
     esp_mqtt5_connection_property_config_t connect_property = {
         .will_delay_interval = 10,
@@ -219,10 +222,9 @@ bool mqtt5_lwt_clean_disconnect(void)
         .correlation_data_len = 6,
     };
     s_event_group = xEventGroupCreate();
-
     esp_mqtt_client_handle_t client1 = esp_mqtt_client_init(&mqtt5_cfg1);
     esp_mqtt_client_handle_t client2 = esp_mqtt_client_init(&mqtt5_cfg2);
-    TEST_ASSERT_TRUE(NULL != client1 && NULL != client2 );
+    TEST_ASSERT_TRUE(NULL != client1 && NULL != client2);
     esp_mqtt_client_register_event(client1, ESP_EVENT_ANY_ID, mqtt5_event_handler, NULL);
     esp_mqtt_client_register_event(client2, ESP_EVENT_ANY_ID, mqtt5_event_handler, NULL);
     TEST_ASSERT_TRUE(ESP_OK == esp_mqtt5_client_set_connect_property(client1, &connect_property));
@@ -258,15 +260,15 @@ bool mqtt5_lwt_clean_disconnect(void)
 bool mqtt5_subscribe_payload(void)
 {
     const esp_mqtt_client_config_t mqtt5_cfg = {
-            .broker.address.uri = CONFIG_MQTT5_TEST_BROKER_URI,
-            .network.disable_auto_reconnect = true,
-            .session.protocol_ver = MQTT_PROTOCOL_V_5,
+        .broker.address.uri = CONFIG_MQTT5_TEST_BROKER_URI,
+        .network.disable_auto_reconnect = true,
+        .session.protocol_ver = MQTT_PROTOCOL_V_5,
     };
-    char* topic = append_mac("topic");
+    char *topic = append_mac("topic");
     TEST_ASSERT_TRUE(NULL != topic);
     s_event_group = xEventGroupCreate();
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt5_cfg);
-    TEST_ASSERT_TRUE(NULL != client );
+    TEST_ASSERT_TRUE(NULL != client);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt5_event_handler, NULL);
     TEST_ASSERT_TRUE(ESP_OK == esp_mqtt_client_start(client));
     WAIT_FOR_EVENT(CONNECT_BIT);

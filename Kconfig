@@ -185,6 +185,6 @@ menu "ESP-MQTT Configurations"
             Set to true to have publish topic in all data events. This changes the behaviour
             when  the message is bigger than the receive buffer size. The first event of the sequence
             always have the topic.
-            Note: This will allocate memory to store the topic only in case of messge bigger than the buffer size.
+            Note: This will allocate memory to store the topic only in case of message bigger than the buffer size.
 
 endmenu

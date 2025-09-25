@@ -1,0 +1,25 @@
+# Pre-check jobs for ESP-MQTT
+
+.check_pre_commit_template:
+  stage: pre_check
+  image: "${CI_DOCKER_REGISTRY}/esp-idf-pre-commit:2"
+  tags: [build, internet]
+  variables:
+    GIT_STRATEGY: fetch
+    GIT_DEPTH: 1
+    SUBMODULES_TO_FETCH: "all"
+  script:
+    - pre-commit install
+    - pre-commit run --all-files
+  cache:
+    paths:
+      - .cache/submodule_archives
+    policy: pull
+
+check_pre_commit:
+  extends:
+    - .check_pre_commit_template
+  rules:
+    - if: '$CI_COMMIT_REF_NAME == "master" && $CI_PIPELINE_SOURCE == "push"'
+      when: never
+    - when: on_success

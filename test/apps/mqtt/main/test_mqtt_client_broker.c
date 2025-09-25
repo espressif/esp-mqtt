@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2021-2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2021-2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -22,7 +22,6 @@
             } \
     } while(0)
 
-
 static const int COMMON_OPERATION_TIMEOUT = 10000;
 static const int CONNECT_BIT = BIT0;
 static const int DISCONNECT_BIT = BIT1;
@@ -30,7 +29,7 @@ static const int DATA_BIT = BIT2;
 
 static EventGroupHandle_t s_event_group;
 
-static char* append_mac(const char* string)
+static char *append_mac(const char *string)
 {
     uint8_t mac[6];
     char *id_string = NULL;
@@ -43,7 +42,7 @@ static void mqtt_data_handler_qos(void *handler_args, esp_event_base_t base, int
 {
     if (event_id == MQTT_EVENT_DATA) {
         esp_mqtt_event_handle_t event = event_data;
-        int * qos  = handler_args;
+        int *qos  = handler_args;
         *qos = event->qos;
         xEventGroupSetBits(s_event_group, DATA_BIT);
     }
@@ -56,12 +55,13 @@ static void mqtt_data_handler_lwt(void *handler_args, esp_event_base_t base, int
         ESP_LOGI("mqtt-lwt", "MQTT_EVENT_DATA");
         ESP_LOGI("mqtt-lwt", "TOPIC=%.*s", event->topic_len, event->topic);
         ESP_LOGI("mqtt-lwt", "DATA=%.*s", event->data_len, event->data);
+
         if (strncmp(event->data, "no-lwt", event->data_len) == 0) {
             // no lwt, just to indicate the test has finished
             xEventGroupSetBits(s_event_group, DATA_BIT);
         } else {
             // count up any potential lwt message
-            int * count  = handler_args;
+            int *count  = handler_args;
             *count = *count + 1;
             ESP_LOGE("mqtt-lwt", "count=%d", *count);
         }
@@ -73,40 +73,42 @@ static void mqtt_data_handler_subscribe(void *handler_args, esp_event_base_t bas
     if (event_id == MQTT_EVENT_SUBSCRIBED) {
         esp_mqtt_event_handle_t event = event_data;
         ESP_LOGI("mqtt-subscribe", "MQTT_EVENT_SUBSCRIBED, data size=%d", event->data_len);
-        int * sub_payload  = handler_args;
+        int *sub_payload  = handler_args;
+
         if (event->data_len == 1) {
-            ESP_LOGI("mqtt-subscribe", "DATA=%d", *(uint8_t*)event->data);
-            *sub_payload = *(uint8_t*)event->data;
+            ESP_LOGI("mqtt-subscribe", "DATA=%d", *(uint8_t *)event->data);
+            *sub_payload = *(uint8_t *)event->data;
         }
+
         xEventGroupSetBits(s_event_group, DATA_BIT);
     }
 }
 
-
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     switch ((esp_mqtt_event_id_t)event_id) {
-        case MQTT_EVENT_CONNECTED:
-            xEventGroupSetBits(s_event_group, CONNECT_BIT);
-            break;
+    case MQTT_EVENT_CONNECTED:
+        xEventGroupSetBits(s_event_group, CONNECT_BIT);
+        break;
 
-        case MQTT_EVENT_DISCONNECTED:
-            xEventGroupSetBits(s_event_group, DISCONNECT_BIT);
-            break;
-        default:
-            break;
+    case MQTT_EVENT_DISCONNECTED:
+        xEventGroupSetBits(s_event_group, DISCONNECT_BIT);
+        break;
+
+    default:
+        break;
     }
 }
 
 bool mqtt_connect_disconnect(void)
 {
     const esp_mqtt_client_config_t mqtt_cfg = {
-            .broker.address.uri = CONFIG_MQTT_TEST_BROKER_URI,
-            .network.disable_auto_reconnect = true,
+        .broker.address.uri = CONFIG_MQTT_TEST_BROKER_URI,
+        .network.disable_auto_reconnect = true,
     };
     s_event_group = xEventGroupCreate();
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-    TEST_ASSERT_TRUE(NULL != client );
+    TEST_ASSERT_TRUE(NULL != client);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     TEST_ASSERT_TRUE(ESP_OK == esp_mqtt_client_start(client));
     WAIT_FOR_EVENT(CONNECT_BIT);
@@ -122,13 +124,13 @@ bool mqtt_connect_disconnect(void)
 bool mqtt_subscribe_publish(void)
 {
     const esp_mqtt_client_config_t mqtt_cfg = {
-            .broker.address.uri = CONFIG_MQTT_TEST_BROKER_URI,
+        .broker.address.uri = CONFIG_MQTT_TEST_BROKER_URI,
     };
-    char* topic = append_mac("topic");
+    char *topic = append_mac("topic");
     TEST_ASSERT_TRUE(NULL != topic);
     s_event_group = xEventGroupCreate();
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-    TEST_ASSERT_TRUE(NULL != client );
+    TEST_ASSERT_TRUE(NULL != client);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     TEST_ASSERT_TRUE(ESP_OK == esp_mqtt_client_start(client));
     WAIT_FOR_EVENT(CONNECT_BIT);
@@ -149,25 +151,24 @@ bool mqtt_subscribe_publish(void)
 
 bool mqtt_lwt_clean_disconnect(void)
 {
-    char* lwt = append_mac("lwt");
+    char *lwt = append_mac("lwt");
     TEST_ASSERT_TRUE(lwt);
     const esp_mqtt_client_config_t mqtt_cfg1 = {
-            .broker.address.uri = CONFIG_MQTT_TEST_BROKER_URI,
-            .credentials.set_null_client_id = true,
-            .session.last_will.topic = lwt,
-            .session.last_will.msg = "lwt_msg"
+        .broker.address.uri = CONFIG_MQTT_TEST_BROKER_URI,
+        .credentials.set_null_client_id = true,
+        .session.last_will.topic = lwt,
+        .session.last_will.msg = "lwt_msg"
     };
     const esp_mqtt_client_config_t mqtt_cfg2 = {
-            .broker.address.uri = CONFIG_MQTT_TEST_BROKER_URI,
-            .credentials.set_null_client_id = true,
-            .session.last_will.topic = lwt,
-            .session.last_will.msg = "lwt_msg"
+        .broker.address.uri = CONFIG_MQTT_TEST_BROKER_URI,
+        .credentials.set_null_client_id = true,
+        .session.last_will.topic = lwt,
+        .session.last_will.msg = "lwt_msg"
     };
     s_event_group = xEventGroupCreate();
-
     esp_mqtt_client_handle_t client1 = esp_mqtt_client_init(&mqtt_cfg1);
     esp_mqtt_client_handle_t client2 = esp_mqtt_client_init(&mqtt_cfg2);
-    TEST_ASSERT_TRUE(NULL != client1 && NULL != client2 );
+    TEST_ASSERT_TRUE(NULL != client1 && NULL != client2);
     esp_mqtt_client_register_event(client1, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_register_event(client2, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     TEST_ASSERT_TRUE(esp_mqtt_client_start(client1) == ESP_OK);
@@ -201,14 +202,14 @@ bool mqtt_lwt_clean_disconnect(void)
 bool mqtt_subscribe_payload(void)
 {
     const esp_mqtt_client_config_t mqtt_cfg = {
-            .broker.address.uri = CONFIG_MQTT_TEST_BROKER_URI,
-            .network.disable_auto_reconnect = true,
+        .broker.address.uri = CONFIG_MQTT_TEST_BROKER_URI,
+        .network.disable_auto_reconnect = true,
     };
-    char* topic = append_mac("topic");
+    char *topic = append_mac("topic");
     TEST_ASSERT_TRUE(NULL != topic);
     s_event_group = xEventGroupCreate();
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-    TEST_ASSERT_TRUE(NULL != client );
+    TEST_ASSERT_TRUE(NULL != client);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     TEST_ASSERT_TRUE(ESP_OK == esp_mqtt_client_start(client));
     WAIT_FOR_EVENT(CONNECT_BIT);

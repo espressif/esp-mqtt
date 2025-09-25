@@ -6,6 +6,7 @@
     tags:
         - build
         - internet
+    timeout: 1h
     script:
         - pip install -U 'idf-ci<1'
         - idf-ci build run
