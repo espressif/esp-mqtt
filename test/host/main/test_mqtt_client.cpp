@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2022-2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -25,7 +25,7 @@ extern "C" {
 #include "Mockqueue.h"
 #include "Mocktask.h"
 #if __has_include ("Mockidf_additions.h")
-/* Some functions were moved from "task.h" to "idf_additions.h" */
+    /* Some functions were moved from "task.h" to "idf_additions.h" */
 #include "Mockidf_additions.h"
 #endif
 #include "Mockesp_timer.h"
@@ -49,7 +49,8 @@ auto random_string(std::size_t n)
     return str;
 }
 
-using unique_mqtt_client = std::unique_ptr < std::remove_pointer_t<esp_mqtt_client_handle_t>, decltype([](esp_mqtt_client_handle_t client)
+using unique_mqtt_client = std::unique_ptr < std::remove_pointer_t<esp_mqtt_client_handle_t>,
+decltype([](esp_mqtt_client_handle_t client)
 {
     esp_mqtt_client_destroy(client);
 }) >;
@@ -118,15 +119,15 @@ SCENARIO("MQTT Client Operation")
                     REQUIRE(res == ESP_FAIL);
                 }
             }
-            SECTION("User set interface to use"){
+            SECTION("User set interface to use") {
                 http_parser_parse_url_ExpectAnyArgsAndReturn(0);
                 http_parser_parse_url_ReturnThruPtr_u(&ret_uri);
                 struct ifreq if_name = {};
                 strncpy(if_name.ifr_name, "custom", IFNAMSIZ - 1);
                 if_name.ifr_name[IFNAMSIZ - 1] = '\0';;
                 config.network.if_name = &if_name;
-                SECTION("Client is not started"){
-                    REQUIRE(esp_mqtt_set_config(client.get(), &config)== ESP_OK);
+                SECTION("Client is not started") {
+                    REQUIRE(esp_mqtt_set_config(client.get(), &config) == ESP_OK);
                 }
             }
             SECTION("After Start Client Is Cleanly destroyed") {
@@ -143,15 +144,14 @@ SCENARIO("MQTT Client Operation")
             auto password = random_string(10);
             auto lw_topic = random_string(10);
             auto lw_msg = random_string(10);
-
             config.broker = {.address = {
                     .hostname = host.data(),
-                    .path = path.data()
+                                    .path = path.data()
                 }
             };
             config.credentials = {
                 .username = username.data(),
-                .client_id = client_id.data(),
+                                    .client_id = client_id.data(),
                 .authentication = {
                     .password = password.data()
                 }
@@ -159,13 +159,11 @@ SCENARIO("MQTT Client Operation")
             config.session = {
                 .last_will {
                     .topic = lw_topic.data(),
-                    .msg = lw_msg.data()
+                                     .msg = lw_msg.data()
                 }
             };
             auto client = unique_mqtt_client{esp_mqtt_client_init(&config)};
             REQUIRE(client != nullptr);
-
         }
     }
 }
-

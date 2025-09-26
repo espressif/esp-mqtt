@@ -34,4 +34,3 @@ jobs:
     #          target: ${{inputs.target}}
     #          app_name: ${{inputs.app_name}}
     #          app_path: ${{inputs.app_path}}
-

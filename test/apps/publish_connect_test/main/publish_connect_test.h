@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2023 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2023-2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Unlicense OR CC0-1.0
  */
@@ -11,7 +11,7 @@ typedef enum {NONE, TCP, SSL, WS, WSS} transport_t;
 
 typedef struct {
     esp_mqtt_client_handle_t mqtt_client;
-    void * data;
+    void *data;
 } command_context_t;
 
 typedef struct {
@@ -25,7 +25,7 @@ typedef struct {
     size_t expected_size;
     size_t nr_of_msg_received;
     size_t nr_of_msg_expected;
-    char * received_data;
+    char *received_data;
 } publish_context_t ;
 
 typedef struct {
@@ -51,9 +51,9 @@ typedef struct {
 } publish_setup_args_t;
 
 void publish_init_flags(void);
-void publish_setup(command_context_t * ctx, char const *  transport);
-void publish_teardown(command_context_t * ctx);
-void publish_test(command_context_t * ctx, int expect_to_publish, int qos, bool enqueue);
-void connection_test(command_context_t * ctx, const char *uri, int test_case);
-void connect_setup(command_context_t * ctx);
-void connect_teardown(command_context_t * ctx);
+void publish_setup(command_context_t *ctx, char const   *transport);
+void publish_teardown(command_context_t *ctx);
+void publish_test(command_context_t *ctx, int expect_to_publish, int qos, bool enqueue);
+void connection_test(command_context_t *ctx, const char *uri, int test_case);
+void connect_setup(command_context_t *ctx);
+void connect_teardown(command_context_t *ctx);

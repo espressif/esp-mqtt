@@ -6,9 +6,12 @@
     tags:
         - build
         - internet
+    timeout: 1h
     script:
         - pip install -U 'idf-ci<1'
         - idf-ci build run
+          --parallel-count ${CI_NODE_TOTAL:-1}
+          --parallel-index ${CI_NODE_INDEX:-1}
 
 build_idf_v5.3:
     extends: .build_template

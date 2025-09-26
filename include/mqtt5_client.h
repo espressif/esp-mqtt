@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2022-2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -76,15 +76,18 @@ typedef struct {
     uint16_t topic_alias_maximum;                /*!< The maximum topic alias that we support */
     bool request_resp_info;                      /*!< This value to request Server to return Response information */
     bool request_problem_info;                   /*!< This value to indicate whether the reason string or user properties are sent in case of failures */
-    mqtt5_user_property_handle_t user_property;  /*!< The handle for user property, call function esp_mqtt5_client_set_user_property to set it */
+    mqtt5_user_property_handle_t
+    user_property;  /*!< The handle for user property, call function esp_mqtt5_client_set_user_property to set it */
     uint32_t will_delay_interval;                /*!< The time interval that server delays publishing will message  */
     uint32_t message_expiry_interval;            /*!< The time interval that message expiry */
     bool payload_format_indicator;               /*!< This value is to indicator will message payload format */
-    const char *content_type;                    /*!< This value is to indicator will message content type, use a MIME content type string */
+    const char
+    *content_type;                    /*!< This value is to indicator will message content type, use a MIME content type string */
     const char *response_topic;                  /*!< Topic name for a response message */
     const char *correlation_data;                /*!< Binary data for receiver to match the response message */
     uint16_t correlation_data_len;               /*!< The length of correlation data */
-    mqtt5_user_property_handle_t will_user_property;  /*!< The handle for will message user property, call function esp_mqtt5_client_set_user_property to set it */
+    mqtt5_user_property_handle_t
+    will_user_property;  /*!< The handle for will message user property, call function esp_mqtt5_client_set_user_property to set it */
 } esp_mqtt5_connection_property_config_t;
 
 /**
@@ -93,12 +96,14 @@ typedef struct {
 typedef struct {
     bool payload_format_indicator;               /*!< This value is to indicator publish message payload format */
     uint32_t message_expiry_interval;            /*!< The time interval that message expiry */
-    uint16_t topic_alias;                        /*!< An interger value to identify the topic instead of using topic name string */
+    uint16_t topic_alias;                        /*!< An integer value to identify the topic instead of using topic name string */
     const char *response_topic;                  /*!< Topic name for a response message */
     const char *correlation_data;                /*!< Binary data for receiver to match the response message */
     uint16_t correlation_data_len;               /*!< The length of correlation data */
-    const char *content_type;                    /*!< This value is to indicator publish message content type, use a MIME content type string */
-    mqtt5_user_property_handle_t user_property;  /*!< The handle for user property, call function esp_mqtt5_client_set_user_property to set it */
+    const char
+    *content_type;                    /*!< This value is to indicator publish message content type, use a MIME content type string */
+    mqtt5_user_property_handle_t
+    user_property;  /*!< The handle for user property, call function esp_mqtt5_client_set_user_property to set it */
 } esp_mqtt5_publish_property_config_t;
 
 /**
@@ -110,8 +115,10 @@ typedef struct {
     bool retain_as_published_flag;               /*!< Subscription Option to keep the retain flag as published option */
     uint8_t retain_handle;                       /*!< Subscription Option to handle retain option */
     bool is_share_subscribe;                     /*!< Whether subscribe is a shared subscription */
-    const char *share_name;                      /*!< The name of shared subscription which is a part of $share/{share_name}/{topic} */
-    mqtt5_user_property_handle_t user_property;  /*!< The handle for user property, call function esp_mqtt5_client_set_user_property to set it */
+    const char
+    *share_name;                      /*!< The name of shared subscription which is a part of $share/{share_name}/{topic} */
+    mqtt5_user_property_handle_t
+    user_property;  /*!< The handle for user property, call function esp_mqtt5_client_set_user_property to set it */
 } esp_mqtt5_subscribe_property_config_t;
 
 /**
@@ -119,8 +126,10 @@ typedef struct {
  */
 typedef struct {
     bool is_share_subscribe;                     /*!< Whether subscribe is a shared subscription */
-    const char *share_name;                      /*!< The name of shared subscription which is a part of $share/{share_name}/{topic} */
-    mqtt5_user_property_handle_t user_property;  /*!< The handle for user property, call function esp_mqtt5_client_set_user_property to set it */
+    const char
+    *share_name;                      /*!< The name of shared subscription which is a part of $share/{share_name}/{topic} */
+    mqtt5_user_property_handle_t
+    user_property;  /*!< The handle for user property, call function esp_mqtt5_client_set_user_property to set it */
 } esp_mqtt5_unsubscribe_property_config_t;
 
 /**
@@ -128,8 +137,9 @@ typedef struct {
  */
 typedef struct {
     uint32_t session_expiry_interval;            /*!< The interval time of session expiry */
-    uint8_t disconnect_reason;                   /*!< The reason that connection disconnet, refer to mqtt5_error_reason_code */
-    mqtt5_user_property_handle_t user_property;  /*!< The handle for user property, call function esp_mqtt5_client_set_user_property to set it */
+    uint8_t disconnect_reason;                   /*!< The reason that connection disconnect, refer to mqtt5_error_reason_code */
+    mqtt5_user_property_handle_t
+    user_property;  /*!< The handle for user property, call function esp_mqtt5_client_set_user_property to set it */
 } esp_mqtt5_disconnect_property_config_t;
 
 /**
@@ -144,7 +154,8 @@ typedef struct {
     char *content_type;                 /*!< Content type of the message */
     int content_type_len;               /*!< Content type length of the message */
     uint16_t subscribe_id;              /*!< Subscription identifier of the message */
-    mqtt5_user_property_handle_t user_property;  /*!< The handle for user property, call function esp_mqtt5_client_delete_user_property to free the memory */
+    mqtt5_user_property_handle_t
+    user_property;  /*!< The handle for user property, call function esp_mqtt5_client_delete_user_property to free the memory */
 } esp_mqtt5_event_property_t;
 
 /**
@@ -166,7 +177,8 @@ typedef struct {
  *         ESP_FAIL on fail
  *         ESP_OK on success
  */
-esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client, const esp_mqtt5_connection_property_config_t *connect_property);
+esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client,
+                                                const esp_mqtt5_connection_property_config_t *connect_property);
 
 /**
  * @brief Set MQTT5 client publish property configuration
@@ -181,7 +193,8 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
  *         ESP_FAIL on fail
  *         ESP_OK on success
  */
-esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client, const esp_mqtt5_publish_property_config_t *property);
+esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client,
+                                                const esp_mqtt5_publish_property_config_t *property);
 
 /**
  * @brief Set MQTT5 client subscribe property configuration
@@ -196,7 +209,8 @@ esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client
  *         ESP_FAIL on fail
  *         ESP_OK on success
  */
-esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t client, const esp_mqtt5_subscribe_property_config_t *property);
+esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t client,
+                                                  const esp_mqtt5_subscribe_property_config_t *property);
 
 /**
  * @brief Set MQTT5 client unsubscribe property configuration
@@ -211,7 +225,8 @@ esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t clie
  *         ESP_FAIL on fail
  *         ESP_OK on success
  */
-esp_err_t esp_mqtt5_client_set_unsubscribe_property(esp_mqtt5_client_handle_t client, const esp_mqtt5_unsubscribe_property_config_t *property);
+esp_err_t esp_mqtt5_client_set_unsubscribe_property(esp_mqtt5_client_handle_t client,
+                                                    const esp_mqtt5_unsubscribe_property_config_t *property);
 
 /**
  * @brief Set MQTT5 client disconnect property configuration
@@ -227,7 +242,8 @@ esp_err_t esp_mqtt5_client_set_unsubscribe_property(esp_mqtt5_client_handle_t cl
  *         ESP_FAIL on fail
  *         ESP_OK on success
  */
-esp_err_t esp_mqtt5_client_set_disconnect_property(esp_mqtt5_client_handle_t client, const esp_mqtt5_disconnect_property_config_t *property);
+esp_err_t esp_mqtt5_client_set_disconnect_property(esp_mqtt5_client_handle_t client,
+                                                   const esp_mqtt5_disconnect_property_config_t *property);
 
 /**
  * @brief Set MQTT5 client user property configuration
@@ -244,7 +260,8 @@ esp_err_t esp_mqtt5_client_set_disconnect_property(esp_mqtt5_client_handle_t cli
  *         ESP_FAIL on fail
  *         ESP_OK on success
  */
-esp_err_t esp_mqtt5_client_set_user_property(mqtt5_user_property_handle_t *user_property, esp_mqtt5_user_property_item_t item[], uint8_t item_num);
+esp_err_t esp_mqtt5_client_set_user_property(mqtt5_user_property_handle_t *user_property,
+                                             esp_mqtt5_user_property_item_t item[], uint8_t item_num);
 
 /**
  * @brief Get MQTT5 client user property
@@ -261,7 +278,8 @@ esp_err_t esp_mqtt5_client_set_user_property(mqtt5_user_property_handle_t *user_
  *         ESP_FAIL on fail
  *         ESP_OK on success
  */
-esp_err_t esp_mqtt5_client_get_user_property(mqtt5_user_property_handle_t user_property, esp_mqtt5_user_property_item_t *item, uint8_t *item_num);
+esp_err_t esp_mqtt5_client_get_user_property(mqtt5_user_property_handle_t user_property,
+                                             esp_mqtt5_user_property_item_t *item, uint8_t *item_num);
 
 /**
  * @brief Get MQTT5 client user property list count

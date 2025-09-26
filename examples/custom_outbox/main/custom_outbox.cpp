@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2023 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2023-2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Unlicense OR CC0-1.0
  */
@@ -24,9 +24,11 @@ constexpr auto TAG = "custom_outbox";
  * The trace resource class is created here as an example on how to build a custom memory resource
  * The class is only needed to show where we are allocating from and to track allocations and deallocations.
  */
-class trace_resource : public std::pmr::memory_resource {
+class trace_resource : public std::pmr::memory_resource
+{
 public:
-    explicit trace_resource(std::string resource_name,  std::pmr::memory_resource *upstream_resource = std::pmr::get_default_resource()) : upstream{upstream_resource}, name{std::move(resource_name)} {}
+    explicit trace_resource(std::string resource_name,
+                            std::pmr::memory_resource *upstream_resource = std::pmr::get_default_resource()) : upstream{upstream_resource}, name{std::move(resource_name)} {}
     [[nodiscard]] std::string_view get_name() const noexcept
     {
         return std::string_view(name);
@@ -77,11 +79,14 @@ struct outbox_item {
         outbox_tick_t tick,
         pending_state_t pending_state,
         allocator_type alloc = {}
-    ) : message(std::move(message), alloc), id(msg_id), type(msg_type), qos(msg_qos), tick(tick), pending_state(pending_state) {}
+    ) : message(std::move(message), alloc), id(msg_id), type(msg_type), qos(msg_qos), tick(tick),
+        pending_state(pending_state) {}
 
     /*Copy and move constructors have an extra allocator parameter, for copy default and allocator aware are the same.*/
-    outbox_item(const outbox_item &other, allocator_type alloc = {}) : message(other.message, alloc), id(other.id), type(other.type), qos(other.qos), tick(other.tick), pending_state(other.pending_state) {}
-    outbox_item(outbox_item &&other, allocator_type alloc) noexcept : message(std::move(other.message), alloc), id(other.id), type(other.type), qos(other.qos),  tick(other.tick), pending_state(other.pending_state)
+    outbox_item(const outbox_item &other, allocator_type alloc = {}) : message(other.message, alloc), id(other.id),
+        type(other.type), qos(other.qos), tick(other.tick), pending_state(other.pending_state) {}
+    outbox_item(outbox_item &&other, allocator_type alloc) noexcept : message(std::move(other.message), alloc),
+        id(other.id), type(other.type), qos(other.qos),  tick(other.tick), pending_state(other.pending_state)
     {}
 
     outbox_item(const outbox_item &) = default;
@@ -175,6 +180,7 @@ struct outbox_t {
                 total_size -= item.get_size();
                 return true;
             }
+
             return false;
         });
     }
@@ -228,7 +234,8 @@ struct outbox_t {
                                    QUEUED
                                   );
             total_size += item.get_size();
-            ESP_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%d, size=%" PRIu64, message->msg_id, message->msg_type, message->len + message->remaining_len, outbox_get_size(this));
+            ESP_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%d, size=%" PRIu64, message->msg_id, message->msg_type,
+                     message->len + message->remaining_len, outbox_get_size(this));
             return &item;
         } catch (const std::exception &e) {
             return nullptr;
@@ -244,6 +251,7 @@ struct outbox_t {
             if (tick != nullptr) {
                 *tick = item->get_tick();
             }
+
             return &(*item);
         }
         return nullptr;
@@ -260,6 +268,7 @@ private:
             queue.erase(to_erase);
             return ESP_OK;
         }
+
         return ESP_FAIL;
     }
     std::size_t total_size{};
@@ -273,17 +282,17 @@ extern "C" {
         /* First we create a fixed size memory buffer to be used. */
         static constexpr  auto work_memory_size = 16 * 1024;
         static std::array<std::byte, work_memory_size> resource_buffer{};
+
         try {
             /*
              * Since the outbox is managed by a C API we can't rely on C++ automatic cleanup and smart pointers but, on production code it would be better to add the
              * memory resources to outbox_t, applying RAII principles, and make only outbox_item allocator aware. For the sake of the example we are keeping them
-             * separated to explictly show the relations.
-             * First we create the monotonic buffer and add null_memory_resource as upstream. This way if our working memory is exausted an exception is thrown.
+             * separated to explicitly show the relations.
+             * First we create the monotonic buffer and add null_memory_resource as upstream. This way if our working memory is exhausted an exception is thrown.
                 */
             auto *monotonic_resource = new std::pmr::monotonic_buffer_resource{resource_buffer.data(), resource_buffer.size(), std::pmr::null_memory_resource()};
             /*Here we add our custom trace wrapper type to trace allocations and deallocations*/
             auto  *trace_monotonic = new trace_resource("Monotonic", monotonic_resource);
-
             /* We compose monotonic buffer with pool resource, since the monotonic deallocate is a no-op and we need to remove messages to not go out of memory.*/
             auto  *pool_resource = new std::pmr::unsynchronized_pool_resource{trace_monotonic};
             auto  *trace_pool = new trace_resource("Pool", pool_resource);
@@ -293,7 +302,6 @@ extern "C" {
         } catch (const std::exception &e) {
             ESP_LOGD(TAG, "Not enough memory to construct the outbox, review the resource_buffer size");
             return nullptr;
-
         }
     }
 
@@ -318,13 +326,13 @@ uint8_t *outbox_item_get_data(outbox_item_handle_t item,  size_t *len, uint16_t 
     if (item == nullptr) {
         return nullptr;
     }
+
     return item->get_data(len, msg_id, msg_type, qos);
 }
 
 esp_err_t outbox_delete_item(outbox_handle_t outbox, outbox_item_handle_t item_to_delete)
 {
     return outbox->erase(item_to_delete);
-
 }
 
 esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type)
@@ -356,6 +364,7 @@ pending_state_t outbox_item_get_pending(outbox_item_handle_t item)
     if (item != nullptr) {
         return item->state();
     }
+
     return QUEUED;
 }
 
@@ -384,7 +393,6 @@ void outbox_destroy(outbox_handle_t outbox)
     auto *pool_resource = static_cast<std::pmr::unsynchronized_pool_resource *>(trace_pool->upstream_resource());
     auto  *trace_monotonic = static_cast<trace_resource *>(pool_resource->upstream_resource());
     auto *monotonic_resource = static_cast<std::pmr::monotonic_buffer_resource *>(trace_monotonic->upstream_resource());
-
     delete monotonic_resource;
     delete trace_monotonic;
     delete pool_resource;

@@ -19,5 +19,3 @@ tags:
 dependencies:
     idf:
         version: ">=5.3"
-
-

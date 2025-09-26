@@ -19,7 +19,6 @@
         ESP_LOGI("mqtt_test", "Test:" #test_name "() passed ");                       \
     } while(0)
 
-
 /**
  * @brief This module contains mqtt test cases interacting the client with a (real) broker
  */

@@ -1,11 +1,24 @@
 stages:
-    - build
-    - test
-    - test_deploy
-    - deploy
+  - pre_check
+  - build
+  - test
+  - test_deploy
+  - deploy
+
+variables:
+  TEST_BROKER_BRNO_TCP: "${TEST_BROKER_BRNO_TCP}"
+  TEST_BROKER_BRNO_SSL: "${TEST_BROKER_BRNO_SSL}"
+  TEST_BROKER_BRNO_WS: "${TEST_BROKER_BRNO_WS}"
+  TEST_BROKER_BRNO_WSS: "${TEST_BROKER_BRNO_WSS}"
+  EXAMPLE_MQTT_BROKER_CERTIFICATE: "${EXAMPLE_MQTT_BROKER_CERTIFICATE}"
 
 include:
-    - local: ".gitlab/ci/build.yml"
-    - local: ".gitlab/ci/test.yml"
-    - local: ".gitlab/ci/docs.yml"
-    - local: ".gitlab/ci/deploy.yml"
+  - local: ".gitlab/ci/build.yml"
+  - local: ".gitlab/ci/docs.yml"
+  - local: ".gitlab/ci/test.yml"
+  - local: ".gitlab/ci/deploy.yml"
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "master"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
