@@ -2,29 +2,51 @@
 # is tested and then merged onto top of master branch.
 
 .build_template:
-    stage: build
-    tags:
-        - build
-        - internet
-    timeout: 1h
-    script:
-        - pip install -U 'idf-ci<1'
-        - idf-ci build run
-          --parallel-count ${CI_NODE_TOTAL:-1}
-          --parallel-index ${CI_NODE_INDEX:-1}
+  stage: build
+  tags:
+    - build
+    - internet
+  timeout: 1h
+  # rules:
+  #     # Run build jobs only when source or build configuration changes
+  #     - changes:
+  #         - examples/**/*
+  #         - test/apps/**/*
+  #         - include/**/*
+  #         - lib/**/*
+  #         - mqtt_client.c
+  #         - mqtt5_client.c
+  #         - Kconfig
+  #         - idf_component.yml
+  #         - .build-test-rules.yml
+  #         - .idf_build_apps.toml
+  #         - .idf_ci.toml
+  #     - when: never
+  parallel:
+    matrix:
+      - PATHS:
+          - "-p examples/tcp -p examples/mqtt5"
+          - "-p examples/ws -p examples/wss"
+          - "-p examples/ssl -p examples/ssl_mutual_auth"
+          - "-p examples/ssl_psk -p examples/ssl_ds -p examples/custom_outbox"
+          - "-p test/apps"
+  script:
+    - pip install -U 'idf-ci<1'
+    - echo "Running idf-ci build run ${PATHS}"
+    - idf-ci build run ${PATHS}
 
 build_idf_v5.3:
-    extends: .build_template
-    image: espressif/idf:release-v5.3
+  extends: .build_template
+  image: espressif/idf:release-v5.3
 
 build_idf_v5.4:
-    extends: .build_template
-    image: espressif/idf:release-v5.4
+  extends: .build_template
+  image: espressif/idf:release-v5.4
 
 build_idf_v5.5:
-    extends: .build_template
-    image: espressif/idf:release-v5.5
+  extends: .build_template
+  image: espressif/idf:release-v5.5
 
 build_idf_latest:
-    extends: .build_template
-    image: espressif/idf:latest
+  extends: .build_template
+  image: espressif/idf:latest
