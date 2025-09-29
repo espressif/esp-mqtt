@@ -239,6 +239,48 @@ The following events may be posted by the MQTT client:
 * ``MQTT_EVENT_DATA``: The client has received a publish message. The event data contains: message ID, name of the topic it was published to, received data and its length. For data that exceeds the internal buffer, multiple ``MQTT_EVENT_DATA`` events are posted and :cpp:member:`current_data_offset <esp_mqtt_event_t::current_data_offset>` and :cpp:member:`total_data_len <esp_mqtt_event_t::total_data_len>` from event data updated to keep track of the fragmented message.
 * ``MQTT_EVENT_ERROR``: The client has encountered an error. The field :cpp:type:`error_handle <esp_mqtt_error_codes_t>` in the event data contains :cpp:type:`error_type <esp_mqtt_error_type_t>` that can be used to identify the error. The type of error determines which parts of the :cpp:type:`error_handle <esp_mqtt_error_codes_t>` struct is filled.
 
+Relation between errors and disconnections in MQTT client
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Disconnection can happen for several reasons and they are handled differently by event system.
+
++--------------------------------+-----------------------------+---------------------------------------------------------------------------+
+| Cause of disconnection         | Event(s) produced           | Conditions and details                                                    |
++================================+=============================+===========================================================================+
+| ``esp_mqtt_client_disconnect`` | ``MQTT_EVENT_DISCONNECTED`` | Will be invoked when disconnect message is sent                           |
++--------------------------------+-----------------------------+---------------------------------------------------------------------------+
+| ``esp_mqtt_client_stop``       | *None*                      | No event will be triggered by calling this function                       |
++--------------------------------+-----------------------------+---------------------------------------------------------------------------+
+| Automatic disconnection due to | ``MQTT_EVENT_DISCONNECTED`` | Will be the only event produced                                           | 
+| missing keep-alive packet      |                             |                                                                           |
++--------------------------------+-----------------------------+---------------------------------------------------------------------------+
+| Being unable to send PING      | ``MQTT_EVENT_ERROR``        | Will be produced first if it is impossible to send PING packet due to a   |
+| packet                         |                             | network error                                                             |
+|                                +-----------------------------+---------------------------------------------------------------------------+
+|                                | ``MQTT_EVENT_DISCONNECTED`` |                                                                           |
++--------------------------------+-----------------------------+---------------------------------------------------------------------------+
+| MQTT client unable to transmit | ``MQTT_EVENT_ERROR``        | Will **not** be produced if the disconnection happened due to the network |
+| over the network               |                             | timeout                                                                   |
+|                                +-----------------------------+---------------------------------------------------------------------------+
+|                                | ``MQTT_EVENT_DISCONNECTED`` |                                                                           |
++--------------------------------+-----------------------------+---------------------------------------------------------------------------+
+| MQTT client is unable to       | ``MQTT_EVENT_ERROR``        |                                                                           |
+| connect to the broker          +-----------------------------+---------------------------------------------------------------------------+
+|                                | ``MQTT_EVENT_DISCONNECTED`` |                                                                           |
++--------------------------------+-----------------------------+---------------------------------------------------------------------------+
+| MQTT client is unable to       | ``MQTT_EVENT_ERROR``        | Will be produced if the cause is a network problem or if there was an     |
+| receive a message              |                             | error when transmitting acknowledgement if QoS > 0 is used. Malformed     |
+|                                |                             | message or insufficient input buffer size will also cause the event to be |
+|                                |                             | produced                                                                  |
+|                                +-----------------------------+---------------------------------------------------------------------------+
+|                                | ``MQTT_EVENT_DISCONNECTED`` | Will be produced regardless of ``MQTT_EVENT_ERROR``, but if both are      |
+|                                |                             | produced ``MQTT_EVENT_DISCONNECTED`` will always be the last one          |
++--------------------------------+-----------------------------+---------------------------------------------------------------------------+
+| Timeout when refreshing        | ``MQTT_EVENT_DISCONNECTED`` | Will be the only event produced                                           |
+| connection                     |                             |                                                                           |
++--------------------------------+-----------------------------+---------------------------------------------------------------------------+
+| Poll read timeout              | ``MQTT_EVENT_DISCONNECTED`` | Will be the only event produced                                           |
++--------------------------------+-----------------------------+---------------------------------------------------------------------------+
+
 API Reference
 -------------
 
