@@ -10,12 +10,47 @@ build_job_filepatterns = [
     "**/build*/*.bin",
     "**/build*/*.elf",
     "**/build*/flasher_args.json",
+    "**/build.log",
 ]
 
-test_job_filepatterns = [
-    "**/test_logs",
-    "**/XUNIT_RESULT_*.xml",
-]
+test_job_filepatterns = ["**/test_logs", "**/XUNIT_RESULT_*.xml"]
 
 [gitlab.build_pipeline]
+job_template_jinja = """
+{{ settings.gitlab.build_pipeline.job_template_name }}:
+  stage: "{{ settings.gitlab.build_pipeline.job_stage }}"
+  tags: {{ settings.gitlab.build_pipeline.job_tags }}
+  image: "{{ settings.gitlab.build_pipeline.job_image }}"
+  timeout: "1h"
+  artifacts:
+    paths:
+    {%- for path in settings.gitlab.artifacts.build_job_filepatterns %}
+      - "{{ path }}"
+    {%- endfor %}
+    expire_in: "1 week"
+    when: "always"
+  before_script:
+    - pip install -U 'idf-ci<1'
+  script: |
+    set -euo pipefail
+    ORIG_DIR="${CI_PROJECT_DIR:-$(pwd)}"
+    cd "${ORIG_DIR}"
+    echo "Original dir: $(pwd)"
+    rm -rf mqtt
+    git worktree add --force mqtt HEAD || (echo "Worktree failed; using local clone" && git clone --local --no-hardlinks . mqtt)
+    git worktree list || true
+    cd mqtt
+    echo "Build dir: $(pwd)"
+    idf-ci build run --parallel-count ${CI_NODE_TOTAL:-1} --parallel-index ${CI_NODE_INDEX:-1}
+    cd "${ORIG_DIR}"
+    echo "Moving build* dirs back to repo root..."
+    find mqtt -type d -name 'build_esp32_*' -print0 | while IFS= read -r -d '' d; do \
+      rel="${d#mqtt/}"; \
+      dest="${rel}"; \
+      mkdir -p "$(dirname "${dest}")"; \
+      rm -rf "${dest}"; \
+      mv "$d" "${dest}"; \
+    done
+    git worktree remove -f mqtt || rm -rf mqtt
+"""
 runs_per_job = 15

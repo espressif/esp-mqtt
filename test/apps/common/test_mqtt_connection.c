@@ -3,13 +3,15 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include "esp_eth.h"
+#include "esp_event.h"
+#include "esp_log.h"
+#include "esp_netif.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "unity.h"
-#include "esp_event.h"
-#include "esp_netif.h"
-#include "esp_eth.h"
-#include "esp_log.h"
+
+#include "esp_idf_version.h"
 
 #if SOC_EMAC_SUPPORTED
 #define ETH_START_BIT BIT(0)
@@ -74,7 +76,8 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
     xEventGroupSetBits(eth_event_group, ETH_GOT_IP_BIT);
 }
 
-static esp_err_t test_uninstall_driver(esp_eth_handle_t eth_hdl, uint32_t ms_to_wait)
+static esp_err_t test_uninstall_driver(esp_eth_handle_t eth_hdl,
+                                       uint32_t ms_to_wait)
 {
     int i = 0;
     ms_to_wait += 100;
@@ -107,7 +110,11 @@ void connect_test_fixture_setup(void)
     eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
     s_mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
     eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+    s_phy = esp_eth_phy_new_generic(&phy_config);
+#else
     s_phy = esp_eth_phy_new_ip101(&phy_config);
+#endif
     esp_eth_config_t eth_config = ETH_DEFAULT_CONFIG(s_mac, s_phy);
     // install Ethernet driver
     TEST_ESP_OK(esp_eth_driver_install(&eth_config, &s_eth_handle));
@@ -115,12 +122,15 @@ void connect_test_fixture_setup(void)
     s_eth_glue = esp_eth_new_netif_glue(s_eth_handle);
     TEST_ESP_OK(esp_netif_attach(s_eth_netif, s_eth_glue));
     // register user defined event handlers
-    TEST_ESP_OK(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, s_eth_event_group));
-    TEST_ESP_OK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &got_ip_event_handler, s_eth_event_group));
+    TEST_ESP_OK(esp_event_handler_register(
+                    ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, s_eth_event_group));
+    TEST_ESP_OK(esp_event_handler_register(
+                    IP_EVENT, IP_EVENT_ETH_GOT_IP, &got_ip_event_handler, s_eth_event_group));
     // start Ethernet driver
     TEST_ESP_OK(esp_eth_start(s_eth_handle));
     /* wait for IP lease */
-    bits = xEventGroupWaitBits(s_eth_event_group, ETH_GOT_IP_BIT, true, true, pdMS_TO_TICKS(ETH_GET_IP_TIMEOUT_MS));
+    bits = xEventGroupWaitBits(s_eth_event_group, ETH_GOT_IP_BIT, true, true,
+                               pdMS_TO_TICKS(ETH_GET_IP_TIMEOUT_MS));
     TEST_ASSERT((bits & ETH_GOT_IP_BIT) == ETH_GOT_IP_BIT);
 }
 
@@ -130,15 +140,18 @@ void connect_test_fixture_teardown(void)
     // stop Ethernet driver
     TEST_ESP_OK(esp_eth_stop(s_eth_handle));
     /* wait for connection stop */
-    bits = xEventGroupWaitBits(s_eth_event_group, ETH_STOP_BIT, true, true, pdMS_TO_TICKS(ETH_STOP_TIMEOUT_MS));
+    bits = xEventGroupWaitBits(s_eth_event_group, ETH_STOP_BIT, true, true,
+                               pdMS_TO_TICKS(ETH_STOP_TIMEOUT_MS));
     TEST_ASSERT((bits & ETH_STOP_BIT) == ETH_STOP_BIT);
     TEST_ESP_OK(esp_eth_del_netif_glue(s_eth_glue));
     /* driver should be uninstalled within 2 seconds */
     TEST_ESP_OK(test_uninstall_driver(s_eth_handle, 2000));
     TEST_ESP_OK(s_phy->del(s_phy));
     TEST_ESP_OK(s_mac->del(s_mac));
-    TEST_ESP_OK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP, got_ip_event_handler));
-    TEST_ESP_OK(esp_event_handler_unregister(ETH_EVENT, ESP_EVENT_ANY_ID, eth_event_handler));
+    TEST_ESP_OK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP,
+                                             got_ip_event_handler));
+    TEST_ESP_OK(esp_event_handler_unregister(ETH_EVENT, ESP_EVENT_ANY_ID,
+                                             eth_event_handler));
     esp_netif_destroy(s_eth_netif);
     TEST_ESP_OK(esp_event_loop_delete_default());
     vEventGroupDelete(s_eth_event_group);

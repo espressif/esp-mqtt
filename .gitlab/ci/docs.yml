@@ -24,6 +24,9 @@ docs_build:
     script:
         - cd docs
         - build-docs -t esp32 -l en
+    rules:
+        - if: $CI_COMMIT_REF_NAME == "master"
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
 .deploy_docs_template:
     image: $ESP_DOCS_ENV_IMAGE
