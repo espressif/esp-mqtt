@@ -21,7 +21,7 @@ repos:
       - id: check-executables-have-shebangs              # Checks executables have a proper shebang
       - id: mixed-line-ending                            # Detects mixed line endings (CRLF/LF)
         args: ['-f=lf']                                  # Forces files to use LF line endings
-      - id: double-quote-string-fixer                    # Converts single quotes to double quotes in strings
+      # Removed double-quote-string-fixer in favor of Ruff enforcing quotes
 
   - repo: https://github.com/espressif/check-copyright/
     rev: v1.1.1

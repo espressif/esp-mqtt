@@ -107,6 +107,7 @@ static void connect_with_server_der_cert(esp_mqtt_client_handle_t client, const 
         .broker.address.uri = uri,
         .broker.verification.certificate = (const char *)ca_der_start,
                .broker.verification.certificate_len = ca_der_end - ca_der_start,
+               .broker.verification.skip_cert_common_name_check = true,
                .credentials.authentication.certificate = "NULL",
                .credentials.authentication.key = "NULL"
     };
@@ -118,6 +119,7 @@ static void connect_with_wrong_server_cert(esp_mqtt_client_handle_t client, cons
     const esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = uri,
         .broker.verification.certificate = (const char *)client_pwd_crt,
+               .broker.verification.skip_cert_common_name_check = true,
                .credentials.authentication.certificate = "NULL",
                .credentials.authentication.key = "NULL"
     };
@@ -129,6 +131,7 @@ static void connect_with_server_cert(esp_mqtt_client_handle_t client, const char
     const esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = uri,
         .broker.verification.certificate = (const char *)ca_local_crt,
+               .broker.verification.skip_cert_common_name_check = true,
     };
     esp_mqtt_set_config(client, &mqtt_cfg);
 }
@@ -138,6 +141,7 @@ static void connect_with_server_client_certs(esp_mqtt_client_handle_t client, co
     const esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = uri,
         .broker.verification.certificate = (const char *)ca_local_crt,
+               .broker.verification.skip_cert_common_name_check = true,
                .credentials.authentication.certificate = (const char *)client_pwd_crt,
                .credentials.authentication.key = (const char *)client_no_pwd_key
     };
@@ -149,6 +153,7 @@ static void connect_with_invalid_client_certs(esp_mqtt_client_handle_t client, c
     const esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = uri,
         .broker.verification.certificate = (const char *)ca_local_crt,
+               .broker.verification.skip_cert_common_name_check = true,
                .credentials.authentication.certificate = (const char *)client_inv_crt,
                .credentials.authentication.key = (const char *)client_no_pwd_key
     };

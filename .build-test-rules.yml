@@ -63,7 +63,6 @@ examples/ssl_ds:
         - if: IDF_TARGET == IDF_TARGET
           reason: Advanced feature demonstration, only build
 
-# Custom outbox implementation example
 examples/custom_outbox:
     <<: *default_rules
     disable_test:

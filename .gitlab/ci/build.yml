@@ -1,52 +1,35 @@
 # Note: No need to run build and test on master branch since we use FastForward merge strategy and so each merge request
 # is tested and then merged onto top of master branch.
-
-.build_template:
-  stage: build
-  tags:
-    - build
-    - internet
-  timeout: 1h
-  # rules:
-  #     # Run build jobs only when source or build configuration changes
-  #     - changes:
-  #         - examples/**/*
-  #         - test/apps/**/*
-  #         - include/**/*
-  #         - lib/**/*
-  #         - mqtt_client.c
-  #         - mqtt5_client.c
-  #         - Kconfig
-  #         - idf_component.yml
-  #         - .build-test-rules.yml
-  #         - .idf_build_apps.toml
-  #         - .idf_ci.toml
-  #     - when: never
-  parallel:
-    matrix:
-      - PATHS:
-          - "-p examples/tcp -p examples/mqtt5"
-          - "-p examples/ws -p examples/wss"
-          - "-p examples/ssl -p examples/ssl_mutual_auth"
-          - "-p examples/ssl_psk -p examples/ssl_ds -p examples/custom_outbox"
-          - "-p test/apps"
-  script:
-    - pip install -U 'idf-ci<1'
-    - echo "Running idf-ci build run ${PATHS}"
-    - idf-ci build run ${PATHS}
-
-build_idf_v5.3:
-  extends: .build_template
-  image: espressif/idf:release-v5.3
-
-build_idf_v5.4:
-  extends: .build_template
-  image: espressif/idf:release-v5.4
-
-build_idf_v5.5:
-  extends: .build_template
-  image: espressif/idf:release-v5.5
-
-build_idf_latest:
-  extends: .build_template
-  image: espressif/idf:latest
+include:
+  - component: $CI_SERVER_FQDN/ci/actions/idf-dynamic-pipeline/ci-component@main
+    rules:
+      - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    inputs:
+      build-job-image: "espressif/idf:latest"
+      test-job-image: "$CI_DOCKER_REGISTRY/target-test-env-v6.0:2"
+      build-job-tags: ["brew", "build"]
+      job-suffix: ":idf-v6.0"
+  - component: $CI_SERVER_FQDN/ci/actions/idf-dynamic-pipeline/ci-component@main
+    rules:
+      - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    inputs:
+      build-job-image: "espressif/idf:v5.5"
+      test-job-image: "$CI_DOCKER_REGISTRY/target-test-env-v5.5:2"
+      build-job-tags: ["brew", "build"]
+      job-suffix: ":idf-v5.5"
+  - component: $CI_SERVER_FQDN/ci/actions/idf-dynamic-pipeline/ci-component@main
+    rules:
+      - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    inputs:
+      build-job-image: "espressif/idf:v5.4"
+      test-job-image: "$CI_DOCKER_REGISTRY/target-test-env-v5.4:2"
+      build-job-tags: ["brew", "build"]
+      job-suffix: ":idf-v5.4"
+  - component: $CI_SERVER_FQDN/ci/actions/idf-dynamic-pipeline/ci-component@main
+    rules:
+      - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    inputs:
+      build-job-image: "espressif/idf:v5.3"
+      test-job-image: "$CI_DOCKER_REGISTRY/target-test-env-v5.3:1"
+      build-job-tags: ["brew", "build"]
+      job-suffix: ":idf-v5.3"

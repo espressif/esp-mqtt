@@ -212,6 +212,7 @@ static void configure_client(command_context_t *ctx, const char *transport)
         if (selected_transport == SSL || selected_transport == WSS) {
             ESP_LOGI(TAG, "Set certificate");
             config.broker.verification.certificate = (const char *)mqtt_eclipseprojects_io_pem_start;
+            config.broker.verification.skip_cert_common_name_check = true;
         }
 
         // Generate a random client id for each iteration

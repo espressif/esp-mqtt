@@ -1,0 +1,12 @@
+[tool.ruff]
+# Keep default settings; configure lint rules below.
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "Q"]
+
+[tool.ruff.lint."flake8-quotes"]
+inline-quotes = "double"
+multiline-quotes = "double"
+docstring-quotes = "double"
+avoid-escape = true

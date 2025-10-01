@@ -18,22 +18,22 @@ from esp_docs.conf_docs import *  # noqa: F403,F401
 # Only required when using ESP-IDF extensions that depend on IDF environment
 
 
-extensions += ['sphinx_copybutton',  # noqa: F405
+extensions += ["sphinx_copybutton",  # noqa: F405
                # Needed as a trigger for running doxygen
-               'esp_docs.esp_extensions.dummy_build_system',
-               'esp_docs.esp_extensions.run_doxygen'
+               "esp_docs.esp_extensions.dummy_build_system",
+               "esp_docs.esp_extensions.run_doxygen"
                ]
 
 # link roles config
-github_repo = 'espressif/esp-mqtt'
+github_repo = "espressif/esp-mqtt"
 
 # context used by sphinx_idf_theme
-html_context['github_user'] = 'espressif'  # noqa: F405
-html_context['github_repo'] = 'esp-mqtt'  # noqa: F405
+html_context["github_user"] = "espressif"  # noqa: F405
+html_context["github_repo"] = "esp-mqtt"  # noqa: F405
 
 # Extra options required by sphinx_idf_theme
-project_slug = 'esp-mqtt'
-versions_url = './_static/mqtt_docs_versions.js'
+project_slug = "esp-mqtt"
+versions_url = "./_static/mqtt_docs_versions.js"
 
-idf_targets = [ 'esp32' ]
-languages = ['en']
+idf_targets = [ "esp32" ]
+languages = ["en"]
