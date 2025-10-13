@@ -4,3 +4,4 @@ Warning: Deprecated: Option '--flash_freq' is deprecated. Use '--flash-freq' ins
 Warning: Deprecated: Command 'sign_data' is deprecated. Use 'sign-data' instead.
 Warning: Deprecated: Command 'extract_public_key' is deprecated. Use 'extract-public-key' instead.
 CryptographyDeprecationWarning
+warning: unknown kconfig symbol 'EXAMPLE_ETH_PHY_IP101' assigned to 'y'
