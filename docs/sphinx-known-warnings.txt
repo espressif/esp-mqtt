@@ -12,6 +12,8 @@ mqtt_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:
 Declaration is '.. cpp:enum:: esp_mqtt_transport_t'.
 mqtt_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
 Declaration is '.. cpp:enum:: esp_mqtt_protocol_ver_t'.
+mqtt_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
+Declaration is '.. cpp:enum:: esp_mqtt_client_connection_state_t'.
 mqtt5_client.inc:line: WARNING: Duplicate C++ declaration, also defined at index:line.
 Declaration is '.. cpp:enumerator:: __attribute__'.
 index.rst:line: CRITICAL: Duplicate ID: "mqtt5__client_8h_1a4504a6557b6b27d66613101e758693f4a8c1dfc1ccf00a08192611433ee7f17b4".
