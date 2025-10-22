@@ -1,19 +1,51 @@
+.deploy_setup_ci_tools: &deploy_setup_ci_tools |
+  set -euo pipefail 2>/dev/null || set -eu
+  curl -sSL "${CIT_LOADER_URL}" | sh
+  source citools/import_functions
+  cit_add_ssh_key "${GH_PUSH_KEY}"
+
+.deploy_set_target_branch: &deploy_set_target_branch |
+  git remote remove github 2>/dev/null || true
+  git remote add github "${GH_PUSH_REPO}"
+  BR="${CI_COMMIT_BRANCH:-${CI_COMMIT_REF_NAME}}"; export BR
+  if [ -z "${BR}" ]; then echo "[diag] No branch context; aborting"; exit 0; fi
+
+.deploy_print_diagnostics: &deploy_print_diagnostics |
+  echo "Deploying commit ${CI_COMMIT_SHA} to ${BR}"
+  echo "[diag] pipeline SHA: ${CI_COMMIT_SHA}"
+  echo "[diag] branch name: ${BR}"
+  echo "[diag] github ls-remote:" && git ls-remote github "refs/heads/${BR}" || true
+
+.deploy_check_origin_tip: &deploy_check_origin_tip |
+  git fetch --no-tags --prune origin "${BR}"
+  ORG_TIP=$(git rev-parse FETCH_HEAD); echo "[diag] origin/${BR} tip: ${ORG_TIP}"
+  if [ "${ORG_TIP}" != "${CI_COMMIT_SHA}" ]; then echo "[diag] Tip moved on origin/${BR}; skipping stale push"; exit 0; fi
+
+.deploy_check_github_fast_forward: &deploy_check_github_fast_forward |
+  git fetch --no-tags --prune github "${BR}" || true
+  GH_TIP=$(git rev-parse "github/${BR}" 2>/dev/null || true); echo "[diag] github/${BR} tip: ${GH_TIP:-none}"
+  if [ -n "${GH_TIP:-}" ]; then git rev-list --left-right --count "github/${BR}...${CI_COMMIT_SHA}" || true; fi
+  if [ -n "${GH_TIP:-}" ] && ! git merge-base --is-ancestor "github/${BR}" "${CI_COMMIT_SHA}"; then echo "[diag] GitHub is ahead/diverged on ${BR}; skipping push"; exit 0; fi
+
+.deploy_push_commit: &deploy_push_commit |
+  git push github "${CI_COMMIT_SHA}:refs/heads/${BR}"
+
 push_master_to_github:
-    stage: deploy
-    image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
-    tags:
-        - build
-    only:
-        refs:
-            - master
-            - idf
-    when: on_success
-    variables:
-        GIT_STRATEGY: clone
-    script:
-        - curl -sSL ${CIT_LOADER_URL} | sh
-        - source citools/import_functions
-        - cit_add_ssh_key "${GH_PUSH_KEY}"
-        - git remote remove github || true
-        - git remote add github ${GH_PUSH_REPO}
-        - git push github HEAD:${CI_COMMIT_REF_NAME}
+  stage: deploy
+  image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
+  tags:
+    - build
+  only:
+    refs:
+      - master
+      - idf
+  when: on_success
+  variables:
+    GIT_STRATEGY: clone
+  script:
+    - *deploy_setup_ci_tools
+    - *deploy_set_target_branch
+    - *deploy_print_diagnostics
+    - *deploy_check_origin_tip
+    - *deploy_check_github_fast_forward
+    - *deploy_push_commit
