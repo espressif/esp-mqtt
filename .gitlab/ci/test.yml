@@ -45,6 +45,7 @@ check_remotes_sync:
         - idf
     script:
         - *add_gh_key_remote
-        - git fetch --depth=1 origin master
-        - git fetch --depth=1 github master
-        - test "$(git rev-parse origin/master)" == "$(git rev-parse github/master)"
+        - BR=${CI_DEFAULT_BRANCH:-master}
+        - git fetch origin ${BR}
+        - git fetch github ${BR}
+        - if git merge-base --is-ancestor github/${BR} origin/${BR}; then echo "github/${BR} is ancestor or equal to origin/${BR}"; else echo "github/${BR} is ahead or diverged from origin/${BR}"; exit 1; fi
