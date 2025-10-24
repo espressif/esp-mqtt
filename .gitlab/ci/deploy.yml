@@ -22,10 +22,16 @@
   if [ "${ORG_TIP}" != "${CI_COMMIT_SHA}" ]; then echo "[diag] Tip moved on origin/${BR}; skipping stale push"; exit 0; fi
 
 .deploy_check_github_fast_forward: &deploy_check_github_fast_forward |
+  # Ensure we have enough history for ancestry checks (avoid shallow false positives)
+  if git rev-parse --is-shallow-repository 2>/dev/null | grep -q true; then
+    echo "[diag] Repository is shallow; deepening origin/${BR} for ancestry checks"
+    git fetch --no-tags --prune --unshallow origin "${BR}" \
+      || git fetch --no-tags --prune --deepen=100000 origin "${BR}"
+  fi
   git fetch --no-tags --prune github "${BR}" || true
   GH_TIP=$(git rev-parse "github/${BR}" 2>/dev/null || true); echo "[diag] github/${BR} tip: ${GH_TIP:-none}"
   if [ -n "${GH_TIP:-}" ]; then git rev-list --left-right --count "github/${BR}...${CI_COMMIT_SHA}" || true; fi
-  if [ -n "${GH_TIP:-}" ] && ! git merge-base --is-ancestor "github/${BR}" "${CI_COMMIT_SHA}"; then echo "[diag] GitHub is ahead/diverged on ${BR}; skipping push"; exit 0; fi
+  if [ -n "${GH_TIP:-}" ] && ! git merge-base --is-ancestor "github/${BR}" "${CI_COMMIT_SHA}"; then echo "[diag] GitHub is ahead/diverged on ${BR}; aborting deploy"; exit 1; fi
 
 .deploy_push_commit: &deploy_push_commit |
   git push github "${CI_COMMIT_SHA}:refs/heads/${BR}"
@@ -49,3 +55,27 @@ push_master_to_github:
     - *deploy_check_origin_tip
     - *deploy_check_github_fast_forward
     - *deploy_push_commit
+
+pre_release_validate_push:
+  stage: test_deploy
+  image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
+  tags:
+    - build
+    - internet
+  needs: []
+  except:
+    - master
+    - idf
+  when: manual
+  allow_failure: false
+  variables:
+    GIT_STRATEGY: clone
+  script:
+    - *deploy_setup_ci_tools
+    - *deploy_set_target_branch
+    - *deploy_print_diagnostics
+    - *deploy_check_origin_tip
+    - *deploy_check_github_fast_forward
+    - echo "[diag] Performing dry-run push to validate fast-forward"
+    - git push --dry-run github "${CI_COMMIT_SHA}:refs/heads/${BR}"
+    - echo "[diag] Dry-run push succeeded; real deploy would succeed"
