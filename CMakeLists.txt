@@ -12,3 +12,6 @@ idf_component_register(SRCS "${srcs}"
                     PRIV_REQUIRES esp_timer http_parser esp_hw_support heap
                     KCONFIG ${CMAKE_CURRENT_LIST_DIR}/Kconfig
                     )
+
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/mqtt_utils)
+target_link_libraries(${COMPONENT_LIB} PUBLIC idf::mqtt::utils)

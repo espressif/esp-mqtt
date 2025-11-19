@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <algorithm>
+#include <exception>
 #include <memory>
 #include <net/if.h>
 #include <random>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include "esp_transport.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers.hpp>
+#include <rapidcheck.h>
 
 #include "mqtt_client.h"
 #include "test_log_intercept.hpp"
@@ -31,7 +34,6 @@ extern "C" {
 #include "Mockidf_additions.h"
 #endif
 #include "Mockesp_timer.h"
-
     /*
      * The following functions are not directly called but the generation of them
      * from cmock is broken, so we need to define them here.
@@ -98,6 +100,40 @@ SCENARIO("MQTT Client Operation")
                     auto res = esp_mqtt_client_set_uri(client.get(), "invalid string that is not a url");
                     REQUIRE(res == ESP_FAIL);
                 }
+            }
+            SECTION("Any well-formed URI is accepted") {
+                static constexpr std::array<const char *, 4> schemes = {
+                    "mqtt", "mqtts", "ws", "wss"
+                };
+                auto host_char = rc::gen::element('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i',
+                                                  'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r',
+                                                  's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+                                                  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9');
+                rc::check("esp_mqtt_client_set_uri accepts well-formed URIs",
+                [&] {
+                    auto scheme = *rc::gen::elementOf(schemes);
+                    auto host = *rc::gen::container<std::string>(
+                        *rc::gen::inRange<int>(1, 33), host_char).as("host");
+                    auto path = *rc::gen::container<std::string>(
+                        *rc::gen::inRange<int>(0, 17), host_char).as("path");
+                    auto port = *rc::gen::maybe(rc::gen::inRange<uint16_t>(1, 65535)).as("port");
+                    std::string uri = scheme;
+                    uri += "://";
+                    uri += host;
+
+                    if (port) {
+                        uri += ":";
+                        uri += std::to_string(*port);
+                    }
+
+                    if (!path.empty())
+                    {
+                        uri += "/";
+                        uri += path;
+                    }
+
+                    RC_ASSERT(esp_mqtt_client_set_uri(client.get(), uri.c_str()) == ESP_OK);
+                });
             }
             SECTION("User set interface to use") {
                 struct ifreq if_name = {};

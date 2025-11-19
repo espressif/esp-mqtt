@@ -8,6 +8,7 @@ host_tests:
     needs: []
     artifacts:
         paths:
+            - "**/build*/build.log"
             - "**/coverage.xml"
             - "**/coverage.html"
         expire_in: 1 week
@@ -28,8 +29,10 @@ host_tests:
         git worktree add --force mqtt HEAD || (echo "Worktree failed; using local clone" && git clone --local --no-hardlinks . mqtt)
         git worktree list || true
         cd mqtt
-        idf-ci build run -t linux -p test/host
+        idf-ci build run -t linux -p test
         cd test/host
         ./build_linux_coverage/host_mqtt_client_test.elf -r junit -o junit.xml
+        cd ../mqtt_utils_host_test
+        ./build_linux_default/mqtt_utils_host_test.elf
         cd ../..
         gcovr --gcov-ignore-parse-errors -g -k -r . --html coverage.html -x coverage.xml
