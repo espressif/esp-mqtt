@@ -26,12 +26,20 @@ host_tests:
                 path: "**/coverage.xml"
     before_script:
         - pip install -U gcovr 'idf-ci<1'
-    script:
-        - idf-ci build run -t linux -p test/host
-        - cd test/host
-        - ./build_linux_coverage/host_mqtt_client_test.elf -r junit -o junit.xml
-        - cd ../..
-        - gcovr --gcov-ignore-parse-errors -g -k -r . --html coverage.html -x coverage.xml
+    script: |
+        set -euo pipefail
+        ORIG_DIR="${CI_PROJECT_DIR:-$(pwd)}"
+        cd "${ORIG_DIR}"
+        echo "Original dir: $(pwd)"
+        rm -rf mqtt
+        git worktree add --force mqtt HEAD || (echo "Worktree failed; using local clone" && git clone --local --no-hardlinks . mqtt)
+        git worktree list || true
+        cd mqtt
+        idf-ci build run -t linux -p test/host
+        cd test/host
+        ./build_linux_coverage/host_mqtt_client_test.elf -r junit -o junit.xml
+        cd ../..
+        gcovr --gcov-ignore-parse-errors -g -k -r . --html coverage.html -x coverage.xml
 
 check_remotes_sync:
     stage: test_deploy
