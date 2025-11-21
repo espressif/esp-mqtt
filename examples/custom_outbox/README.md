@@ -87,14 +87,14 @@ I (6015) Pool: Pool: 18 bytes deallocated, 623 total bytes in use
 I (6015) MQTT_EXAMPLE: MQTT_EVENT_SUBSCRIBED, msg_id=33273
 I (6025) MQTT_EXAMPLE: sent publish successful, msg_id=0
 I (6035) MQTT_EXAMPLE: MQTT_EVENT_DATA
-TOPIC=/topic/qos1
+TOPIC=topic/qos1
 DATA=data_3
 I (6315) MQTT_EXAMPLE: MQTT_EVENT_DATA
-TOPIC=/topic/qos1
+TOPIC=topic/qos1
 DATA=data_3
 I (6315) Pool: Pool: 23 bytes deallocated, 623 total bytes in use
 I (6315) MQTT_EXAMPLE: MQTT_EVENT_PUBLISHED, msg_id=14345
 I (6615) MQTT_EXAMPLE: MQTT_EVENT_DATA
-TOPIC=/topic/qos0
+TOPIC=topic/qos0
 DATA=data
 ```

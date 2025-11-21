@@ -26,7 +26,7 @@ def on_connect(client, userdata, flags, rc):  # type: (mqtt.Client, str, bool, s
     _ = (userdata, flags)
     print("Connected with result code " + str(rc))
     event_client_connected.set()
-    client.subscribe("/topic/qos0")
+    client.subscribe("topic/qos0")
 
 
 def mqtt_client_task(client):  # type: (mqtt.Client) -> None
@@ -39,7 +39,7 @@ def on_message(client, userdata, msg):  # type: (mqtt.Client, tuple, mqtt.client
     global message_log
     global event_client_received_correct
     global event_client_received_binary
-    if msg.topic == "/topic/binary":
+    if msg.topic == "topic/binary":
         binary, bin_size = userdata
         print("Receiving binary from esp and comparing with {}, size {}...".format(binary, bin_size))
         with open(binary, "rb") as f:
@@ -57,9 +57,9 @@ def on_message(client, userdata, msg):  # type: (mqtt.Client, tuple, mqtt.client
 
     payload = msg.payload.decode()
     if not event_client_received_correct.is_set() and payload == "data":
-        client.subscribe("/topic/binary")
-        client.publish("/topic/qos0", "send binary please")
-        if msg.topic == "/topic/qos0" and payload == "data":
+        client.subscribe("topic/binary")
+        client.publish("topic/qos0", "send binary please")
+        if msg.topic == "topic/qos0" and payload == "data":
             event_client_received_correct.set()
     message_log += "Received data:" + msg.topic + " " + payload + "\n"
 

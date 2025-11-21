@@ -158,7 +158,7 @@ bool mqtt5_subscribe_publish(void)
         .payload_format_indicator = 1,
         .message_expiry_interval = 1000,
         .topic_alias = 1,
-        .response_topic = "/topic/test/response",
+        .response_topic = "topic/test/response",
         .correlation_data = "123456",
         .correlation_data_len = 6,
         .content_type = "json",
@@ -217,7 +217,7 @@ bool mqtt5_lwt_clean_disconnect(void)
         .payload_format_indicator = true,
         .message_expiry_interval = 10,
         .content_type = "json",
-        .response_topic = "/test/response",
+        .response_topic = "test/response",
         .correlation_data = "123456",
         .correlation_data_len = 6,
     };
