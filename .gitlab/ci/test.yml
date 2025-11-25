@@ -1,10 +1,3 @@
-.add_gh_key_remote: &add_gh_key_remote |
-    curl -sSL ${CIT_LOADER_URL} | sh
-    source citools/import_functions
-    cit_add_ssh_key "${GH_PUSH_KEY}"
-    git remote remove github || true
-    git remote add github ${GH_PUSH_REPO}
-
 host_tests:
     image: espressif/idf:latest
     stage: test
@@ -40,21 +33,3 @@ host_tests:
         ./build_linux_coverage/host_mqtt_client_test.elf -r junit -o junit.xml
         cd ../..
         gcovr --gcov-ignore-parse-errors -g -k -r . --html coverage.html -x coverage.xml
-
-check_remotes_sync:
-    stage: test_deploy
-    image: espressif/idf:latest
-    tags:
-        - build
-        - internet
-    needs: []
-    except:
-        - master
-        - idf
-    script:
-        - *add_gh_key_remote
-        - BR=${CI_DEFAULT_BRANCH:-master}
-        - git fetch --no-tags --prune origin ${BR}
-        - git fetch --no-tags --prune github ${BR}
-        - if git rev-parse --is-shallow-repository 2>/dev/null | grep -q true; then echo "[diag] Repository is shallow; deepening origin/${BR} for ancestry checks"; git fetch --no-tags --prune --unshallow origin ${BR} || git fetch --no-tags --prune --deepen=100000 origin ${BR}; fi
-        - if git merge-base --is-ancestor github/${BR} origin/${BR}; then echo "github/${BR} is ancestor or equal to origin/${BR}"; else echo "github/${BR} is ahead or diverged from origin/${BR}"; exit 1; fi
