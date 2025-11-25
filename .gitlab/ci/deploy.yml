@@ -16,65 +16,71 @@
   echo "[diag] branch name: ${BR}"
   echo "[diag] github ls-remote:" && git ls-remote github "refs/heads/${BR}" || true
 
-.deploy_check_origin_tip: &deploy_check_origin_tip |
-  git fetch --no-tags --prune origin "${BR}"
-  ORG_TIP=$(git rev-parse FETCH_HEAD); echo "[diag] origin/${BR} tip: ${ORG_TIP}"
-  if [ "${ORG_TIP}" != "${CI_COMMIT_SHA}" ]; then echo "[diag] Tip moved on origin/${BR}; skipping stale push"; exit 0; fi
-
 .deploy_check_github_fast_forward: &deploy_check_github_fast_forward |
+  TARGET="${GITHUB_TARGET:-${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-${BR:-master}}}"
   # Ensure we have enough history for ancestry checks (avoid shallow false positives)
   if git rev-parse --is-shallow-repository 2>/dev/null | grep -q true; then
-    echo "[diag] Repository is shallow; deepening origin/${BR} for ancestry checks"
-    git fetch --no-tags --prune --unshallow origin "${BR}" \
-      || git fetch --no-tags --prune --deepen=100000 origin "${BR}"
+    echo "[diag] Repository is shallow; deepening origin/${TARGET} for ancestry checks"
+    git fetch --no-tags --prune --unshallow origin "${TARGET}" \
+      || git fetch --no-tags --prune --deepen=50 origin "${TARGET}"
+    if git ls-remote --exit-code --heads github "refs/heads/${TARGET}" >/dev/null 2>&1; then
+      echo "[diag] Repository is shallow; deepening github/${TARGET} for ancestry checks"
+      git fetch --no-tags --prune --unshallow github "${TARGET}" \
+        || git fetch --no-tags --prune --deepen=50 github "${TARGET}" || true
+    else
+      echo "[diag] github/${TARGET} missing; skip deepening on github"
+    fi
   fi
-  git fetch --no-tags --prune github "${BR}" || true
-  GH_TIP=$(git rev-parse "github/${BR}" 2>/dev/null || true); echo "[diag] github/${BR} tip: ${GH_TIP:-none}"
-  if [ -n "${GH_TIP:-}" ]; then git rev-list --left-right --count "github/${BR}...${CI_COMMIT_SHA}" || true; fi
-  if [ -n "${GH_TIP:-}" ] && ! git merge-base --is-ancestor "github/${BR}" "${CI_COMMIT_SHA}"; then echo "[diag] GitHub is ahead/diverged on ${BR}; aborting deploy"; exit 1; fi
+  if git ls-remote --exit-code --heads github "refs/heads/${TARGET}" >/dev/null 2>&1; then
+    git fetch --no-tags --prune github "${TARGET}" || true
+    GH_TIP=$(git rev-parse "github/${TARGET}" 2>/dev/null || true); echo "[diag] github/${TARGET} tip: ${GH_TIP:-none}"
+    if [ -n "${GH_TIP:-}" ]; then git rev-list --left-right --count "github/${TARGET}...${CI_COMMIT_SHA}" || true; fi
+    if [ -n "${GH_TIP:-}" ] && ! git merge-base --is-ancestor "github/${TARGET}" "${CI_COMMIT_SHA}"; then echo "[diag] GitHub is ahead/diverged on ${TARGET}; aborting"; exit 1; fi
+  else
+    echo "[diag] github/${TARGET} missing; aborting (non-mirrored target branch?)"
+    exit 1
+  fi
+
 
 .deploy_push_commit: &deploy_push_commit |
   git push github "${CI_COMMIT_SHA}:refs/heads/${BR}"
 
-push_master_to_github:
-  stage: deploy
+.github_deploy_base:
   image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
   tags:
     - build
+  variables:
+    GIT_STRATEGY: clone
+    GIT_DEPTH: 0
+  before_script:
+    - *deploy_setup_ci_tools
+    - *deploy_set_target_branch
+    - *deploy_print_diagnostics
+
+push_to_github:
+  extends: .github_deploy_base
+  stage: deploy
   only:
     refs:
       - master
       - idf
   when: on_success
-  variables:
-    GIT_STRATEGY: clone
   script:
-    - *deploy_setup_ci_tools
-    - *deploy_set_target_branch
-    - *deploy_print_diagnostics
-    - *deploy_check_origin_tip
     - *deploy_check_github_fast_forward
     - *deploy_push_commit
 
 pre_release_validate_push:
+  extends: .github_deploy_base
   stage: test_deploy
-  image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
   tags:
     - build
     - internet
   needs: []
   except:
     - master
-    - idf
-  when: manual
+  when: on_success
   allow_failure: false
-  variables:
-    GIT_STRATEGY: clone
   script:
-    - *deploy_setup_ci_tools
-    - *deploy_set_target_branch
-    - *deploy_print_diagnostics
-    - *deploy_check_origin_tip
     - *deploy_check_github_fast_forward
     - echo "[diag] Performing dry-run push to validate fast-forward"
     - git push --dry-run github "${CI_COMMIT_SHA}:refs/heads/${BR}"
