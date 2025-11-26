@@ -68,11 +68,10 @@ D (4750) MQTT_CLIENT: Connected
 I (4760) MQTTS_EXAMPLE: MQTT_EVENT_CONNECTED
 D (4760) MQTT_CLIENT: mqtt_enqueue id: 4837, type=8 successful
 D (4770) OUTBOX: ENQUEUE msgid=4837, msg_type=8, len=18, size=18
-D (4770) MQTT_CLIENT: Sent subscribe topic=/topic/qos0, id: 4837, type=8 successful
+D (4770) MQTT_CLIENT: Sent subscribe topic=topic/qos0, id: 4837, type=8 successful
 I (4780) MQTTS_EXAMPLE: sent subscribe successful, msg_id=4837
 D (4790) MQTT_CLIENT: mqtt_enqueue id: 58982, type=8 successful
 D (4790) OUTBOX: ENQUEUE msgid=58982, msg_type=8, len=18, size=36
-D (4800) MQTT_CLIENT: Sent subscribe topic=/topic/qos1, id: 58982, type=8 successful
+D (4800) MQTT_CLIENT: Sent subscribe topic=topic/qos1, id: 58982, type=8 successful
 I (4810) MQTTS_EXAMPLE: sent subscribe successful, msg_id=58982
 ```
-

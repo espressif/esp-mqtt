@@ -51,11 +51,10 @@ I (4684) MQTTWS_EXAMPLE: MQTT_EVENT_SUBSCRIBED, msg_id=42970
 I (4684) MQTTWS_EXAMPLE: sent publish successful, msg_id=0
 I (4884) MQTT_CLIENT: deliver_publish, message_length_read=19, message_length=19
 I (4884) MQTTWS_EXAMPLE: MQTT_EVENT_DATA
-TOPIC=/topic/qos0
+TOPIC=topic/qos0
 DATA=data
 I (5194) MQTT_CLIENT: deliver_publish, message_length_read=19, message_length=19
 I (5194) MQTTWS_EXAMPLE: MQTT_EVENT_DATA
-TOPIC=/topic/qos0
+TOPIC=topic/qos0
 DATA=data
 ```
-

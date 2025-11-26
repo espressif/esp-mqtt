@@ -66,10 +66,10 @@ I (8079) MQTT5_EXAMPLE: key is board, value is esp32
 I (8079) MQTT5_EXAMPLE: key is u, value is user
 I (8089) MQTT5_EXAMPLE: key is p, value is password
 I (8089) MQTT5_EXAMPLE: payload_format_indicator is 1
-I (8099) MQTT5_EXAMPLE: response_topic is /topic/test/response
+I (8099) MQTT5_EXAMPLE: response_topic is topic/test/response
 I (8109) MQTT5_EXAMPLE: correlation_data is 123456
 I (8109) MQTT5_EXAMPLE: content_type is 
-I (8119) MQTT5_EXAMPLE: TOPIC=/topic/qos1
+I (8119) MQTT5_EXAMPLE: TOPIC=topic/qos1
 I (8119) MQTT5_EXAMPLE: DATA=data_3
 I (8129) mqtt5_client: MQTT_MSG_TYPE_UNSUBACK return code is 0
 I (8129) MQTT5_EXAMPLE: MQTT_EVENT_UNSUBSCRIBED, msg_id=55594

@@ -27,7 +27,7 @@ def on_connect(client, userdata, flags, rc):  # type: (mqtt.Client, tuple, bool,
     _ = (userdata, flags)
     print("Connected with result code " + str(rc))
     event_client_connected.set()
-    client.subscribe("/topic/qos0")
+    client.subscribe("topic/qos0")
 
 
 def mqtt_client_task(client):  # type: (mqtt.Client) -> None
@@ -41,8 +41,8 @@ def on_message(client, userdata, msg):  # type: (mqtt.Client, tuple, mqtt.client
     global message_log
     payload = msg.payload.decode()
     if not event_client_received_correct.is_set() and payload == "data":
-        client.publish("/topic/qos0", "data_to_esp32")
-        if msg.topic == "/topic/qos0" and payload == "data":
+        client.publish("topic/qos0", "data_to_esp32")
+        if msg.topic == "topic/qos0" and payload == "data":
             event_client_received_correct.set()
     message_log += "Received data:" + msg.topic + " " + payload + "\n"
 

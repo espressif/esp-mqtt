@@ -68,13 +68,13 @@ static void mqtt_app_start(void)
     esp_mqtt_client_register_event(client, MQTT_EVENT_ANY, mqtt_event_handler, client);
     esp_mqtt_client_start(client);
     esp_mqtt_set_config(client, &mqtt_cfg);
-    int msg_id = esp_mqtt_client_publish(client, "/topic/qos1", "data", 0, 0, 0);
+    int msg_id = esp_mqtt_client_publish(client, "topic/qos1", "data", 0, 0, 0);
     ESP_LOGI(TAG, "mqtt api returned %d", msg_id);
-    msg_id = esp_mqtt_client_subscribe(client, "/topic/qos0", 0);
+    msg_id = esp_mqtt_client_subscribe(client, "topic/qos0", 0);
     ESP_LOGI(TAG, "mqtt api returned %d", msg_id);
-    msg_id = esp_mqtt_client_subscribe(client, "/topic/qos1", 1);
+    msg_id = esp_mqtt_client_subscribe(client, "topic/qos1", 1);
     ESP_LOGI(TAG, "mqtt api returned %d", msg_id);
-    msg_id = esp_mqtt_client_unsubscribe(client, "/topic/qos1");
+    msg_id = esp_mqtt_client_unsubscribe(client, "topic/qos1");
     ESP_LOGI(TAG, "mqtt api returned %d", msg_id);
     esp_err_t err = esp_mqtt_client_set_uri(client, "mqtt://localhost:1883");
     ESP_LOGI(TAG, "mqtt api returned %d", err);

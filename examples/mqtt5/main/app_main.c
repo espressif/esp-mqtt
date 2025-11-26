@@ -37,7 +37,7 @@ static esp_mqtt5_publish_property_config_t publish_property = {
     .payload_format_indicator = 1,
     .message_expiry_interval = 1000,
     .topic_alias = 0,
-    .response_topic = "/topic/test/response",
+    .response_topic = "topic/test/response",
     .correlation_data = "123456",
     .correlation_data_len = 6,
 };
@@ -115,25 +115,25 @@ static void mqtt5_event_handler(void *handler_args, esp_event_base_t base, int32
         print_user_property(event->property->user_property);
         esp_mqtt5_client_set_user_property(&publish_property.user_property, user_property_arr, USE_PROPERTY_ARR_SIZE);
         esp_mqtt5_client_set_publish_property(client, &publish_property);
-        msg_id = esp_mqtt_client_publish(client, "/topic/qos1", "data_3", 0, 1, 1);
+        msg_id = esp_mqtt_client_publish(client, "topic/qos1", "data_3", 0, 1, 1);
         esp_mqtt5_client_delete_user_property(publish_property.user_property);
         publish_property.user_property = NULL;
         ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
         esp_mqtt5_client_set_user_property(&subscribe_property.user_property, user_property_arr, USE_PROPERTY_ARR_SIZE);
         esp_mqtt5_client_set_subscribe_property(client, &subscribe_property);
-        msg_id = esp_mqtt_client_subscribe(client, "/topic/qos0", 0);
+        msg_id = esp_mqtt_client_subscribe(client, "topic/qos0", 0);
         esp_mqtt5_client_delete_user_property(subscribe_property.user_property);
         subscribe_property.user_property = NULL;
         ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
         esp_mqtt5_client_set_user_property(&subscribe1_property.user_property, user_property_arr, USE_PROPERTY_ARR_SIZE);
         esp_mqtt5_client_set_subscribe_property(client, &subscribe1_property);
-        msg_id = esp_mqtt_client_subscribe(client, "/topic/qos1", 2);
+        msg_id = esp_mqtt_client_subscribe(client, "topic/qos1", 2);
         esp_mqtt5_client_delete_user_property(subscribe1_property.user_property);
         subscribe1_property.user_property = NULL;
         ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
         esp_mqtt5_client_set_user_property(&unsubscribe_property.user_property, user_property_arr, USE_PROPERTY_ARR_SIZE);
         esp_mqtt5_client_set_unsubscribe_property(client, &unsubscribe_property);
-        msg_id = esp_mqtt_client_unsubscribe(client, "/topic/qos0");
+        msg_id = esp_mqtt_client_unsubscribe(client, "topic/qos0");
         ESP_LOGI(TAG, "sent unsubscribe successful, msg_id=%d", msg_id);
         esp_mqtt5_client_delete_user_property(unsubscribe_property.user_property);
         unsubscribe_property.user_property = NULL;
@@ -148,7 +148,7 @@ static void mqtt5_event_handler(void *handler_args, esp_event_base_t base, int32
         ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d, reason code=0x%02x ", event->msg_id, (uint8_t)*event->data);
         print_user_property(event->property->user_property);
         esp_mqtt5_client_set_publish_property(client, &publish_property);
-        msg_id = esp_mqtt_client_publish(client, "/topic/qos0", "data", 0, 0, 0);
+        msg_id = esp_mqtt_client_publish(client, "topic/qos0", "data", 0, 0, 0);
         ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
         break;
 
@@ -210,7 +210,7 @@ static void mqtt5_app_start(void)
         .will_delay_interval = 10,
         .payload_format_indicator = true,
         .message_expiry_interval = 10,
-        .response_topic = "/test/response",
+        .response_topic = "test/response",
         .correlation_data = "123456",
         .correlation_data_len = 6,
     };
@@ -220,7 +220,7 @@ static void mqtt5_app_start(void)
         .network.disable_auto_reconnect = true,
         .credentials.username = "123",
         .credentials.authentication.password = "456",
-        .session.last_will.topic = "/topic/will",
+        .session.last_will.topic = "topic/will",
         .session.last_will.msg = "i will leave",
         .session.last_will.msg_len = 12,
         .session.last_will.qos = 1,
