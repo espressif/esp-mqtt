@@ -1033,6 +1033,7 @@ _mqtt_init_failed:
 esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client)
 {
     if (client == NULL) {
+        ESP_LOGD(TAG, "Unable to destroy client - client handle is NULL");
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -2636,6 +2637,7 @@ esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mq
                                          esp_event_handler_t event_handler, void *event_handler_arg)
 {
     if (client == NULL) {
+        ESP_LOGD(TAG, "Unable to register event - client handle is NULL");
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -2652,6 +2654,7 @@ esp_err_t esp_mqtt_client_unregister_event(esp_mqtt_client_handle_t client, esp_
                                            esp_event_handler_t event_handler)
 {
     if (client == NULL) {
+        ESP_LOGD(TAG, "Unable to unregister event - client handle is NULL");
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -2688,6 +2691,7 @@ int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client)
     int outbox_size = 0;
 
     if (client == NULL) {
+        ESP_LOGE(TAG, "Unable to get outbox size - client handle is NULL");
         return 0;
     }
 
@@ -2703,7 +2707,13 @@ int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client)
 
 esp_transport_handle_t esp_mqtt_client_get_transport(esp_mqtt_client_handle_t client, char *transport_scheme)
 {
-    if (client == NULL || (transport_scheme == NULL && client->config->transport == NULL)) {
+    if (client == NULL) {
+        ESP_LOGE(TAG, "Unable to get transport - client handle is NULL");
+        return NULL;
+    }
+
+    if (transport_scheme == NULL && client->config->transport == NULL) {
+        ESP_LOGE(TAG, "Unable to get transport - no transport scheme set and no transport provided");
         return NULL;
     }
 
@@ -2712,4 +2722,40 @@ esp_transport_handle_t esp_mqtt_client_get_transport(esp_mqtt_client_handle_t cl
     }
 
     return esp_transport_list_get_transport(client->transport_list, transport_scheme);
+}
+
+esp_mqtt_client_connection_state_t esp_mqtt_client_get_state(esp_mqtt_client_handle_t client)
+{
+    if (client == NULL) {
+        ESP_LOGD(TAG, "Unable to get MQTT client state - client handle is NULL");
+        return MQTT_CLIENT_STATE_NOT_INITIALIZED;
+    }
+
+    if (client->task_handle == NULL) {
+        return MQTT_CLIENT_STATE_NOT_STARTED;
+    }
+
+    MQTT_API_LOCK(client);
+    esp_mqtt_client_connection_state_t ret = MQTT_CLIENT_STATE_NOT_INITIALIZED;
+
+    switch (client->state) {
+    case MQTT_STATE_INIT:
+        ret = MQTT_CLIENT_STATE_NOT_STARTED;
+        break;
+
+    case MQTT_STATE_CONNECTED:
+        ret = MQTT_CLIENT_STATE_CONNECTED;
+        break;
+
+    case MQTT_STATE_WAIT_RECONNECT:
+        ret = MQTT_CLIENT_STATE_WAITING_RECONNECT;
+        break;
+
+    case MQTT_STATE_DISCONNECTED:
+        ret = MQTT_CLIENT_STATE_DISCONNECTED;
+        break;
+    }
+
+    MQTT_API_UNLOCK(client);
+    return ret;
 }

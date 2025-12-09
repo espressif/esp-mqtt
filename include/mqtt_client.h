@@ -154,6 +154,17 @@ typedef enum esp_mqtt_protocol_ver_t {
 } esp_mqtt_protocol_ver_t;
 
 /**
+ * States of MQTT client connection
+ */
+typedef enum esp_mqtt_client_connection_state_t {
+    MQTT_CLIENT_STATE_NOT_INITIALIZED = 0,  /*!< MQTT Client is not initialized */
+    MQTT_CLIENT_STATE_NOT_STARTED,          /*!< MQTT Client is initialized, but not started */
+    MQTT_CLIENT_STATE_DISCONNECTED,         /*!< MQTT Client is started, but not connected to the broker */
+    MQTT_CLIENT_STATE_CONNECTED,            /*!< MQTT Client is connected to the broker */
+    MQTT_CLIENT_STATE_WAITING_RECONNECT,    /*!< MQTT Client is waiting for reconnection request */
+} esp_mqtt_client_connection_state_t;
+
+/**
  * @brief *MQTT* error code structure to be passed as a contextual information
  * into ERROR event
  *
@@ -706,6 +717,19 @@ esp_err_t esp_mqtt_dispatch_custom_event(esp_mqtt_client_handle_t client, esp_mq
  *
 */
 esp_transport_handle_t esp_mqtt_client_get_transport(esp_mqtt_client_handle_t client, char *transport_scheme);
+
+/**
+ * @brief Get MQTT client's current state
+ *
+ * Get the current state of MQTT client. Returns a value to indicate whether is it initialized, connected, waiting for
+ * reconnection, or disconnected.
+ *
+ * @param client            *MQTT* client handle
+ * @return MQTT client state on success
+ *         MQTT_CLIENT_STATE_INVALID in case of error
+ */
+esp_mqtt_client_connection_state_t esp_mqtt_client_get_state(esp_mqtt_client_handle_t client);
+
 #ifdef __cplusplus
 }
 #endif //__cplusplus
