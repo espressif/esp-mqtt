@@ -6,6 +6,7 @@
 #include "esp_log.h"
 
 #define MQTT5_MAX_FIXED_HEADER_SIZE 5
+#define MQTT5_MAX_PROPERTY_STRING_LEN (16 * 1024)
 
 static const char *TAG = "mqtt5_msg";
 
@@ -71,6 +72,11 @@ static size_t get_variable_len(uint8_t *buffer, size_t offset, size_t buffer_len
 
     *len_bytes = i - offset;
     return len;
+}
+
+static bool mqtt5_property_has_bytes(size_t property_offset, size_t needed, size_t property_len)
+{
+    return property_offset <= property_len && needed <= (property_len - property_offset);
 }
 
 static int update_property_len_value(mqtt_connection_t *connection, size_t property_len, int property_offset)
@@ -236,19 +242,48 @@ static mqtt5_user_property_handle_t mqtt5_msg_get_user_property(uint8_t *buffer,
         uint8_t property_id = property[property_offset ++];
         switch (property_id) {
         case MQTT5_PROPERTY_REASON_STRING: //only print now
+            if (!mqtt5_property_has_bytes(property_offset, 2, buffer_length)) {
+                goto err;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, buffer_length)) {
+                goto err;
+            }
+
             ESP_LOGD(TAG, "MQTT5_PROPERTY_REASON_STRING %.*s", len, &property[property_offset]);
             property_offset += len;
             continue;
         case MQTT5_PROPERTY_USER_PROPERTY: {
             uint8_t *key = NULL, *value = NULL;
             size_t key_len = 0, value_len = 0;
+
+            if (!mqtt5_property_has_bytes(property_offset, 2, buffer_length)) {
+                goto err;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, buffer_length)) {
+                goto err;
+            }
+
             key = &property[property_offset];
             key_len = len;
             ESP_LOGD(TAG, "MQTT5_PROPERTY_USER_PROPERTY key: %.*s", key_len, (char *)key);
             property_offset += len;
+
+            if (!mqtt5_property_has_bytes(property_offset, 2, buffer_length)) {
+                goto err;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, buffer_length)) {
+                goto err;
+            }
+
             value = &property[property_offset];
             value_len = len;
             ESP_LOGD(TAG, "MQTT5_PROPERTY_USER_PROPERTY value: %.*s", value_len, (char *)value);
@@ -345,19 +380,43 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
         uint8_t property_id = property[property_offset ++];
         switch (property_id) {
         case MQTT5_PROPERTY_PAYLOAD_FORMAT_INDICATOR:
+            if (!mqtt5_property_has_bytes(property_offset, 1, *property_len)) {
+                return NULL;
+            }
+
             resp_property->payload_format_indicator = property[property_offset ++];
             ESP_LOGD(TAG, "MQTT5_PROPERTY_PAYLOAD_FORMAT_INDICATOR %d", resp_property->payload_format_indicator);
             continue;
         case MQTT5_PROPERTY_MESSAGE_EXPIRY_INTERVAL:
-            MQTT5_CONVERT_ONE_BYTE_TO_FOUR(resp_property->message_expiry_interval, property[property_offset ++], property[property_offset ++], property[property_offset ++], property[property_offset ++])
+            if (!mqtt5_property_has_bytes(property_offset, 4, *property_len)) {
+                return NULL;
+            }
+
+            MQTT5_CONVERT_ONE_BYTE_TO_FOUR(resp_property->message_expiry_interval, property[property_offset ++],
+                                           property[property_offset ++], property[property_offset ++], property[property_offset ++])
             ESP_LOGD(TAG, "MQTT5_PROPERTY_MESSAGE_EXPIRY_INTERVAL %"PRIu32, resp_property->message_expiry_interval);
             continue;
         case MQTT5_PROPERTY_TOPIC_ALIAS:
+            if (!mqtt5_property_has_bytes(property_offset, 2, *property_len)) {
+                return NULL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(resp_property->topic_alias, property[property_offset ++], property[property_offset ++])
             ESP_LOGD(TAG, "MQTT5_PROPERTY_TOPIC_ALIAS %d", resp_property->topic_alias);
             continue;
         case MQTT5_PROPERTY_RESPONSE_TOPIC:
-            MQTT5_CONVERT_ONE_BYTE_TO_TWO(resp_property->response_topic_len, property[property_offset ++], property[property_offset ++])
+            if (!mqtt5_property_has_bytes(property_offset, 2, *property_len)) {
+                return NULL;
+            }
+
+            MQTT5_CONVERT_ONE_BYTE_TO_TWO(resp_property->response_topic_len, property[property_offset ++],
+                                          property[property_offset ++])
+
+            if (resp_property->response_topic_len > MQTT5_MAX_PROPERTY_STRING_LEN ||
+                    !mqtt5_property_has_bytes(property_offset, resp_property->response_topic_len, *property_len)) {
+                return NULL;
+            }
+
             resp_property->response_topic = (char *)(property + property_offset);
             property_offset += resp_property->response_topic_len;
             ESP_LOGD(TAG, "MQTT5_PROPERTY_RESPONSE_TOPIC %.*s", resp_property->response_topic_len, resp_property->response_topic);
@@ -369,7 +428,12 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
             ESP_LOGD(TAG, "MQTT5_PROPERTY_CORRELATION_DATA length %d", resp_property->correlation_data_len);
             continue;
         case MQTT5_PROPERTY_SUBSCRIBE_IDENTIFIER:
-            resp_property->subscribe_id = get_variable_len(property, property_offset, buffer_length, &len_bytes);
+            resp_property->subscribe_id = get_variable_len(property, property_offset, *property_len, &len_bytes);
+
+            if (!mqtt5_property_has_bytes(property_offset, len_bytes, *property_len)) {
+                return NULL;
+            }
+
             property_offset += len_bytes;
             ESP_LOGD(TAG, "MQTT5_PROPERTY_SUBSCRIBE_IDENTIFIER %d", resp_property->subscribe_id);
             continue;
@@ -382,12 +446,32 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
         case MQTT5_PROPERTY_USER_PROPERTY: {
             uint8_t *key = NULL, *value = NULL;
             size_t key_len = 0, value_len = 0;
+
+            if (!mqtt5_property_has_bytes(property_offset, 2, *property_len)) {
+                return NULL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, *property_len)) {
+                return NULL;
+            }
+
             key = &property[property_offset];
             key_len = len;
             ESP_LOGD(TAG, "MQTT5_PROPERTY_USER_PROPERTY key: %.*s", key_len, (char *)key);
             property_offset += len;
+
+            if (!mqtt5_property_has_bytes(property_offset, 2, *property_len)) {
+                return NULL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, *property_len)) {
+                return NULL;
+            }
+
             value = &property[property_offset];
             value_len = len;
             ESP_LOGD(TAG, "MQTT5_PROPERTY_USER_PROPERTY value: %.*s", value_len, (char *)value);
@@ -401,7 +485,16 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
             continue;
         }
         case MQTT5_PROPERTY_REASON_STRING: //only print now
+            if (!mqtt5_property_has_bytes(property_offset, 2, *property_len)) {
+                return NULL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, *property_len)) {
+                return NULL;
+            }
+
             ESP_LOGD(TAG, "MQTT5_PROPERTY_REASON_STRING %.*s", len, &property[property_offset]);
             property_offset += len;
             continue;
@@ -435,6 +528,11 @@ char *mqtt5_get_suback_data(uint8_t *buffer, size_t *length, mqtt5_user_property
     if (offset < totlen) {
         size_t property_len = get_variable_len(buffer, offset, totlen, &len_bytes);
         offset += len_bytes;
+
+        if (property_len > (totlen - offset)) {
+            goto err;
+        }
+
         *user_property = mqtt5_msg_get_user_property(buffer + offset, property_len);
         offset += property_len;
         if (offset < totlen) {
@@ -464,6 +562,12 @@ char *mqtt5_get_puback_data(uint8_t *buffer, size_t *length, mqtt5_user_property
         if (offset < totlen) {
             size_t property_len = get_variable_len(buffer, offset, totlen, &len_bytes);
             offset += len_bytes;
+
+            if (property_len > (totlen - offset)) {
+                *length = 0;
+                return NULL;
+            }
+
             *user_property = mqtt5_msg_get_user_property(buffer + offset, property_len);
         }
         return data;
@@ -608,12 +712,23 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
     size_t property_len = get_variable_len(buffer, offset, buffer_len, &len_bytes);
     offset += len_bytes;
     uint16_t property_offset = 0, len = 0;
+
+    if (property_len > (buffer_len - offset)) {
+        ESP_LOGE(TAG, "Property length %d exceeds buffer bounds %d", property_len, buffer_len - offset);
+        return ESP_FAIL;
+    }
+
     uint8_t *property = (buffer + offset);
     while (property_offset < property_len) {
         uint8_t property_id = property[property_offset ++];
         switch (property_id) {
         case MQTT5_PROPERTY_SESSION_EXPIRY_INTERVAL:
-            MQTT5_CONVERT_ONE_BYTE_TO_FOUR(connection_property->session_expiry_interval, property[property_offset ++], property[property_offset ++], property[property_offset ++], property[property_offset ++])
+            if (!mqtt5_property_has_bytes(property_offset, 4, property_len)) {
+                return ESP_FAIL;
+            }
+
+            MQTT5_CONVERT_ONE_BYTE_TO_FOUR(connection_property->session_expiry_interval, property[property_offset ++],
+                                           property[property_offset ++], property[property_offset ++], property[property_offset ++])
             ESP_LOGD(TAG, "MQTT5_PROPERTY_SESSION_EXPIRY_INTERVAL %"PRIu32, connection_property->session_expiry_interval);
             continue;
         case MQTT5_PROPERTY_RECEIVE_MAXIMUM:
@@ -621,10 +736,18 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
             ESP_LOGD(TAG, "MQTT5_PROPERTY_RECEIVE_MAXIMUM %d", resp_property->receive_maximum);
             continue;
         case MQTT5_PROPERTY_MAXIMUM_QOS:
+            if (!mqtt5_property_has_bytes(property_offset, 1, property_len)) {
+                return ESP_FAIL;
+            }
+
             resp_property->max_qos = property[property_offset ++];
             ESP_LOGD(TAG, "MQTT5_PROPERTY_MAXIMUM_QOS %d", resp_property->max_qos);
             continue;
         case MQTT5_PROPERTY_RETAIN_AVAILABLE:
+            if (!mqtt5_property_has_bytes(property_offset, 1, property_len)) {
+                return ESP_FAIL;
+            }
+
             resp_property->retain_available = property[property_offset ++];
             ESP_LOGD(TAG, "MQTT5_PROPERTY_RETAIN_AVAILABLE %d", resp_property->retain_available);
             continue;
@@ -633,7 +756,17 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
             ESP_LOGD(TAG, "MQTT5_PROPERTY_MAXIMUM_PACKET_SIZE %"PRIu32, resp_property->maximum_packet_size);
             continue;
         case MQTT5_PROPERTY_ASSIGNED_CLIENT_IDENTIFIER:
+            if (!mqtt5_property_has_bytes(property_offset, 2, property_len)) {
+                return ESP_FAIL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, property_len)) {
+                ESP_LOGE(TAG, "Sub-length %d exceeds property bounds", len);
+                return ESP_FAIL;
+            }
+
             if (connection_info->client_id) {
                 free(connection_info->client_id);
             }
@@ -652,19 +785,48 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
             ESP_LOGD(TAG, "MQTT5_PROPERTY_TOPIC_ALIAS_MAXIMIM %d", resp_property->topic_alias_maximum);
             continue;
         case MQTT5_PROPERTY_REASON_STRING: //only print now
+            if (!mqtt5_property_has_bytes(property_offset, 2, property_len)) {
+                return ESP_FAIL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, property_len)) {
+                return ESP_FAIL;
+            }
+
             ESP_LOGD(TAG, "MQTT5_PROPERTY_REASON_STRING %.*s", len, &property[property_offset]);
             property_offset += len;
             continue;
         case MQTT5_PROPERTY_USER_PROPERTY: {
             uint8_t *key = NULL, *value = NULL;
             size_t key_len = 0, value_len = 0;
+
+            if (!mqtt5_property_has_bytes(property_offset, 2, property_len)) {
+                return ESP_FAIL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, property_len)) {
+                return ESP_FAIL;
+            }
+
             key = &property[property_offset];
             key_len = len;
             ESP_LOGD(TAG, "MQTT5_PROPERTY_USER_PROPERTY key: %.*s", key_len, (char *)key);
             property_offset += len;
+
+            if (!mqtt5_property_has_bytes(property_offset, 2, property_len)) {
+                return ESP_FAIL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, property_len)) {
+                return ESP_FAIL;
+            }
+
             value = &property[property_offset];
             value_len = len;
             ESP_LOGD(TAG, "MQTT5_PROPERTY_USER_PROPERTY value: %.*s", value_len, (char *)value);
@@ -678,18 +840,34 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
             continue;
         }
         case MQTT5_PROPERTY_WILDCARD_SUBSCR_AVAILABLE:
+            if (!mqtt5_property_has_bytes(property_offset, 1, property_len)) {
+                return ESP_FAIL;
+            }
+
             resp_property->wildcard_subscribe_available = property[property_offset++];
             ESP_LOGD(TAG, "MQTT5_PROPERTY_WILDCARD_SUBSCR_AVAILABLE %d", resp_property->wildcard_subscribe_available);
             continue;
         case MQTT5_PROPERTY_SUBSCR_IDENTIFIER_AVAILABLE:
+            if (!mqtt5_property_has_bytes(property_offset, 1, property_len)) {
+                return ESP_FAIL;
+            }
+
             resp_property->subscribe_identifiers_available = property[property_offset++];
             ESP_LOGD(TAG, "MQTT5_PROPERTY_SUBSCR_IDENTIFIER_AVAILABLE %d", resp_property->subscribe_identifiers_available);
             continue;
         case MQTT5_PROPERTY_SHARED_SUBSCR_AVAILABLE:
+            if (!mqtt5_property_has_bytes(property_offset, 1, property_len)) {
+                return ESP_FAIL;
+            }
+
             resp_property->shared_subscribe_available = property[property_offset++];
             ESP_LOGD(TAG, "MQTT5_PROPERTY_SHARED_SUBSCR_AVAILABLE %d", resp_property->shared_subscribe_available);
             continue;
         case MQTT5_PROPERTY_SERVER_KEEP_ALIVE:
+            if (!mqtt5_property_has_bytes(property_offset, 2, property_len)) {
+                return ESP_FAIL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(connection_info->keepalive, property[property_offset ++], property[property_offset ++])
             ESP_LOGD(TAG, "MQTT5_PROPERTY_SERVER_KEEP_ALIVE %lld", connection_info->keepalive);
             continue;
@@ -697,7 +875,17 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
             if (resp_property->response_info) {
                 free(resp_property->response_info);
             }
+
+            if (!mqtt5_property_has_bytes(property_offset, 2, property_len)) {
+                return ESP_FAIL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, property_len)) {
+                return ESP_FAIL;
+            }
+
             resp_property->response_info = calloc(1, len + 1);
             if (!resp_property->response_info) {
                 ESP_LOGE(TAG, "Failed to calloc %d data", len);
@@ -709,17 +897,44 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
             ESP_LOGD(TAG, "MQTT5_PROPERTY_RESP_INFO %s", resp_property->response_info);
             continue;
         case MQTT5_PROPERTY_SERVER_REFERENCE: //only print now
+            if (!mqtt5_property_has_bytes(property_offset, 2, property_len)) {
+                return ESP_FAIL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, property_len)) {
+                return ESP_FAIL;
+            }
+
             ESP_LOGD(TAG, "MQTT5_PROPERTY_SERVER_REFERENCE %.*s", len, &property[property_offset]);
             property_offset += len;
             continue;
         case MQTT5_PROPERTY_AUTHENTICATION_METHOD: //only print now
+            if (!mqtt5_property_has_bytes(property_offset, 2, property_len)) {
+                return ESP_FAIL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, property_len)) {
+                return ESP_FAIL;
+            }
+
             ESP_LOGD(TAG, "MQTT5_PROPERTY_AUTHENTICATION_METHOD %.*s", len, &property[property_offset]);
             property_offset += len;
             continue;
         case MQTT5_PROPERTY_AUTHENTICATION_DATA: //only print now
+            if (!mqtt5_property_has_bytes(property_offset, 2, property_len)) {
+                return ESP_FAIL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(len, property[property_offset ++], property[property_offset ++])
+
+            if (len > MQTT5_MAX_PROPERTY_STRING_LEN || !mqtt5_property_has_bytes(property_offset, len, property_len)) {
+                return ESP_FAIL;
+            }
+
             ESP_LOGD(TAG, "MQTT5_PROPERTY_AUTHENTICATION_DATA length %d", len);
             property_offset += len;
             continue;
