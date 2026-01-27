@@ -574,13 +574,7 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
             client->mqtt5_config->connect_property_info.session_expiry_interval = connect_property->session_expiry_interval;
         }
         if (connect_property->maximum_packet_size) {
-            if (connect_property->maximum_packet_size > client->mqtt_state.in_buffer_length) {
-                ESP_LOGW(TAG, "Connect maximum_packet_size property is over buffer_size(%d), Please first change it", client->mqtt_state.in_buffer_length);
-                MQTT_API_UNLOCK(client);
-                return ESP_FAIL;
-            } else {
-                client->mqtt5_config->connect_property_info.maximum_packet_size = connect_property->maximum_packet_size;
-            }
+            client->mqtt5_config->connect_property_info.maximum_packet_size = connect_property->maximum_packet_size;
         } else {
             client->mqtt5_config->connect_property_info.maximum_packet_size = client->mqtt_state.in_buffer_length;
         }
