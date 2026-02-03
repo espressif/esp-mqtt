@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2025-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -355,16 +355,16 @@ typedef struct esp_mqtt_client_config_t {
                         by default. Note: setting the config value `keepalive` to `0` doesn't disable
                         keepalive feature, but uses a default keepalive period */
         esp_mqtt_protocol_ver_t protocol_ver; /*!< *MQTT* protocol version used for connection.*/
-        int message_retransmit_timeout; /*!< timeout for retransmitting of failed packet */
+        int message_retransmit_timeout; /*!< timeout for retransmitting of failed packet, default: 1000 ms */
     } session; /*!< *MQTT* session configuration. */
     /**
      * Network related configuration
      */
     struct network_t {
         int reconnect_timeout_ms; /*!< Reconnect to the broker after this value in milliseconds if auto reconnect is not
-                          disabled (defaults to 10s) */
+                          disabled (default: 10000 ms) */
         int timeout_ms; /*!< Abort network operation if it is not completed after this value, in milliseconds
-                (defaults to 10s). */
+                (default: 10000 ms). */
         int refresh_connection_after_ms; /*!< Refresh connection after this value (in milliseconds) */
         bool disable_auto_reconnect;     /*!< Client will reconnect to server (when errors/disconnect). Set
                                  `disable_auto_reconnect=true` to disable */
@@ -386,7 +386,7 @@ typedef struct esp_mqtt_client_config_t {
      * Client have two buffers for input and output respectively.
      */
     struct buffer_t {
-        int size;     /*!< size of *MQTT* send/receive buffer*/
+        int size;     /*!< size of *MQTT* send/receive buffer, default: 1024*/
         int out_size; /*!< size of *MQTT* output buffer. If not defined, defaults to the size defined by
               ``buffer_size`` */
     } buffer; /*!< Buffer size configuration.*/
