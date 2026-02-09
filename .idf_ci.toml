@@ -50,3 +50,9 @@ job_template_jinja = """
     git worktree remove -f mqtt || rm -rf mqtt
 """
 runs_per_job = 15
+
+[gitlab.test_pipeline]
+pre_yaml_jinja = """
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+"""
