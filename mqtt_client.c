@@ -1781,7 +1781,6 @@ static esp_err_t mqtt_resend_queued(esp_mqtt_client_handle_t client, outbox_item
         esp_mqtt_abort_connection(client);
         return ESP_FAIL;
     }
-
     return ESP_OK;
 }
 
@@ -1984,6 +1983,13 @@ static void esp_mqtt_task(void *pv)
                         if (outbox_delete_item(client->outbox, item) != ESP_OK) {
                             ESP_LOGE(TAG, "Failed to remove queued qos0 message from the outbox");
                         }
+
+                        client->event.data_len = client->event.total_data_len = client->mqtt_state.connection.outbound_message.length;
+                        client->event.current_data_offset = 0;
+                        client->event.msg_id = client->mqtt_state.pending_msg_id;
+                        client->event.qos = client->mqtt_state.pending_publish_qos;
+                        client->event.event_id = MQTT_EVENT_PUBLISHED;
+                        esp_mqtt_dispatch_event(client);
                     }
 
                     if (client->mqtt_state.pending_publish_qos > 0 &&
