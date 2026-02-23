@@ -2196,6 +2196,14 @@ static esp_err_t send_disconnect_msg(esp_mqtt_client_handle_t client)
 
 esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 {
+    esp_err_t result = esp_mqtt_client_initiate_stop(client);
+    if (result == ESP_OK)
+        xEventGroupWaitBits(client->status_bits, STOPPED_BIT, false, true, portMAX_DELAY);
+    return result;
+}
+
+esp_err_t esp_mqtt_client_initiate_stop(esp_mqtt_client_handle_t client)
+{
     if (!client) {
         ESP_LOGE(TAG, "Client was not initialized");
         return ESP_ERR_INVALID_ARG;
@@ -2221,13 +2229,24 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
         client->run = false;
         client->state = MQTT_STATE_DISCONNECTED;
         MQTT_API_UNLOCK(client);
-        xEventGroupWaitBits(client->status_bits, STOPPED_BIT, false, true, portMAX_DELAY);
+
         return ESP_OK;
     } else {
         ESP_LOGW(TAG, "Client asked to stop, but was not started");
         MQTT_API_UNLOCK(client);
         return ESP_FAIL;
     }
+}
+
+bool esp_mqtt_client_is_stopped(esp_mqtt_client_handle_t client)
+{
+    if (!client) {
+        ESP_LOGE(TAG, "Client was not initialized");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    EventBits_t bits = xEventGroupClearBits(client->status_bits, 0);
+    return bits & STOPPED_BIT;
 }
 
 static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client)
