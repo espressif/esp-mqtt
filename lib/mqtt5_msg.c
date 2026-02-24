@@ -62,13 +62,21 @@ static size_t get_variable_len(uint8_t *buffer, size_t offset, size_t buffer_len
     *len_bytes = 0;
     size_t len = 0, i = 0;
 
-    for (i = offset; i < buffer_length; i ++) {
-        len += (buffer[i] & 0x7f) << (7 * (i - offset));
+    // MQTT Variable Byte Integer is max 4 bytes (MQTT v5 spec).
+    // Limit decoding to 4 bytes to avoid undefined shift behavior on malformed inputs.
+    for (i = offset; i < buffer_length && (i - offset) < 4; i ++) {
+        len += ((size_t)(buffer[i] & 0x7f)) << (7 * (i - offset));
 
         if ((buffer[i] & 0x80) == 0) {
             i ++;
             break;
         }
+    }
+
+    // If the varint didn't terminate within 4 bytes, treat as invalid (0 bytes consumed).
+    if ((i - offset) == 4 && i <= buffer_length && (buffer[i - 1] & 0x80)) {
+        *len_bytes = 0;
+        return 0;
     }
 
     *len_bytes = i - offset;
