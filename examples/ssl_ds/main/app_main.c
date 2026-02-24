@@ -32,7 +32,12 @@
 
 #include "esp_log.h"
 #include "mqtt_client.h"
+#include "sdkconfig.h"
+#if CONFIG_MBEDTLS_VER_4_X_SUPPORT
+#include "psa_crypto_driver_esp_rsa_ds.h"
+#else
 #include "rsa_sign_alt.h"
+#endif /* MBEDTLS_VER_4_X_SUPPORT */
 #include "esp_secure_cert_read.h"
 
 static const char *TAG = "mqtts_example";
