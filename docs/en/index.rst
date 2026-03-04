@@ -60,7 +60,8 @@ The configuration is made by setting fields in :cpp:class:`esp_mqtt_client_confi
    * :cpp:class:`esp_mqtt_client_config_t::session_t` - Configuration for MQTT session aspects.
    * :cpp:class:`esp_mqtt_client_config_t::network_t` - Networking related configuration.
    * :cpp:class:`esp_mqtt_client_config_t::task_t` - Allow to configure FreeRTOS task.
-   * :cpp:class:`esp_mqtt_client_config_t::buffer_t` - Buffer size for input and output.
+   * :cpp:class:`esp_mqtt_client_config_t::buffer_t` - Message buffer for send/receive operation.
+   * :cpp:class:`esp_mqtt_client_config_t::outbox_config_t` - Outbox capacity for pending QoS1/2 messages.
 
 In the following sections, the most common aspects are detailed.
 
@@ -173,6 +174,54 @@ MQTT allows for a last will and testament (LWT) message to notify other clients 
  * :cpp:member:`msg_len <esp_mqtt_client_config_t::session_t::last_will_t::msg_len>`: length of the LWT message, required if :cpp:member:`msg <esp_mqtt_client_config_t::session_t::last_will_t::msg>` is not null-terminated
  * :cpp:member:`qos <esp_mqtt_client_config_t::session_t::last_will_t::qos>`: quality of service for the LWT message
  * :cpp:member:`retain <esp_mqtt_client_config_t::session_t::last_will_t::retain>`: specifies the retain flag of the LWT message
+
+Outbox (QoS persistence)
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+ESP-MQTT keeps an in-RAM *outbox* for packets that require acknowledgement —
+primarily PUBLISH with QoS 1/2 (and the QoS2 handshake). Entries are sent FIFO
+when connected, retransmitted (with DUP) after reconnect, and removed on
+PUBACK/PUBREL/PUBCOMP.
+
+=====================
+Outbox configuration
+=====================
+
+The client has an outbox configuration field of type :c:struct:`outbox_config_t`:
+
+- :cpp:member:`outbox_config_t::limit` (bytes): Byte budget for the outbox.
+  If adding a new entry would exceed this budget, enqueue returns a negative value.
+
+=======================
+Sizing
+=======================
+
+The number of messages, that fit into outbox, depends on the topic/payload sizes plus
+a small per-message overhead (MQTT PUBLISH framing + metadata). A useful upper bound is::
+
+   floor( limit / (topic_len + payload_len + overhead_per_msg) )
+
+The effective overhead is typically ~4–6 bytes per message for messages, if topic length
+plus  payload length is much less than outbox limit. If ``limit`` is not a multiple of the 
+per-message size, the remainder reduce the final count by at most one entry.
+
+===============================
+Not related to outbox capacity
+===============================
+
+The ``out_size`` of :c:struct:`buffer_t` configures the transport’s **send buffer** used
+during encoding/writes; it does **not** affect how many messages can be queued in the outbox.
+
+=======================
+Publish vs. enqueue
+=======================
+
+- :c:func:`esp_mqtt_client_publish` sends immediately if connected.
+  QoS0 publish fails when disconnected; QoS1/2 are stored in the outbox until ACK.
+- :c:func:`esp_mqtt_client_enqueue` puts the message into the outbox first and
+  lets the MQTT task send it when possible. With ``store=true`` even QoS0 can be
+  queued locally (useful across brief disconnects).
+
 
 Change Settings in Project Configuration Menu
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
