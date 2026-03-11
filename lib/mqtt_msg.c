@@ -121,9 +121,8 @@ size_t mqtt_get_total_length(const uint8_t *buffer, size_t length, int *fixed_si
     int i;
     size_t totlen = 0;
 
-    for (i = 1; i < length; ++i) {
-        totlen += (buffer[i] & 0x7f) << (7 * (i - 1));
-
+    for (i = 1; i < length && i <= 4; ++i) {
+        totlen += (size_t)(buffer[i] & 0x7f) << (7 * (i - 1));
         if ((buffer[i] & 0x80) == 0) {
             ++i;
             break;
@@ -208,7 +207,7 @@ char *mqtt_get_publish_data(uint8_t *buffer, size_t *length)
     int blength = *length;
     *length = 0;
 
-    for (i = 1; i < blength; ++i) {
+    for (i = 1; i < blength && i <= 4; ++i) {
         totlen += (buffer[i] & 0x7f) << (7 * (i - 1));
 
         if ((buffer[i] & 0x80) == 0) {
