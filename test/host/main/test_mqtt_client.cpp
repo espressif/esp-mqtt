@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2022-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2022-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -15,13 +15,11 @@
 #include "mqtt_client.h"
 extern "C" {
 #include "Mockesp_event.h"
-#include "Mockesp_mac.h"
 #include "Mockesp_transport.h"
 #include "Mockesp_transport_ssl.h"
 #include "Mockesp_transport_tcp.h"
 #include "Mockesp_transport_ws.h"
 #include "Mockevent_groups.h"
-#include "Mockhttp_parser.h"
 #include "Mockqueue.h"
 #include "Mocktask.h"
 #if __has_include ("Mockidf_additions.h")
@@ -62,7 +60,6 @@ SCENARIO("MQTT Client Operation")
     int transport_list = 0;
     int transport = 0;
     int event_group = 0;
-    uint8_t mac[] = {0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55};
     esp_timer_get_time_IgnoreAndReturn(0);
     xQueueTakeMutexRecursive_IgnoreAndReturn(true);
     xQueueGiveMutexRecursive_IgnoreAndReturn(true);
@@ -76,10 +73,7 @@ SCENARIO("MQTT Client Operation")
     esp_transport_ws_set_subprotocol_IgnoreAndReturn(ESP_OK);
     esp_transport_list_add_IgnoreAndReturn(ESP_OK);
     esp_transport_set_default_port_IgnoreAndReturn(ESP_OK);
-    http_parser_url_init_Ignore();
     esp_event_loop_create_IgnoreAndReturn(ESP_OK);
-    esp_read_mac_IgnoreAndReturn(ESP_OK);
-    esp_read_mac_ReturnThruPtr_mac(mac);
     esp_transport_list_destroy_IgnoreAndReturn(ESP_OK);
     esp_transport_destroy_IgnoreAndReturn(ESP_OK);
     vEventGroupDelete_Ignore();
@@ -87,41 +81,21 @@ SCENARIO("MQTT Client Operation")
     GIVEN("An a minimal config") {
         esp_mqtt_client_config_t config{};
         config.broker.address.uri = "mqtt://1.1.1.1";
-        struct http_parser_url ret_uri = {
-            .field_set = 1 | (1 << 1),
-            .port = 0,
-            .field_data = { { 0, 4 } /*mqtt*/, { 7, 1 } } // at least *scheme* and *host*
-        };
-        http_parser_parse_url_ExpectAnyArgsAndReturn(0);
-        http_parser_parse_url_ReturnThruPtr_u(&ret_uri);
         xTaskCreatePinnedToCore_ExpectAnyArgsAndReturn(pdTRUE);
         SECTION("Client with minimal config") {
             auto client = unique_mqtt_client{esp_mqtt_client_init(&config)};
             REQUIRE(client != nullptr);
             SECTION("User will set a new uri") {
-                struct http_parser_url ret_uri = {
-                    .field_set = 1,
-                    .port = 0,
-                    .field_data = { { 0, 1} }
-                };
                 SECTION("User set a correct URI") {
-                    http_parser_parse_url_StopIgnore();
-                    http_parser_parse_url_ExpectAnyArgsAndReturn(0);
-                    http_parser_parse_url_ReturnThruPtr_u(&ret_uri);
-                    auto res = esp_mqtt_client_set_uri(client.get(), " ");
+                    auto res = esp_mqtt_client_set_uri(client.get(), "mqtt://example.com/valid");
                     REQUIRE(res == ESP_OK);
                 }
                 SECTION("Incorrect URI from user") {
-                    http_parser_parse_url_StopIgnore();
-                    http_parser_parse_url_ExpectAnyArgsAndReturn(1);
-                    http_parser_parse_url_ReturnThruPtr_u(&ret_uri);
-                    auto res = esp_mqtt_client_set_uri(client.get(), " ");
+                    auto res = esp_mqtt_client_set_uri(client.get(), "invalid string that is not a url");
                     REQUIRE(res == ESP_FAIL);
                 }
             }
             SECTION("User set interface to use") {
-                http_parser_parse_url_ExpectAnyArgsAndReturn(0);
-                http_parser_parse_url_ReturnThruPtr_u(&ret_uri);
                 struct ifreq if_name = {};
                 strncpy(if_name.ifr_name, "custom", IFNAMSIZ - 1);
                 if_name.ifr_name[IFNAMSIZ - 1] = '\0';;
