@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # -*- coding: utf-8 -*-
 #
-# English Language RTD & Sphinx config file
+# Simplified Chinese RTD & Sphinx config file
 #
 # Uses ../conf_common.py for most non-language-specific settings.
 

@@ -24,6 +24,7 @@ docs_build:
     script:
         - cd docs
         - build-docs -t esp32 -l en
+        - build-docs -t esp32 -l zh_CN
     rules:
         - if: $CI_COMMIT_REF_NAME == "master"
         - if: $CI_PIPELINE_SOURCE == "merge_request_event"
