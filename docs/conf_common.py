@@ -36,4 +36,4 @@ project_slug = "esp-mqtt"
 versions_url = "./_static/mqtt_docs_versions.js"
 
 idf_targets = [ "esp32" ]
-languages = ["en"]
+languages = ["en", "zh_CN"]
