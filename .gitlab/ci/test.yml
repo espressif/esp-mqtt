@@ -18,7 +18,7 @@ host_tests:
                 coverage_format: cobertura
                 path: "**/coverage.xml"
     before_script:
-        - pip install -U gcovr 'idf-ci<1'
+        - pip install -U gcovr 'idf-ci>=1,<2'
     script: |
         set -euo pipefail
         ORIG_DIR="${CI_PROJECT_DIR:-$(pwd)}"
