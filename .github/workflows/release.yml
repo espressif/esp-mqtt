@@ -1,0 +1,84 @@
+name: Release and Upload Component
+
+on:
+  # For pull requests: validate component upload rules with dry-run.
+  pull_request:
+
+  # For pushes to master: run release-please, then upload when a release is created.
+  push:
+    branches:
+      - master
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref_name == 'master'
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      paths_released: ${{ steps.release.outputs.paths_released }}
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  upload_components_dry_run:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Upload component to the component registry (dry run)
+        uses: espressif/upload-components-ci-action@v2
+        with:
+          components: |
+            .
+          namespace: "espressif"
+          api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
+          dry_run: true
+
+  upload_components_release:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_name == 'master' &&
+      needs.release-please.outputs.releases_created == 'true'
+    needs: [release-please]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Upload component to the component registry
+        uses: espressif/upload-components-ci-action@v2
+        with:
+          components: ${{ join(fromJSON(needs.release-please.outputs.paths_released), '\n') }}
+          namespace: "espressif"
+          api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
+          dry_run: ${{ github.repository_owner != 'espressif' }}
+
+  update_mirror_tags:
+    runs-on: ubuntu-latest
+    # Only run on push to master when release-please actually creates a release
+    if: github.event_name == 'push' && github.ref_name == 'master' && needs.release-please.outputs.releases_created == 'true'
+    needs: [release-please]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'false'
+      - name: Sync tags to Gitlab
+        run: |
+          echo "Syncing tags to Gitlab"
+
+          GITLAB_URL=$(echo "${{ secrets.GITLAB_URL }}" | sed 's|https://||')
+
+          git remote add gitlab https://oauth2:${{ secrets.GITLAB_TOKEN }}@${GITLAB_URL}/${{ github.repository }}.git
+
+          git push gitlab --tags
+
+          echo "Tags successfully synced to GitLab"
