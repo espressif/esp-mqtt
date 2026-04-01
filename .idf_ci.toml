@@ -1,5 +1,5 @@
 # ESP-MQTT idf-ci Configuration
-[gitlab.artifacts]
+[gitlab.artifacts.native]
 build_job_filepatterns = [
     "**/build*/partition_table/*.bin",
     "**/build*/bootloader/*.bin",
@@ -24,13 +24,13 @@ job_template_jinja = """
   timeout: "1h"
   artifacts:
     paths:
-    {%- for path in settings.gitlab.artifacts.build_job_filepatterns %}
+    {%- for path in settings.gitlab.artifacts.native.build_job_filepatterns %}
       - "{{ path }}"
     {%- endfor %}
     expire_in: "1 week"
     when: "always"
   before_script:
-    - pip install -U 'idf-ci<1'
+    - pip install -U 'idf-ci>=1,<2'
   script: |
     set -euo pipefail
     ORIG_DIR="${CI_PROJECT_DIR:-$(pwd)}"
@@ -65,7 +65,7 @@ job_template_jinja = """
   timeout: "1h"
   artifacts:
     paths:
-    {%- for path in settings.gitlab.artifacts.test_job_filepatterns %}
+    {%- for path in settings.gitlab.artifacts.native.test_job_filepatterns %}
       - "{{ path }}"
     {%- endfor %}
     expire_in: "1 week"
@@ -78,7 +78,7 @@ job_template_jinja = """
     - pipeline: "$PARENT_PIPELINE_ID"
       job: "build_test_related_apps{{ settings.gitlab.test_pipeline.parent_pipeline_job_suffix }}"
   before_script:
-    - pip install -U 'idf-ci<1'
+    - pip install -U 'idf-ci>=1,<2'
   script:
     - eval pytest $nodes
       --parallel-count ${CI_NODE_TOTAL:-1}
