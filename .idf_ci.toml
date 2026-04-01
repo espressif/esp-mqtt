@@ -3,12 +3,8 @@
 build_job_filepatterns = [
     "**/build*/partition_table/*.bin",
     "**/build*/bootloader/*.bin",
-    "**/build*/bootloader/*.map",
-    "**/build*/bootloader/*.elf",
     "**/build*/config/sdkconfig.json",
-    "**/build*/*.map",
     "**/build*/*.bin",
-    "**/build*/*.elf",
     "**/build*/flasher_args.json",
     "**/build.log",
 ]
@@ -54,35 +50,3 @@ job_template_jinja = """
     git worktree remove -f mqtt || rm -rf mqtt
 """
 runs_per_job = 15
-
-# Test pipeline: same as idf-ci default but add GitLab JUnit test reports so the
-# pipeline/MR Tests tab shows per-test results (e.g. conformance tests).
-[gitlab.test_pipeline]
-job_template_jinja = """
-{{ settings.gitlab.test_pipeline.job_template_name }}:
-  stage: "{{ settings.gitlab.test_pipeline.job_stage }}"
-  image: "{{ settings.gitlab.test_pipeline.job_image }}"
-  timeout: "1h"
-  artifacts:
-    paths:
-    {%- for path in settings.gitlab.artifacts.native.test_job_filepatterns %}
-      - "{{ path }}"
-    {%- endfor %}
-    expire_in: "1 week"
-    when: "always"
-    reports:
-      junit: "**/XUNIT_RESULT_*.xml"
-  variables:
-    PYTEST_EXTRA_FLAGS: ""
-  needs:
-    - pipeline: "$PARENT_PIPELINE_ID"
-      job: "build_test_related_apps{{ settings.gitlab.test_pipeline.parent_pipeline_job_suffix }}"
-  before_script:
-    - pip install -U 'idf-ci>=1,<2'
-  script:
-    - eval pytest $nodes
-      --parallel-count ${CI_NODE_TOTAL:-1}
-      --parallel-index ${CI_NODE_INDEX:-1}
-      --junitxml "XUNIT_RESULT_${CI_JOB_NAME_SLUG}.xml"
-      ${PYTEST_EXTRA_FLAGS}
-"""
