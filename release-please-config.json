@@ -1,0 +1,15 @@
+{
+  "include-v-in-tag": true,
+  "extra-files": [
+    {
+      "type": "yaml",
+      "path": "idf_component.yml",
+      "jsonpath": "$.version"
+    }
+  ],
+  "packages": {
+    ".": {
+      "release-type": "simple"
+    }
+  }
+}
