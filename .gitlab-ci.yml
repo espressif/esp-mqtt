@@ -18,6 +18,7 @@ include:
   - local: ".gitlab/ci/docs.yml"
   - local: ".gitlab/ci/test.yml"
   - local: ".gitlab/ci/deploy.yml"
+  - local: ".gitlab/ci/prebuild_report.yml"
 
 workflow:
   rules:
