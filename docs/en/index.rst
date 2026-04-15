@@ -187,6 +187,44 @@ The following settings are available:
 
 - :ref:`CONFIG_MQTT_CUSTOM_OUTBOX`: disable default implementation of mqtt_outbox, so a specific implementation can be supplied
 
+Considerations when using ESP-MQTT with unstable network connection
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+When using ESP-MQTT with QoS>0 it does not send the message immediately, but keeps in in the outbox while it's being processed.
+With intermittent connection it may lead to messages piling up in the outbox waiting to be sent, and acknowledged by the broker.
+While this behaviour is normal this may pose a problem if the outbox size becomes too big over time. There are several ways to remedy that:
+
+1. Switching to QoS=0 so the outbox is not used, this will lead to possible message loss 
+2. Limiting the size of the outbox with `outbox.limit` in MQTT client config and handling outbox becoming too big with:
+
+   .. code:: c
+
+      int msg_id = esp_mqtt_client_publish(client, topic, data, len, qos, retain);
+       if (msg_id == -1) {
+           // an error has occurred during publishing
+       } else if (msg_id == -2) {
+           // outbox has became too big and it's impossible to publish new messages for now
+       } else {
+           // message was published successfully
+       }
+3. Monitoring the size of the outbox manually to decide whether message should be added or not despite it growing too big:
+
+   .. code:: c
+
+      int outbox_size = esp_mqtt_client_get_outbox_size(client);
+       if (outbox_size > OUTBOX_MAX_ALLOWED SIZE) {
+           if (message_is_important) {
+               esp_mqtt_client_publish(client, topic, data, len, qos, retain);
+           } else {
+               // drop the message, or stop producing new data for some while
+           }
+       } else {
+           // outbox have not became big enough, we can publish normally
+           esp_mqtt_client_publish(client, topic, data, len, qos, retain);
+       }
+
+   .. note::
+
+      This method has an advantage of being more customizable, for example you can publish a notification that the device will stop transmitting for logging purposes, only allow transmissions of most important messages, start collecting data slower, or try sending bigger messages with longer intervals between them.
 
 Events
 ------
