@@ -98,6 +98,16 @@ test/apps/publish_connect_test:
           temporary: false
           reason: Only esp32 target has ethernet runners for integration tests
 
+# MQTT conformance integration test
+test/apps/mqtt_conformance:
+    enable:
+        - if: IDF_TARGET in ["esp32"]
+          reason: Integration test for conformance scenarios
+    disable_test:
+        - if: IDF_TARGET != "esp32"
+          temporary: false
+          reason: Only esp32 target has ethernet runners for integration tests
+
 # Host tests (unit tests with mocks)
 test/host:
     enable:

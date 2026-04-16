@@ -82,6 +82,7 @@ test/host/managed_components/
 # idf-ci generated files
 app_info_*.txt
 size_info_*.txt
+test_child_pipeline.yml
 compile_commands.json
 *.log
 

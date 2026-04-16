@@ -4,5 +4,12 @@ Warning: Deprecated: Option '--flash_freq' is deprecated. Use '--flash-freq' ins
 Warning: Deprecated: Command 'sign_data' is deprecated. Use 'sign-data' instead.
 Warning: Deprecated: Command 'extract_public_key' is deprecated. Use 'extract-public-key' instead.
 CryptographyDeprecationWarning
+warning: unknown kconfig symbol 'EXAMPLE_USE_INTERNAL_ETHERNET' assigned to 'y'
 warning: unknown kconfig symbol 'EXAMPLE_ETH_PHY_IP101' assigned to 'y'
+warning: unknown kconfig symbol 'EXAMPLE_ETH_MDC_GPIO' assigned
+warning: unknown kconfig symbol 'EXAMPLE_ETH_MDIO_GPIO' assigned
+warning: unknown kconfig symbol 'EXAMPLE_ETH_PHY_RST_GPIO' assigned
+warning: unknown kconfig symbol 'EXAMPLE_ETH_PHY_ADDR' assigned
 WARNING: The following Kconfig variables were used in "if" clauses
+Kconfig variables were used in .* "if" clauses
+Missing kconfig option
