@@ -36,8 +36,7 @@ jobs:
       - name: Upload component to the component registry (dry run)
         uses: espressif/upload-components-ci-action@v2
         with:
-          components: |
-            .
+          components: "mqtt: ."
           namespace: "espressif"
           api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
           dry_run: true
