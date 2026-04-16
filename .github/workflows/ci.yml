@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  pre-commit:
+    name: Pre-commit checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: pre-commit/action@v3.0.1
+
+  build:
+    name: Build (${{ matrix.idf_version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        idf_version:
+          - release-v6.0
+          - latest
+    container: espressif/idf:${{ matrix.idf_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          path: mqtt
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ matrix.idf_version }}-esp32c6
+          max-size: 500M
+
+      - name: Build apps
+        shell: bash
+        working-directory: mqtt
+        env:
+          IDF_CCACHE_ENABLE: "1"
+        run: |
+          . ${IDF_PATH}/export.sh
+          pip install -U 'idf-ci>=1,<2'
+          idf-ci build run --only-non-test-related -t esp32c6
+
+  host-tests:
+    name: Host tests
+    runs-on: ubuntu-latest
+    container: espressif/idf:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          path: mqtt
+
+      - name: Build and run host tests
+        shell: bash
+        working-directory: mqtt
+        run: |
+          . ${IDF_PATH}/export.sh
+          pip install -U 'idf-ci>=1,<2'
+          idf-ci build run -t linux -p test/host
+          cd test/host
+          ./build_linux_coverage/host_mqtt_client_test.elf -r junit -o junit.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-test-results
+          path: mqtt/test/host/junit.xml
+          if-no-files-found: warn
