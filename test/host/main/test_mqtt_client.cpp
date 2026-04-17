@@ -11,9 +11,13 @@
 #include <type_traits>
 #include "esp_transport.h"
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers.hpp>
 
 #include "mqtt_client.h"
+#include "test_log_intercept.hpp"
+#include "test_log_matchers.hpp"
 extern "C" {
+#include "esp_log.h"
 #include "Mockesp_event.h"
 #include "Mockesp_transport.h"
 #include "Mockesp_transport_ssl.h"
@@ -105,7 +109,11 @@ SCENARIO("MQTT Client Operation")
                 }
             }
             SECTION("After Start Client Is Cleanly destroyed") {
+                esp_log_level_set("mqtt_client", ESP_LOG_DEBUG);
+                test::esp_log::Capture log;
                 REQUIRE(esp_mqtt_client_start(client.get()) == ESP_OK);
+                using namespace test::esp_log::matchers;
+                REQUIRE_THAT(log, HasMessageIn("mqtt_client", "Core selection"));
                 // Only need to start the client, destroy is called automatically at the end of
                 // scope
             }
