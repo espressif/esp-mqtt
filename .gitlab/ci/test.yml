@@ -1,5 +1,5 @@
 host_tests:
-    image: espressif/idf:latest
+    image: espressif/idf:release-v6.0
     stage: test
     tags: [build]
     timeout: 1h

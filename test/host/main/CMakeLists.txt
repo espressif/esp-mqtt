@@ -1,4 +1,4 @@
-idf_component_register(SRCS  "test_mqtt_client.cpp"
+idf_component_register(SRCS  "test_mqtt_client.cpp" "test_log_intercept.cpp" "test_log_matchers.cpp" "test_log_parser.cpp"
                        REQUIRES cmock mqtt esp_timer esp_hw_support http_parser log
                        WHOLE_ARCHIVE)
 
