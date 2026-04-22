@@ -13,3 +13,6 @@ warning: unknown kconfig symbol 'EXAMPLE_ETH_PHY_ADDR' assigned
 WARNING: The following Kconfig variables were used in "if" clauses
 Kconfig variables were used in .* "if" clauses
 Missing kconfig option
+Pydantic serializer warnings
+PydanticSerializationUnexpectedValue
+Defaulting to left to right union serialization
