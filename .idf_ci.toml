@@ -12,6 +12,53 @@ build_job_filepatterns = [
 test_job_filepatterns = ["**/test_logs", "**/XUNIT_RESULT_*.xml"]
 
 [gitlab.build_pipeline]
+# Forward the build job suffix to test jobs so each IDF version has unique names.
+yaml_jinja = """
+{{ settings.gitlab.build_pipeline.pre_yaml_jinja }}
+
+workflow:
+  name: "{{ settings.gitlab.build_pipeline.workflow_name }}"
+  rules:
+    - when: "always"
+
+{% if settings.gitlab.build_pipeline.job_template_jinja %}
+{{ job_template }}
+{%- endif %}
+
+{{ jobs }}
+
+{%- if test_related_apps_count > 0 %}
+generate_test_child_pipeline{{ settings.gitlab.build_pipeline.job_name_suffix }}:
+  extends: "{{ settings.gitlab.build_pipeline.job_template_name }}"
+  needs:
+    - "build_test_related_apps{{ settings.gitlab.build_pipeline.job_name_suffix }}"
+  artifacts:
+    paths:
+    {%- for path in settings.gitlab.artifacts.native.build_job_filepatterns %}
+      - "{{ path }}"
+    {%- endfor %}
+      - "{{ settings.gitlab.test_pipeline.yaml_filename }}"
+  script:
+    - idf-ci
+      --config 'gitlab.build_pipeline.job_name_suffix="{{ settings.gitlab.build_pipeline.job_name_suffix }}"'
+      --config 'gitlab.test_pipeline.job_name_suffix="{{ settings.gitlab.build_pipeline.job_name_suffix }}"'
+      --config 'gitlab.test_pipeline.job_image="{{ settings.gitlab.test_pipeline.job_image }}"'
+      gitlab test-child-pipeline
+
+test-child-pipeline{{ settings.gitlab.build_pipeline.job_name_suffix }}:
+  stage: ".post"
+  needs:
+    - "generate_test_child_pipeline{{ settings.gitlab.build_pipeline.job_name_suffix }}"
+  variables:
+    PARENT_PIPELINE_ID: "$CI_PIPELINE_ID"
+  trigger:
+    include:
+      - artifact: "{{ settings.gitlab.test_pipeline.yaml_filename }}"
+        job: "generate_test_child_pipeline{{ settings.gitlab.build_pipeline.job_name_suffix }}"
+    strategy: "depend"
+{%- endif %}
+"""
+
 job_template_jinja = """
 {{ settings.gitlab.build_pipeline.job_template_name }}:
   stage: "{{ settings.gitlab.build_pipeline.job_stage }}"
