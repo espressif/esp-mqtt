@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2025-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -14,6 +14,7 @@
 #include "mqtt_client_priv.h"
 #include "mqtt_msg.h"
 #include "mqtt_outbox.h"
+#include "mqtt_utils.h"
 
 _Static_assert(sizeof(uint64_t) == sizeof(outbox_tick_t), "mqtt-client tick type size different from outbox tick type");
 #ifdef ESP_EVENT_ANY_ID
@@ -39,7 +40,6 @@ static esp_err_t esp_mqtt_dispatch_event_with_msgid(esp_mqtt_client_handle_t cli
 static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms);
 static void esp_mqtt_abort_connection(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client);
-static char *create_string(const char *ptr, int len);
 static int mqtt_message_receive(esp_mqtt_client_handle_t client, int read_poll_timeout_ms);
 static void esp_mqtt_client_dispatch_transport_error(esp_mqtt_client_handle_t client);
 static esp_err_t send_disconnect_msg(esp_mqtt_client_handle_t client);
@@ -691,27 +691,27 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
         client->config->scheme = NULL;
 
         if (config->broker.address.transport == MQTT_TRANSPORT_OVER_TCP) {
-            client->config->scheme = create_string(MQTT_OVER_TCP_SCHEME, strlen(MQTT_OVER_TCP_SCHEME));
+            client->config->scheme = mqtt_create_string(MQTT_OVER_TCP_SCHEME, strlen(MQTT_OVER_TCP_SCHEME));
             ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
         }
 
 #if MQTT_ENABLE_WS
         else if (config->broker.address.transport == MQTT_TRANSPORT_OVER_WS) {
-            client->config->scheme = create_string(MQTT_OVER_WS_SCHEME, strlen(MQTT_OVER_WS_SCHEME));
+            client->config->scheme = mqtt_create_string(MQTT_OVER_WS_SCHEME, strlen(MQTT_OVER_WS_SCHEME));
             ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
         }
 
 #endif
 #if MQTT_ENABLE_SSL
         else if (config->broker.address.transport == MQTT_TRANSPORT_OVER_SSL) {
-            client->config->scheme = create_string(MQTT_OVER_SSL_SCHEME, strlen(MQTT_OVER_SSL_SCHEME));
+            client->config->scheme = mqtt_create_string(MQTT_OVER_SSL_SCHEME, strlen(MQTT_OVER_SSL_SCHEME));
             ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
         }
 
 #endif
 #if MQTT_ENABLE_WSS
         else if (config->broker.address.transport == MQTT_TRANSPORT_OVER_WSS) {
-            client->config->scheme = create_string(MQTT_OVER_WSS_SCHEME, strlen(MQTT_OVER_WSS_SCHEME));
+            client->config->scheme = mqtt_create_string(MQTT_OVER_WSS_SCHEME, strlen(MQTT_OVER_WSS_SCHEME));
             ESP_MEM_CHECK(TAG, client->config->scheme, goto _mqtt_set_config_failed);
         }
 
@@ -1064,20 +1064,6 @@ esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client)
     return ESP_OK;
 }
 
-static char *create_string(const char *ptr, int len)
-{
-    char *ret;
-
-    if (len <= 0) {
-        return NULL;
-    }
-
-    ret = calloc(1, len + 1);
-    ESP_MEM_CHECK(TAG, ret, return NULL);
-    memcpy(ret, ptr, len);
-    return ret;
-}
-
 esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *uri)
 {
     struct http_parser_url puri;
@@ -1085,7 +1071,7 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
     int parser_status = http_parser_parse_url(uri, strlen(uri), 0, &puri);
 
     if (parser_status != 0) {
-        ESP_LOGE(TAG, "Error parse uri = %s", uri);
+        ESP_LOGE(TAG, "Error parse uri (%d) = %s", parser_status, uri);
         return ESP_FAIL;
     }
 
@@ -1103,8 +1089,8 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
     free(client->config->scheme);
     free(client->config->host);
     free(client->config->path);
-    client->config->scheme = create_string(uri + puri.field_data[UF_SCHEMA].off, puri.field_data[UF_SCHEMA].len);
-    client->config->host = create_string(uri + puri.field_data[UF_HOST].off, puri.field_data[UF_HOST].len);
+    client->config->scheme = mqtt_create_string(uri + puri.field_data[UF_SCHEMA].off, puri.field_data[UF_SCHEMA].len);
+    client->config->host = mqtt_create_string(uri + puri.field_data[UF_HOST].off, puri.field_data[UF_HOST].len);
     client->config->path = NULL;
 #pragma GCC diagnostic pop
 
@@ -1137,7 +1123,7 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
         client->config->port = strtol((const char *)(uri + puri.field_data[UF_PORT].off), NULL, 10);
     }
 
-    char *user_info = create_string(uri + puri.field_data[UF_USERINFO].off, puri.field_data[UF_USERINFO].len);
+    char *user_info = mqtt_create_string(uri + puri.field_data[UF_USERINFO].off, puri.field_data[UF_USERINFO].len);
 
     if (user_info) {
         char *pass = strchr(user_info, ':');
@@ -1145,7 +1131,19 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
         if (pass) {
             pass[0] = 0; //terminal username
             pass ++;
+
+            // parse %-encoded symbols such as %40 = @ in the password
+            if (esp_mqtt_decode_percent_encoded_string(pass) < 0) {
+                ESP_LOGE(TAG, "Error parse uri (non-hexadecimal data after %%) = %s", uri);
+                return ESP_FAIL;
+            }
+
             client->mqtt_state.connection.information.password = strdup(pass);
+        }
+
+        if (esp_mqtt_decode_percent_encoded_string(user_info) < 0) {
+            ESP_LOGE(TAG, "Error parse uri (non-hexadecimal data after %%) = %s", uri);
+            return ESP_FAIL;
         }
 
         client->mqtt_state.connection.information.username = strdup(user_info);

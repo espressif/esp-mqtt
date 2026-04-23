@@ -4,7 +4,7 @@ idf_component_register(SRCS  "test_mqtt_client.cpp" "test_log_intercept.cpp" "te
 
 target_compile_options(${COMPONENT_LIB} PUBLIC -fsanitize=address -Wno-missing-field-initializers)
 target_link_options(${COMPONENT_LIB} PUBLIC -fsanitize=address)
-target_link_libraries(${COMPONENT_LIB} PUBLIC Catch2::Catch2WithMain)
+target_link_libraries(${COMPONENT_LIB} PUBLIC Catch2::Catch2WithMain rapidcheck rapidcheck_catch)
 
 idf_component_get_property(mqtt mqtt COMPONENT_LIB)
 target_compile_definitions(${mqtt} PRIVATE SOC_WIFI_SUPPORTED=1)
