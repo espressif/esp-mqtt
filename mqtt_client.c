@@ -1746,7 +1746,11 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
             int disconnect_rsp_code;
             esp_mqtt5_parse_disconnect(client, &disconnect_rsp_code);
             client->event.event_id = MQTT_EVENT_DISCONNECTED;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
             client->event.error_handle->disconnect_return_code = disconnect_rsp_code;
+            client->event.reason_code = disconnect_rsp_code;
+#pragma GCC diagnostic pop
             esp_mqtt_dispatch_event_with_msgid(client);
         }
 
@@ -2670,7 +2674,11 @@ static void esp_mqtt_client_dispatch_transport_error(esp_mqtt_client_handle_t cl
     client->event.error_handle->error_type = MQTT_ERROR_TYPE_TCP_TRANSPORT;
     client->event.error_handle->connect_return_code = 0;
 #ifdef MQTT_PROTOCOL_5
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     client->event.error_handle->disconnect_return_code = 0;
+    client->event.reason_code = 0;
+#pragma GCC diagnostic pop
 #endif
 #ifdef MQTT_SUPPORTED_FEATURE_TRANSPORT_ERR_REPORTING
     client->event.error_handle->esp_tls_last_esp_err = esp_tls_get_and_clear_last_error(esp_transport_get_error_handle(

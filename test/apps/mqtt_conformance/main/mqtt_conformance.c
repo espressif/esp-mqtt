@@ -33,7 +33,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_DISCONNECTED:
 #if CONFIG_MQTT_PROTOCOL_5
         if (event->error_handle) {
-            ESP_LOGW(TAG, "DISCONNECT_REASON=%d", event->error_handle->disconnect_return_code);
+            ESP_LOGW(TAG, "DISCONNECT_REASON=%d", event->reason_code);
         }
 
 #endif
