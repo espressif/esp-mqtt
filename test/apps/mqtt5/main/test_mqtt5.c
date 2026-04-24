@@ -145,6 +145,7 @@ TEST(mqtt5, broker_tests)
     RUN_MQTT5_BROKER_TEST(mqtt5_subscribe_publish);
     RUN_MQTT5_BROKER_TEST(mqtt5_lwt_clean_disconnect);
     RUN_MQTT5_BROKER_TEST(mqtt5_subscribe_payload);
+    RUN_MQTT5_BROKER_TEST(mqtt5_server_properties);
     connect_test_fixture_teardown();
 }
 #endif // SOC_EMAC_SUPPORTED
