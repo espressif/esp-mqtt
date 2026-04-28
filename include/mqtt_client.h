@@ -199,9 +199,7 @@ typedef struct esp_mqtt_error_codes {
     connect_return_code; /*!< connection refused error code reported from
                               *MQTT* broker on connection */
 #ifdef CONFIG_MQTT_PROTOCOL_5
-    esp_mqtt5_error_reason_code_t
-    disconnect_return_code; /*!< disconnection reason code reported from
-                              *MQTT* broker on disconnection */
+    esp_mqtt5_reason_code_t disconnect_return_code __attribute__((deprecated)); /*!<\deprecated disconnection reason code reported from *MQTT* broker on disconnection, deprecated - use reason_code in event instead */
 #endif
     /* tcp_transport extension */
     int esp_transport_sock_errno; /*!< errno from the underlying socket */
@@ -234,6 +232,7 @@ typedef struct esp_mqtt_event_t {
     esp_mqtt_protocol_ver_t
     protocol_ver;   /*!< MQTT protocol version used for connection, defaults to value from menuconfig*/
 #ifdef CONFIG_MQTT_PROTOCOL_5
+    esp_mqtt5_reason_code_t reason_code; /*!< *MQTT* 5 reason code */
     esp_mqtt5_event_property_t *property; /*!< MQTT 5 property associated with this event */
 #endif
 

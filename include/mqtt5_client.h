@@ -18,7 +18,17 @@ typedef struct esp_mqtt_client *esp_mqtt5_client_handle_t;
 /**
  *  MQTT5 protocol error reason code, more details refer to MQTT5 protocol document section 2.4
  */
-typedef enum mqtt5_error_reason_code_t {
+typedef enum mqtt5_reason_code_t {
+    MQTT5_SUCCESS                                             = 0x00,
+    MQTT5_NORMAL_DISCONNECT                                   = 0x00,
+    MQTT5_GRANTED_QOS0                                        = 0x00,
+    MQTT5_GRANTED_QOS1                                        = 0x01,
+    MQTT5_GRANTED_QOS2                                        = 0x02,
+    MQTT5_DISCONNECT_WITH_WILL                                = 0x04,
+    MQTT5_NO_MATCHING_SUBSCRIBERS                             = 0x10,
+    MQTT5_NO_SUBSCRIPTION_EXISTED                             = 0x11,
+    MQTT5_CONTINUE_AUTHENTICATION                             = 0x18,
+    MQTT5_REAUTHENTICATE                                      = 0x19,
     MQTT5_UNSPECIFIED_ERROR                                   = 0x80,
     MQTT5_MALFORMED_PACKET                                    = 0x81,
     MQTT5_PROTOCOL_ERROR                                      = 0x82,
@@ -59,7 +69,13 @@ typedef enum mqtt5_error_reason_code_t {
     MQTT5_MAXIMUM_CONNECT_TIME                                = 0xA0,
     MQTT5_SUBSCRIBE_IDENTIFIER_NOT_SUPPORT                    = 0xA1,
     MQTT5_WILDCARD_SUBSCRIBE_NOT_SUPPORT                      = 0xA2,
-} esp_mqtt5_error_reason_code_t;
+} esp_mqtt5_reason_code_t;
+
+/**
+ * \deprecated alias esp_mqtt5_error_reason_code_t for esp_mqtt5_reason_code_t exists for backwards compatibility reasons
+ * and will be removed in subsequent updates.
+ */
+typedef __attribute__((deprecated)) esp_mqtt5_reason_code_t esp_mqtt5_error_reason_code_t;
 
 /**
  *  MQTT5 user property handle

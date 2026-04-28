@@ -36,6 +36,7 @@ MACRO_EXPANSION        = YES
 EXPAND_ONLY_PREDEF     = YES
 PREDEFINED             = \
     $(ENV_DOXYGEN_DEFINES) \
+__attribute__(x)=
 
 ## Do not complain about not having dot
 ##
