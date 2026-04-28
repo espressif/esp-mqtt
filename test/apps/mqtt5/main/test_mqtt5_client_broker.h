@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2022-2023 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2022-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -48,3 +48,9 @@ bool mqtt5_lwt_clean_disconnect(void);
  * and verifies the qos in SUBACK message from the broker.
  */
 bool mqtt5_subscribe_payload(void);
+
+/**
+ * @brief The client connects and verifies that server response
+ * properties from CONNACK are available in the CONNECTED event.
+ */
+bool mqtt5_server_properties(void);

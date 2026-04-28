@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2022-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2022-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -111,6 +111,18 @@ esp_err_t esp_mqtt5_parse_connack(esp_mqtt5_client_handle_t client, int *connect
     if (*connect_rsp_code == MQTT_CONNECTION_ACCEPTED) {
         ESP_LOGD(TAG, "Connected");
         client->event.session_present = ack_flag & 0x01;
+        esp_mqtt5_connection_server_resp_property_t *src = &client->mqtt5_config->server_resp_property_info;
+        esp_mqtt5_server_resp_property_t *dst = &client->event.property->server;
+        dst->maximum_packet_size = src->maximum_packet_size;
+        dst->receive_maximum = src->receive_maximum;
+        dst->topic_alias_maximum = src->topic_alias_maximum;
+        dst->max_qos = src->max_qos;
+        dst->retain_available = src->retain_available;
+        dst->wildcard_subscribe_available = src->wildcard_subscribe_available;
+        dst->subscribe_identifiers_available = src->subscribe_identifiers_available;
+        dst->shared_subscribe_available = src->shared_subscribe_available;
+        dst->response_info = src->response_info;
+        dst->response_info_len = src->response_info ? strlen(src->response_info) : 0;
         return ESP_OK;
     }
 

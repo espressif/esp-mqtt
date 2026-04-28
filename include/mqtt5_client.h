@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2022-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2022-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -143,6 +143,25 @@ typedef struct {
 } esp_mqtt5_disconnect_property_config_t;
 
 /**
+ *  MQTT5 server response properties from CONNACK (section 3.2.2.3)
+ *
+ *  These properties indicate the server's capabilities and limits.
+ *  Available in MQTT_EVENT_CONNECTED via event->property->server.
+ */
+typedef struct {
+    uint32_t maximum_packet_size;            /*!< Maximum packet size the server will accept (0 = no limit imposed) */
+    uint16_t receive_maximum;                /*!< Maximum number of QoS 1/2 messages the server will process concurrently */
+    uint16_t topic_alias_maximum;            /*!< Maximum topic alias value the client may use (0 = topic aliases not supported) */
+    uint8_t max_qos;                         /*!< Maximum QoS level the server supports (0, 1, or 2) */
+    bool retain_available;                   /*!< true if the server supports retained messages */
+    bool wildcard_subscribe_available;       /*!< true if the server supports wildcard subscriptions */
+    bool subscribe_identifiers_available;    /*!< true if the server supports subscription identifiers */
+    bool shared_subscribe_available;         /*!< true if the server supports shared subscriptions */
+    const char *response_info;               /*!< Response information string for request/response (NULL if not provided) */
+    int response_info_len;                   /*!< Length of response_info */
+} esp_mqtt5_server_resp_property_t;
+
+/**
  *  MQTT5 protocol for event properties
  */
 typedef struct {
@@ -156,6 +175,7 @@ typedef struct {
     uint16_t subscribe_id;              /*!< Subscription identifier of the message */
     mqtt5_user_property_handle_t
     user_property;  /*!< The handle for user property, call function esp_mqtt5_client_delete_user_property to free the memory */
+    esp_mqtt5_server_resp_property_t server; /*!< Server response properties from CONNACK (valid only in MQTT_EVENT_CONNECTED) */
 } esp_mqtt5_event_property_t;
 
 /**

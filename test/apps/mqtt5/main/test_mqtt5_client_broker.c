@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2022-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2022-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -7,6 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "mqtt_client.h"
+#include "mqtt5_client.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 
@@ -283,5 +284,60 @@ bool mqtt5_subscribe_payload(void)
     esp_mqtt_client_destroy(client);
     vEventGroupDelete(s_event_group);
     free(topic);
+    return true;
+}
+
+static esp_mqtt5_server_resp_property_t s_server_props;
+static bool s_server_props_received = false;
+
+static void mqtt5_event_handler_server_props(void *handler_args, esp_event_base_t base,
+                                             int32_t event_id, void *event_data)
+{
+    esp_mqtt_event_handle_t event = event_data;
+
+    switch ((esp_mqtt_event_id_t)event_id) {
+    case MQTT_EVENT_CONNECTED:
+        s_server_props = event->property->server;
+        s_server_props_received = true;
+        xEventGroupSetBits(s_event_group, CONNECT_BIT);
+        break;
+
+    case MQTT_EVENT_DISCONNECTED:
+        xEventGroupSetBits(s_event_group, DISCONNECT_BIT);
+        break;
+
+    default:
+        break;
+    }
+}
+
+bool mqtt5_server_properties(void)
+{
+    s_server_props_received = false;
+    memset(&s_server_props, 0, sizeof(s_server_props));
+    const esp_mqtt_client_config_t mqtt5_cfg = {
+        .broker.address.uri = CONFIG_MQTT5_TEST_BROKER_URI,
+        .network.disable_auto_reconnect = true,
+        .session.protocol_ver = MQTT_PROTOCOL_V_5,
+    };
+    s_event_group = xEventGroupCreate();
+    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt5_cfg);
+    TEST_ASSERT_TRUE(NULL != client);
+    esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt5_event_handler_server_props, NULL);
+    TEST_ASSERT_TRUE(ESP_OK == esp_mqtt_client_start(client));
+    WAIT_FOR_EVENT(CONNECT_BIT);
+    TEST_ASSERT_TRUE(s_server_props_received);
+    ESP_LOGI("mqtt5-server-props", "topic_alias_maximum: %d", s_server_props.topic_alias_maximum);
+    ESP_LOGI("mqtt5-server-props", "receive_maximum: %d", s_server_props.receive_maximum);
+    ESP_LOGI("mqtt5-server-props", "maximum_packet_size: %lu", (unsigned long)s_server_props.maximum_packet_size);
+    ESP_LOGI("mqtt5-server-props", "max_qos: %d", s_server_props.max_qos);
+    ESP_LOGI("mqtt5-server-props", "retain_available: %d", s_server_props.retain_available);
+    ESP_LOGI("mqtt5-server-props", "wildcard_subscribe_available: %d", s_server_props.wildcard_subscribe_available);
+    ESP_LOGI("mqtt5-server-props", "subscribe_identifiers_available: %d", s_server_props.subscribe_identifiers_available);
+    ESP_LOGI("mqtt5-server-props", "shared_subscribe_available: %d", s_server_props.shared_subscribe_available);
+    TEST_ASSERT_TRUE(s_server_props.max_qos <= 2);
+    TEST_ASSERT_TRUE(s_server_props.receive_maximum > 0);
+    esp_mqtt_client_destroy(client);
+    vEventGroupDelete(s_event_group);
     return true;
 }
