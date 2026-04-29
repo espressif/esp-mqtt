@@ -446,7 +446,7 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client);
  *
  * @return ESP_OK on success
  *         ESP_ERR_INVALID_ARG on wrong initialization
- *         ESP_FAIL if client is in invalid state
+ *         ESP_FAIL if client is not waiting for reconnection
  */
 esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client);
 

@@ -226,6 +226,17 @@ While this behaviour is normal this may pose a problem if the outbox size become
 
       This method has an advantage of being more customizable, for example you can publish a notification that the device will stop transmitting for logging purposes, only allow transmissions of most important messages, start collecting data slower, or try sending bigger messages with longer intervals between them.
 
+Maintaining connection
+----------------------
+Behaviour of MQTT client on connection loss can be configured. 
+If `disable_auto_reconnect = true` then automatic reconnection is disabled and the client will disconnect when connection is interrupted or if an error occurs. If auto-reconnect is disabled you can not use `esp_mqtt_client_reconnect()` to reconnect, you will need to use `esp_mqtt_connect` to establish new connection.
+
+When the client is waiting for reconnect it will periodically send reconnect request every `reconnect_timeout_ms` milliseconds. You can also force this request without waiting for the period to pass by calling `esp_mqtt_client_reconnect()`. 
+
+This function is used only for forcing the reconnect request, if you have an active connection `esp_mqtt_client_reconnect` will fail with `ESP_FAIL`
+
+To disconnect from the broker use `esp_mqtt_client_disconnect`. It will perform a clean disconnect and if MQTT 5 is used and the client is configured to will send a disconnect message.
+
 Events
 ------
 The following events may be posted by the MQTT client:
