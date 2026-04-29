@@ -9,6 +9,7 @@
  */
 
 #include "test_log_matchers.hpp"
+#include <algorithm>
 #include <format>
 #include <span>
 #include <string_view>
@@ -16,6 +17,23 @@
 
 namespace test::esp_log::matchers
 {
+
+static const char *level_name(esp_log_level_t level)
+{
+    switch (level) {
+    case ESP_LOG_ERROR: return "ERROR";
+
+    case ESP_LOG_WARN:  return "WARN";
+
+    case ESP_LOG_INFO:  return "INFO";
+
+    case ESP_LOG_DEBUG: return "DEBUG";
+
+    case ESP_LOG_VERBOSE: return "VERBOSE";
+
+    default: return "?";
+    }
+}
 
 std::string ContainsMessage::describe() const
 {
@@ -26,6 +44,22 @@ std::string ContainsMessageWithTag::describe() const
 {
     return std::format(R"(contains message "{}" with tag "{}")",
     expected_message, expected_tag);
+}
+
+bool ContainsMessageAtLevel::match(const Capture &captured_log) const
+{
+    return std::any_of(captured_log.entries().begin(), captured_log.entries().end(),
+    [&](const Entry & e) {
+        return e.level == expected_level &&
+               e.tag == expected_tag &&
+               e.message.find(expected_message) != std::string::npos;
+    });
+}
+
+std::string ContainsMessageAtLevel::describe() const
+{
+    return std::format(R"(contains {} message "{}" with tag "{}")",
+    level_name(expected_level), expected_message, expected_tag);
 }
 
 bool LogsInOrder::match(const Capture &captured_log) const

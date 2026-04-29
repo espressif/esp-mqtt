@@ -57,6 +57,24 @@ private:
     std::string expected_message;
 };
 
+class ContainsMessageAtLevel : public Catch::Matchers::MatcherGenericBase
+{
+public:
+    ContainsMessageAtLevel(esp_log_level_t expected_level, std::string_view expected_tag,
+                           std::string_view expected_message)
+        : expected_level(expected_level), expected_tag(expected_tag),
+          expected_message(expected_message) {}
+
+    bool match(const Capture &captured_log) const;
+
+    std::string describe() const override;
+
+private:
+    esp_log_level_t expected_level;
+    std::string expected_tag;
+    std::string expected_message;
+};
+
 class LogsInOrder : public Catch::Matchers::MatcherGenericBase
 {
 public:
@@ -85,6 +103,18 @@ inline ContainsMessageWithTag HasMessageIn(std::string_view expected_tag,
                                            std::string_view expected_message)
 {
     return ContainsMessageWithTag{expected_tag, expected_message};
+}
+
+inline ContainsMessageAtLevel HasErrorIn(std::string_view expected_tag,
+                                         std::string_view expected_message)
+{
+    return ContainsMessageAtLevel{ESP_LOG_ERROR, expected_tag, expected_message};
+}
+
+inline ContainsMessageAtLevel HasWarnIn(std::string_view expected_tag,
+                                        std::string_view expected_message)
+{
+    return ContainsMessageAtLevel{ESP_LOG_WARN, expected_tag, expected_message};
 }
 
 inline LogsInOrder LogsInOrderAny(std::initializer_list<std::string_view> expected_messages)
