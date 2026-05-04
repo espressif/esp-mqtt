@@ -1,13 +1,15 @@
 /*
- * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2025-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Unlicense OR CC0-1.0
  */
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
+#include <exception>
 #include <iostream>
 #include <iomanip>
 #include <format>
+#include <string_view>
 #include "rapidcheck.h"
 #include "mqtt_utils.h"
 
@@ -75,6 +77,18 @@ std::string percent_encode(std::string input, std::string filter = "`~!@#$%^&*()
     return encoded_str;
 }
 
+static std::string build_uri_authority(std::string_view username, std::string_view password, std::string_view host)
+{
+    std::string uri;
+    uri.reserve(username.size() + password.size() + host.size() + 2);
+    uri += username;
+    uri += ":";
+    uri += password;
+    uri += "@";
+    uri += host;
+    return uri;
+}
+
 TEST_CASE("Parse percent-encoded data")
 {
     SECTION("Zero-length string as an input") {
@@ -120,8 +134,10 @@ TEST_CASE("Parse percent-encoded data")
             RC_PRE(uri.host.value.length() > 0);
             RC_PRE(uri.username.value.length() > 0);
             RC_PRE(uri.password.value.length() > 0);
-            std::string complete_uri_raw = uri.username.value + ":" + uri.password.value + "@" + uri.host.value;
-            std::string complete_uri_enc = percent_encode(uri.username.value) + ":" + percent_encode(uri.password.value) + "@" + percent_encode(uri.host.value);
+            const std::string complete_uri_raw = build_uri_authority(uri.username.value, uri.password.value, uri.host.value);
+            const std::string complete_uri_enc = build_uri_authority(percent_encode(uri.username.value),
+                                                                     percent_encode(uri.password.value),
+                                                                     percent_encode(uri.host.value));
             // Verify that there are no prohibited characters in the encoded username
             RC_PRE([complete_uri_enc]() -> bool {
                 // I have removed /, :, and @ as they are permitted symbols in URI

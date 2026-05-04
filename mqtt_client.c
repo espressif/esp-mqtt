@@ -1075,83 +1075,128 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client, const char *u
         return ESP_FAIL;
     }
 
-    // This API could be also executed when client is active (need to protect config fields)
-    MQTT_API_LOCK(client);
-    // set uri overrides actual scheme, host, path if configured previously
-// False-positive leak detection. TODO: GCC-366
-#pragma GCC diagnostic push  // TODO: IDF-10105
-#if __clang__
-#pragma clang diagnostic ignored "-Wunknown-warning-option"
-#else
-#pragma GCC diagnostic ignored "-Wpragmas"
-#endif
-#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
-    free(client->config->scheme);
-    free(client->config->host);
-    free(client->config->path);
-    client->config->scheme = mqtt_create_string(uri + puri.field_data[UF_SCHEMA].off, puri.field_data[UF_SCHEMA].len);
-    client->config->host = mqtt_create_string(uri + puri.field_data[UF_HOST].off, puri.field_data[UF_HOST].len);
-    client->config->path = NULL;
-#pragma GCC diagnostic pop
+    char *new_scheme = mqtt_create_string(uri + puri.field_data[UF_SCHEMA].off, puri.field_data[UF_SCHEMA].len);
+    char *new_host = mqtt_create_string(uri + puri.field_data[UF_HOST].off, puri.field_data[UF_HOST].len);
+    char *new_path = NULL;
+    char *new_password = NULL;
+    char *new_username = NULL;
+    char *user_info = NULL;
+
+    if (!new_scheme || !new_host) {
+        ESP_LOGE(TAG, "%s(%d): %s", __FUNCTION__, __LINE__, "Memory exhausted");
+        free(new_scheme);
+        free(new_host);
+        return ESP_ERR_NO_MEM;
+    }
+
+    esp_err_t ret = ESP_OK;
 
     if (puri.field_data[UF_PATH].len || puri.field_data[UF_QUERY].len) {
         int asprintf_ret_value;
 
         if (puri.field_data[UF_QUERY].len == 0) {
-            asprintf_ret_value = asprintf(&client->config->path,
+            asprintf_ret_value = asprintf(&new_path,
                                           "%.*s",
                                           puri.field_data[UF_PATH].len, uri + puri.field_data[UF_PATH].off);
         } else if (puri.field_data[UF_PATH].len == 0)  {
-            asprintf_ret_value = asprintf(&client->config->path,
+            asprintf_ret_value = asprintf(&new_path,
                                           "/?%.*s",
                                           puri.field_data[UF_QUERY].len, uri + puri.field_data[UF_QUERY].off);
         } else {
-            asprintf_ret_value = asprintf(&client->config->path,
+            asprintf_ret_value = asprintf(&new_path,
                                           "%.*s?%.*s",
                                           puri.field_data[UF_PATH].len, uri + puri.field_data[UF_PATH].off,
                                           puri.field_data[UF_QUERY].len, uri + puri.field_data[UF_QUERY].off);
         }
 
         if (asprintf_ret_value == -1) {
-            ESP_LOGE(TAG, "%s(%d): %s",  __FUNCTION__, __LINE__, "Memory exhausted");
-            MQTT_API_UNLOCK(client);
-            return ESP_ERR_NO_MEM;
+            ESP_LOGE(TAG, "%s(%d): %s", __FUNCTION__, __LINE__, "Memory exhausted");
+            ret = ESP_ERR_NO_MEM;
+            goto cleanup;
         }
     }
 
-    if (puri.field_data[UF_PORT].len) {
-        client->config->port = strtol((const char *)(uri + puri.field_data[UF_PORT].off), NULL, 10);
-    }
-
-    char *user_info = mqtt_create_string(uri + puri.field_data[UF_USERINFO].off, puri.field_data[UF_USERINFO].len);
+    user_info = mqtt_create_string(uri + puri.field_data[UF_USERINFO].off, puri.field_data[UF_USERINFO].len);
 
     if (user_info) {
         char *pass = strchr(user_info, ':');
 
         if (pass) {
-            pass[0] = 0; //terminal username
-            pass ++;
+            pass[0] = 0;
+            pass++;
 
-            // parse %-encoded symbols such as %40 = @ in the password
             if (esp_mqtt_decode_percent_encoded_string(pass) < 0) {
                 ESP_LOGE(TAG, "Error parse uri (non-hexadecimal data after %%) = %s", uri);
-                return ESP_FAIL;
+                ret = ESP_FAIL;
+                goto cleanup;
             }
 
-            client->mqtt_state.connection.information.password = strdup(pass);
+            new_password = strdup(pass);
         }
 
         if (esp_mqtt_decode_percent_encoded_string(user_info) < 0) {
             ESP_LOGE(TAG, "Error parse uri (non-hexadecimal data after %%) = %s", uri);
-            return ESP_FAIL;
+            ret = ESP_FAIL;
+            goto cleanup;
         }
 
-        client->mqtt_state.connection.information.username = strdup(user_info);
-        free(user_info);
+        new_username = strdup(user_info);
     }
 
+    MQTT_API_LOCK(client);
+
+    // uri may alias client->config->uri (internal call from esp_mqtt_set_config).
+    // In that case skip the redundant strdup; otherwise copy before freeing.
+    if (uri != client->config->uri) {
+        char *new_uri = strdup(uri);
+
+        if (!new_uri) {
+            ESP_LOGE(TAG, "%s(%d): %s", __FUNCTION__, __LINE__, "Memory exhausted");
+            ret = ESP_ERR_NO_MEM;
+            MQTT_API_UNLOCK(client);
+            goto cleanup;
+        }
+
+        free(client->config->uri);
+        client->config->uri = new_uri;
+    }
+
+    free(client->config->scheme);
+    client->config->scheme = new_scheme;
+    new_scheme = NULL;
+    free(client->config->host);
+    client->config->host = new_host;
+    new_host = NULL;
+    free(client->config->path);
+    client->config->path = new_path;
+    new_path = NULL;
+
+    if (puri.field_data[UF_PORT].len) {
+        client->config->port = strtol((const char *)(uri + puri.field_data[UF_PORT].off), NULL, 10);
+    }
+
+    if (new_username) {
+        free(client->mqtt_state.connection.information.username);
+        client->mqtt_state.connection.information.username = new_username;
+        new_username = NULL;
+    }
+
+    if (new_password) {
+        free(client->mqtt_state.connection.information.password);
+        client->mqtt_state.connection.information.password = new_password;
+        new_password = NULL;
+    }
+
+    ESP_LOGD(TAG, "config_uri=%s", client->config->uri);
     MQTT_API_UNLOCK(client);
-    return ESP_OK;
+cleanup:
+    free(new_scheme);
+    free(new_host);
+    free(new_path);
+    free(new_username);
+    free(new_password);
+    free(user_info);
+    return ret;
 }
 
 static esp_err_t esp_mqtt_dispatch_event_with_msgid(esp_mqtt_client_handle_t client)
