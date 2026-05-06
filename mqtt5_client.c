@@ -10,6 +10,9 @@
 
 static const char *TAG = "mqtt5_client";
 
+// Receive Maximum is optional in CONNACK; when absent the limit is 65535
+#define MQTT5_DEFAULT_RECEIVE_MAXIMUM 65535
+
 static void esp_mqtt5_print_error_code(esp_mqtt5_client_handle_t client, int code);
 static esp_err_t esp_mqtt5_client_update_topic_alias(mqtt5_topic_alias_handle_t topic_alias_handle,
                                                      uint16_t topic_alias, char *topic, size_t topic_len);
@@ -21,12 +24,8 @@ static esp_err_t esp_mqtt5_user_property_copy(mqtt5_user_property_handle_t user_
 
 void esp_mqtt5_increment_packet_counter(esp_mqtt5_client_handle_t client)
 {
-    bool msg_dup = mqtt5_get_dup(client->mqtt_state.connection.outbound_message.data);
-
-    if (msg_dup == false) {
-        client->send_publish_packet_count ++;
-        ESP_LOGD(TAG, "Sent (%d) qos > 0 publish packet without ack", client->send_publish_packet_count);
-    }
+    client->send_publish_packet_count ++;
+    ESP_LOGD(TAG, "Sent (%d) qos > 0 publish packet without ack", client->send_publish_packet_count);
 }
 
 void esp_mqtt5_decrement_packet_counter(esp_mqtt5_client_handle_t client)
@@ -104,6 +103,7 @@ esp_err_t esp_mqtt5_parse_connack(esp_mqtt5_client_handle_t client, int *connect
     size_t len = client->mqtt_state.in_buffer_read_len;
     client->mqtt_state.in_buffer_read_len = 0;
     uint8_t ack_flag = 0;
+    client->mqtt5_config->server_resp_property_info.receive_maximum = MQTT5_DEFAULT_RECEIVE_MAXIMUM;
 
     if (mqtt5_msg_parse_connack_property(client->mqtt_state.in_buffer, len, &client->mqtt_state.
                                          connection.information, &client->mqtt5_config->connect_property_info, &client->mqtt5_config->server_resp_property_info,
@@ -195,7 +195,7 @@ esp_err_t esp_mqtt5_create_default_config(esp_mqtt5_client_handle_t client)
         client->mqtt5_config->server_resp_property_info.wildcard_subscribe_available = true;
         client->mqtt5_config->server_resp_property_info.subscribe_identifiers_available = true;
         client->mqtt5_config->server_resp_property_info.shared_subscribe_available = true;
-        client->mqtt5_config->server_resp_property_info.receive_maximum = 65535;
+        client->mqtt5_config->server_resp_property_info.receive_maximum = MQTT5_DEFAULT_RECEIVE_MAXIMUM;
     }
 
     return ESP_OK;
@@ -375,9 +375,13 @@ esp_err_t esp_mqtt5_client_publish_check(esp_mqtt5_client_handle_t client, int q
         return ESP_FAIL;
     }
 
-    /* Flow control to check PUBLISH(No PUBACK or PUBCOMP received) packet sent count(Only record QoS1 and QoS2)*/
-    if (client->send_publish_packet_count > client->mqtt5_config->server_resp_property_info.receive_maximum) {
-        ESP_LOGE(TAG, "Client send more than %d QoS1 and QoS2 PUBLISH packet without no ack",
+    return ESP_OK;
+}
+
+esp_err_t esp_mqtt5_client_check_inflight_maximum(esp_mqtt5_client_handle_t client)
+{
+    if (client->send_publish_packet_count >= client->mqtt5_config->server_resp_property_info.receive_maximum) {
+        ESP_LOGD(TAG, "Broker quota for QoS > 0 exceeded. Quota is %d messages",
                  client->mqtt5_config->server_resp_property_info.receive_maximum);
         return ESP_FAIL;
     }

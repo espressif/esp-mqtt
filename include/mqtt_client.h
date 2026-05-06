@@ -568,8 +568,12 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client,
  * (10s) or if publishing payloads longer than internal buffer (due to message
  *   fragmentation)
  * - Client doesn't have to be connected for this API to work, enqueueing the
- * messages with qos>1 (returning -1 for all the qos=0 messages if
- * disconnected). If MQTT_SKIP_PUBLISH_IF_DISCONNECTED is enabled, this API will
+ * messages with qos>0 (returning -1 for all the qos=0 messages if
+ * disconnected).
+ * - In case of MQTT v5, if the server quota for inflight messages is exceeded,
+ *   message will be enqueued and sent later when quota is available.
+ * - QoS 0 messages are sent immediately in the calling task, not via the outbox.
+ * - If MQTT_SKIP_PUBLISH_IF_DISCONNECTED is enabled, this API will
  * not attempt to publish when the client is not connected and will always
  * return -1.
  * - It is thread safe, please refer to `esp_mqtt_client_subscribe` for details
@@ -597,6 +601,8 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic,
  * (in contrast to the esp_mqtt_client_publish() which sends the publish message
  * immediately in the user task's context). Thus, it could be used as a non
  * blocking version of esp_mqtt_client_publish().
+ * - When MQTT v5 inflight quota is exceeded, queued QoS 1/2 messages are held
+ *   in the outbox. QoS 0 messages enqueued with store=true are not affected.
  *
  * @param client    *MQTT* client handle
  * @param topic     topic string
