@@ -36,3 +36,24 @@ if(CONFIG_ESP_GCOV_ENABLE AND COMMAND idf_create_coverage_report)
             "--xml=${CMAKE_CURRENT_BINARY_DIR}/coverage_report/coverage.xml")
     idf_clean_coverage_report(${CMAKE_CURRENT_BINARY_DIR}/coverage_report)
 endif()
+
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    idf_component_get_property(mqtt_lib mqtt COMPONENT_LIB)
+    target_compile_options(${mqtt_lib} PRIVATE
+        -fanalyzer
+        -fanalyzer-call-summaries
+        -fanalyzer-verbosity=1
+        -Wshadow
+        -Wformat=2
+        -Wnull-dereference
+        -Wimplicit-fallthrough
+        -Wcast-align=strict
+        -Wcast-qual
+        -Wstrict-prototypes
+        -Wmissing-prototypes
+        -Wswitch-enum
+        -Warray-bounds=2
+        -Wduplicated-cond
+        -Wlogical-op
+    )
+endif()

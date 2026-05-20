@@ -39,11 +39,16 @@ enum mqtt5_connect_flag {
     MQTT5_CONNECT_FLAG_CLEAN_SESSION = 1 << 1
 };
 
-static void generate_variable_len(size_t len, uint8_t *len_bytes, uint8_t *encoded_lens)
+static bool generate_variable_len(size_t len, uint8_t *len_bytes, uint8_t *encoded_lens)
 {
     uint8_t bytes = 0;
 
     do {
+        if (bytes >= 4) {
+            *len_bytes = 0;
+            return false;
+        }
+
         uint8_t i = len % 128;
         len /= 128;
 
@@ -55,6 +60,7 @@ static void generate_variable_len(size_t len, uint8_t *len_bytes, uint8_t *encod
     } while (len > 0);
 
     *len_bytes = bytes;
+    return true;
 }
 
 static size_t get_variable_len(uint8_t *buffer, size_t offset, size_t buffer_length, uint8_t *len_bytes)
@@ -92,7 +98,11 @@ static int update_property_len_value(mqtt_connection_t *connection, size_t prope
 {
     uint8_t encoded_lens[4] = {0}, len_bytes = 0;
     size_t len = property_len, message_offset = property_offset + property_len;
-    generate_variable_len(len, &len_bytes, encoded_lens);
+
+    if (!generate_variable_len(len, &len_bytes, encoded_lens)) {
+        return -1;
+    }
+
     int offset = len_bytes - 1;
     connection->outbound_message.length += offset;
 
@@ -130,7 +140,11 @@ static int append_property(mqtt_connection_t *connection, uint8_t property_type,
 
     if (len_occupy == 0) {
         uint8_t encoded_lens[4] = {0}, len_bytes = 0;
-        generate_variable_len(data_len, &len_bytes, encoded_lens);
+
+        if (!generate_variable_len(data_len, &len_bytes, encoded_lens)) {
+            connection->outbound_message.length = origin_message_len;
+            return -1;
+        }
 
         for (int j = 0; j < len_bytes; j ++) {
             connection->buffer[connection->outbound_message.length ++] = encoded_lens[j];
@@ -194,7 +208,9 @@ static mqtt_message_t *fini_message(mqtt_connection_t *connection, int type, int
     }
 
     // Encode MQTT message length
-    generate_variable_len(total_length, &len_bytes, encoded_lens);
+    if (total_length < 0 || !generate_variable_len((size_t)total_length, &len_bytes, encoded_lens)) {
+        return fail_message(connection);
+    }
 
     // Sanity check for MQTT header
     if (len_bytes + 1 > MQTT5_MAX_FIXED_HEADER_SIZE) {
@@ -305,8 +321,13 @@ static mqtt5_user_property_handle_t mqtt5_msg_get_user_property(uint8_t *buffer,
             value_len = len;
             ESP_LOGD(TAG, "MQTT5_PROPERTY_USER_PROPERTY value: %.*s", value_len, (char *)value);
             property_offset += len;
+            /* False positive: user_porperty is released at err or returned to the caller.
+             * The analyzer cannot track its cleanup across the translation-unit boundary. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
 
             if (mqtt5_msg_set_user_property(&user_porperty, (char *)key, key_len, (char *)value, value_len) != ESP_OK) {
+#pragma GCC diagnostic pop
                 ESP_LOGE(TAG, "mqtt5_msg_set_user_property fail");
                 goto err;
             }
@@ -589,33 +610,49 @@ char *mqtt5_get_suback_data(uint8_t *buffer, size_t *length, mqtt5_user_property
     offset += len_bytes;
     totlen += offset;
 
+    if (*user_property) {
+        ESP_LOGE(TAG, "user_property not freed before mqtt5_get_suback_data");
+        esp_mqtt5_client_delete_user_property(*user_property);
+        *user_property = NULL;
+    }
+
     if (totlen > *length) {
-        goto err;
+        *length = 0;
+        return NULL;
     }
 
     offset += 2; // skip the message id
 
-    if (offset < totlen) {
-        size_t property_len = get_variable_len(buffer, offset, totlen, &len_bytes);
-        offset += len_bytes;
-
-        if (property_len > (totlen - offset)) {
-            goto err;
-        }
-
-        *user_property = mqtt5_msg_get_user_property(buffer + offset, property_len);
-        offset += property_len;
-
-        if (offset < totlen) {
-            *length =  totlen - offset;
-            return (char *)(buffer + offset);
-        }
+    if (offset >= totlen) {
+        *length = 0;
+        return NULL;
     }
 
-err:
-    *user_property = NULL;
-    *length = 0;
-    return NULL;
+    size_t property_len = get_variable_len(buffer, offset, totlen, &len_bytes);
+    offset += len_bytes;
+
+    if (property_len > (totlen - offset)) {
+        *length = 0;
+        return NULL;
+    }
+
+    /* False positive: the previous *user_property value is freed above if non-NULL.
+     * The analyzer cannot track the deallocation across the TU boundary. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
+    *user_property = mqtt5_msg_get_user_property(buffer + offset, property_len);
+#pragma GCC diagnostic pop
+    offset += property_len;
+
+    if (offset >= totlen) {
+        esp_mqtt5_client_delete_user_property(*user_property);
+        *user_property = NULL;
+        *length = 0;
+        return NULL;
+    }
+
+    *length = totlen - offset;
+    return (char *)(buffer + offset);
 }
 
 char *mqtt5_get_puback_data(uint8_t *buffer, size_t *length, mqtt5_user_property_handle_t *user_property)
@@ -627,28 +664,39 @@ char *mqtt5_get_puback_data(uint8_t *buffer, size_t *length, mqtt5_user_property
     totlen += offset;
     offset += 2; // skip the message id
 
-    if (offset < totlen) {
-        *length = 1;
-        char *data = (char *)(buffer + offset);
-        offset ++;
+    if (*user_property) {
+        ESP_LOGE(TAG, "user_property not freed before mqtt5_get_puback_data");
+        esp_mqtt5_client_delete_user_property(*user_property);
+        *user_property = NULL;
+    }
 
-        if (offset < totlen) {
-            size_t property_len = get_variable_len(buffer, offset, totlen, &len_bytes);
-            offset += len_bytes;
-
-            if (property_len > (totlen - offset)) {
-                *length = 0;
-                return NULL;
-            }
-
-            *user_property = mqtt5_msg_get_user_property(buffer + offset, property_len);
-        }
-
-        return data;
-    } else {
+    if (offset >= totlen) {
         *length = 0;
         return NULL;
     }
+
+    *length = 1;
+    char *data = (char *)(buffer + offset);
+    offset++;
+
+    if (offset < totlen) {
+        size_t property_len = get_variable_len(buffer, offset, totlen, &len_bytes);
+        offset += len_bytes;
+
+        if (property_len > (totlen - offset)) {
+            *length = 0;
+            return NULL;
+        }
+
+        /* False positive: the previous *user_property value is freed above if non-NULL.
+         * The analyzer cannot track the deallocation across the TU boundary. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
+        *user_property = mqtt5_msg_get_user_property(buffer + offset, property_len);
+#pragma GCC diagnostic pop
+    }
+
+    return data;
 }
 
 mqtt_message_t *mqtt5_msg_connect(mqtt_connection_t *connection, mqtt_connect_info_t *info,

@@ -98,7 +98,7 @@ enum esp_mqtt_ssl_cert_key_api {
 static esp_err_t esp_mqtt_set_cert_key_data(esp_transport_handle_t ssl, enum esp_mqtt_ssl_cert_key_api what,
                                             const char *cert_key_data, int cert_key_len)
 {
-    char *data = (char *)cert_key_data;
+    const char *data = cert_key_data;
     int ssl_transport_api_id = what;
     int len = cert_key_len;
 
@@ -213,7 +213,10 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
     if (cfg->alpn_protos) {
 #if defined(MQTT_SUPPORTED_FEATURE_ALPN) && MQTT_ENABLE_SSL
 #if defined(CONFIG_MBEDTLS_SSL_ALPN) || defined(CONFIG_WOLFSSL_HAVE_ALPN)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
         esp_transport_ssl_set_alpn_protocol(ssl, (const char **)cfg->alpn_protos);
+#pragma GCC diagnostic pop
 #else
         ESP_LOGE(TAG,
                  "APLN configured but not enabled in menuconfig: Please enable MBEDTLS_SSL_ALPN or WOLFSSL_HAVE_ALPN option");
@@ -351,11 +354,18 @@ bool esp_mqtt_set_if_config(char const *const new_config, char **old_config)
 {
     if (new_config) {
         free(*old_config);
+        /* False positive: on the success path the pointer is owned by the caller's struct
+         * (e.g. client->config->uri). On the failure path esp_mqtt_destroy_config frees it,
+         * but the analyzer cannot follow that cross-TU cleanup chain. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
         *old_config = strdup(new_config);
 
         if (*old_config == NULL) {
             return false;
         }
+
+#pragma GCC diagnostic pop
     }
 
     return true;
@@ -1449,7 +1459,7 @@ static bool remove_initiator_message(esp_mqtt_client_handle_t client, int msg_ty
     return false;
 }
 
-static outbox_item_handle_t mqtt_enqueue(esp_mqtt_client_handle_t client, uint8_t *remaining_data, int remaining_len)
+static outbox_item_handle_t mqtt_enqueue(esp_mqtt_client_handle_t client, const uint8_t *remaining_data, int remaining_len)
 {
     ESP_LOGD(TAG, "mqtt_enqueue id: %d, type=%d successful",
              client->mqtt_state.pending_msg_id, client->mqtt_state.pending_msg_type);
@@ -1833,8 +1843,8 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
             client->event.error_handle->disconnect_return_code = disconnect_rsp_code;
-            client->event.reason_code = disconnect_rsp_code;
 #pragma GCC diagnostic pop
+            client->event.reason_code = disconnect_rsp_code;
             esp_mqtt_dispatch_event_with_msgid(client);
         }
 
@@ -2561,7 +2571,7 @@ static inline int mqtt_client_enqueue_publish(esp_mqtt_client_handle_t client, c
             int first_fragment = client->mqtt_state.connection.outbound_message.length -
                                  client->mqtt_state.connection.outbound_message.fragmented_msg_data_offset;
 
-            if (!mqtt_enqueue(client, ((uint8_t *)data) + first_fragment, len - first_fragment)) {
+            if (!mqtt_enqueue(client, (const uint8_t *)data + first_fragment, len - first_fragment)) {
                 return -1;
             }
 
@@ -2798,8 +2808,8 @@ static void esp_mqtt_client_dispatch_transport_error(esp_mqtt_client_handle_t cl
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     client->event.error_handle->disconnect_return_code = 0;
-    client->event.reason_code = 0;
 #pragma GCC diagnostic pop
+    client->event.reason_code = 0;
 #endif
 #ifdef MQTT_SUPPORTED_FEATURE_TRANSPORT_ERR_REPORTING
     client->event.error_handle->esp_tls_last_esp_err = esp_tls_get_and_clear_last_error(esp_transport_get_error_handle(
