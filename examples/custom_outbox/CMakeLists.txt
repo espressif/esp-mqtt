@@ -17,4 +17,4 @@ target_sources(${mqtt} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/main/custom_outbox.cp
 # First we get our dependency
 idf_component_get_property(pthread pthread COMPONENT_LIB)
 # And them we link the components
-target_link_libraries(${mqtt} ${pthread})
+target_link_libraries(${mqtt} PRIVATE ${pthread})
