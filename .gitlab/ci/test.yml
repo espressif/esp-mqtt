@@ -34,5 +34,7 @@ host_tests:
         ./build_linux_coverage/host_mqtt_client_test.elf -r junit -o junit.xml
         cd ../mqtt_utils_host_test
         ./build_linux_default/mqtt_utils_host_test.elf
+        cd ../mqtt_outbox_host_test
+        ./build_linux_coverage/mqtt_outbox_host_test.elf
         cd ../..
         gcovr --gcov-ignore-parse-errors -g -k -r . --html coverage.html -x coverage.xml
