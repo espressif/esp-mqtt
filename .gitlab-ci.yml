@@ -30,6 +30,8 @@ before_script:
     tags:
         - build
         - internet
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     variables:
         IDF_CCACHE_ENABLE: "1"
     artifacts:
@@ -56,9 +58,25 @@ build_idf_v5.5:
 build_and_host_test:
     stage: build
     image: espressif/idf:release-v5.5
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     script:
         # Replace the IDF's default esp-mqtt with this version
         - rm -rf $IDF_PATH/components/mqtt/esp-mqtt && cp -r $MQTT_PATH $IDF_PATH/components/mqtt/
         - cd $IDF_PATH/components/mqtt/esp-mqtt/host_test
         - idf.py build
         - build/host_mqtt_client_test.elf
+
+push_to_github:
+    stage: deploy
+    image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
+    tags:
+        - build
+    rules:
+        - if: $CI_COMMIT_REF_NAME == "release/v5.5"
+    when: on_success
+    variables:
+        GIT_STRATEGY: clone
+    script:
+        - *add_gh_key_remote
+        - git push github HEAD:${CI_COMMIT_REF_NAME}
