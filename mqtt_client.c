@@ -71,6 +71,16 @@ static int esp_mqtt_handle_transport_read_error(int err, esp_mqtt_client_handle_
     return -2;
 }
 
+// Reset per-message pending state before composing a new outbound control packet
+static inline void mqtt_reset_pending_message(esp_mqtt_client_handle_t client)
+{
+    client->mqtt_state.pending_msg_id = 0;
+    client->mqtt_state.pending_msg_type = 0;
+    client->mqtt_state.pending_publish_qos = 0;
+    client->mqtt_state.connection.outbound_message.fragmented_msg_total_length = 0;
+    client->mqtt_state.connection.outbound_message.fragmented_msg_data_offset = 0;
+}
+
 #if MQTT_ENABLE_SSL
 enum esp_mqtt_ssl_cert_key_api {
     MQTT_SSL_DATA_API_CA_CERT,
@@ -741,6 +751,8 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
 {
     int read_len, connect_rsp_code = 0;
     client->wait_for_ping_resp = false;
+    mqtt_reset_pending_message(client);
+
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
         mqtt5_msg_connect(&client->mqtt_state.connection,
@@ -1744,7 +1756,8 @@ static void esp_mqtt_task(void *pv)
                             ESP_LOGE(TAG, "Failed to remove queued qos0 message from the outbox");
                         }
                     }
-                    if (client->mqtt_state.pending_publish_qos > 0) {
+                    if (client->mqtt_state.pending_publish_qos > 0 &&
+                            mqtt_get_type(client->mqtt_state.connection.outbound_message.data) == MQTT_MSG_TYPE_PUBLISH) {
                         outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED);
 #ifdef MQTT_PROTOCOL_5
                         if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
@@ -1760,7 +1773,9 @@ static void esp_mqtt_task(void *pv)
                 if (item && (last_retransmit - msg_tick > client->config->message_retransmit_timeout))  {
                     if (mqtt_resend_queued(client, item) == ESP_OK) {
 #ifdef MQTT_PROTOCOL_5
-                        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
+                        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5 &&
+                                client->mqtt_state.pending_publish_qos > 0 &&
+                                mqtt_get_type(client->mqtt_state.connection.outbound_message.data) == MQTT_MSG_TYPE_PUBLISH) {
                             esp_mqtt5_increment_packet_counter(client);
                         }
 #endif
@@ -1770,7 +1785,13 @@ static void esp_mqtt_task(void *pv)
                 if (item && (last_retransmit - msg_tick > client->config->message_retransmit_timeout))  {
                     if (mqtt_resend_pubrel(client, item) == ESP_OK) {
 #ifdef MQTT_PROTOCOL_5
-                        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
+
+                        // Do not count PUBREL as a new inflight PUBLISH
+                        // Only PUBLISH QoS>0 contributes to inflight limitation
+                        // (outbound_message here is PUBREL, so this condition will be false)
+                        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5 &&
+                                client->mqtt_state.pending_publish_qos > 0 &&
+                                mqtt_get_type(client->mqtt_state.connection.outbound_message.data) == MQTT_MSG_TYPE_PUBLISH) {
                             esp_mqtt5_increment_packet_counter(client);
                         }
 #endif
@@ -1931,10 +1952,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 
         // Only send the disconnect message if the client is connected
         if (client->state == MQTT_STATE_CONNECTED) {
-            if (send_disconnect_msg(client) != ESP_OK) {
-                MQTT_API_UNLOCK(client);
-                return ESP_FAIL;
-            }
+            send_disconnect_msg(client);
         }
 
         client->run = false;
@@ -2029,8 +2047,10 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
     }
 
     ESP_LOGD(TAG, "Sent subscribe, first topic=%s, id: %d", topic_list[0].filter, client->mqtt_state.pending_msg_id);
+
+    int pending_msg_id = client->mqtt_state.pending_msg_id;
     MQTT_API_UNLOCK(client);
-    return client->mqtt_state.pending_msg_id;
+    return pending_msg_id;
 
 }
 int esp_mqtt_client_subscribe_single(esp_mqtt_client_handle_t client, const char *topic, int qos)
@@ -2050,6 +2070,9 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
         return -1;
     }
     MQTT_API_LOCK(client);
+    // Reset pending state to avoid inheriting previous PUBLISH QoS or type
+    mqtt_reset_pending_message(client);
+
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
         mqtt5_msg_unsubscribe(&client->mqtt_state.connection,
@@ -2085,8 +2108,10 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
     }
 
     ESP_LOGD(TAG, "Sent Unsubscribe topic=%s, id: %d, successful", topic, client->mqtt_state.pending_msg_id);
+
+    int pending_msg_id = client->mqtt_state.pending_msg_id;
     MQTT_API_UNLOCK(client);
-    return client->mqtt_state.pending_msg_id;
+    return pending_msg_id;
 }
 
 static int make_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data,
