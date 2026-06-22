@@ -6,10 +6,50 @@ stages:
 variables:
     IDF_REPO: ${GITLAB_SSH_SERVER}/idf/esp-idf.git
 
-.add_gh_key_remote: &add_gh_key_remote |
+.deploy_setup_ci_tools: &deploy_setup_ci_tools |
+    set -euo pipefail 2>/dev/null || set -eu
+    curl -sSL "${CIT_LOADER_URL}" | sh
+    source citools/import_functions
     cit_add_ssh_key "${GH_PUSH_KEY}"
-    git remote remove github || true
-    git remote add github ${GH_PUSH_REPO}
+
+.deploy_set_target_branch: &deploy_set_target_branch |
+    git remote remove github 2>/dev/null || true
+    git remote add github "${GH_PUSH_REPO}"
+    BR="${CI_COMMIT_BRANCH:-${CI_COMMIT_REF_NAME}}"; export BR
+    if [ -z "${BR}" ]; then echo "[diag] No branch context; aborting"; exit 0; fi
+
+.deploy_print_diagnostics: &deploy_print_diagnostics |
+    echo "Deploying commit ${CI_COMMIT_SHA} to ${BR}"
+    echo "[diag] pipeline SHA: ${CI_COMMIT_SHA}"
+    echo "[diag] branch name: ${BR}"
+    echo "[diag] github ls-remote:" && git ls-remote github "refs/heads/${BR}" || true
+
+.deploy_check_github_fast_forward: &deploy_check_github_fast_forward |
+    TARGET="${GITHUB_TARGET:-${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-${BR:-master}}}"
+    if git rev-parse --is-shallow-repository 2>/dev/null | grep -q true; then
+        echo "[diag] Repository is shallow; deepening origin/${TARGET} for ancestry checks"
+        git fetch --no-tags --prune --unshallow origin "${TARGET}" \
+            || git fetch --no-tags --prune --deepen=50 origin "${TARGET}"
+        if git ls-remote --exit-code --heads github "refs/heads/${TARGET}" >/dev/null 2>&1; then
+            echo "[diag] Repository is shallow; deepening github/${TARGET} for ancestry checks"
+            git fetch --no-tags --prune --unshallow github "${TARGET}" \
+                || git fetch --no-tags --prune --deepen=50 github "${TARGET}" || true
+        else
+            echo "[diag] github/${TARGET} missing; skip deepening on github"
+        fi
+    fi
+    if git ls-remote --exit-code --heads github "refs/heads/${TARGET}" >/dev/null 2>&1; then
+        git fetch --no-tags --prune github "${TARGET}" || true
+        GH_TIP=$(git rev-parse "github/${TARGET}" 2>/dev/null || true); echo "[diag] github/${TARGET} tip: ${GH_TIP:-none}"
+        if [ -n "${GH_TIP:-}" ]; then git rev-list --left-right --count "github/${TARGET}...${CI_COMMIT_SHA}" || true; fi
+        if [ -n "${GH_TIP:-}" ] && ! git merge-base --is-ancestor "github/${TARGET}" "${CI_COMMIT_SHA}"; then echo "[diag] GitHub is ahead/diverged on ${TARGET}; aborting"; exit 1; fi
+    else
+        echo "[diag] github/${TARGET} missing; aborting (non-mirrored target branch?)"
+        exit 1
+    fi
+
+.deploy_push_commit: &deploy_push_commit |
+    git push github "${CI_COMMIT_SHA}:refs/heads/${BR}"
 
 before_script:
     # Use CI Tools
@@ -77,6 +117,11 @@ push_to_github:
     when: on_success
     variables:
         GIT_STRATEGY: clone
+        GIT_DEPTH: 0
+    before_script:
+        - *deploy_setup_ci_tools
+        - *deploy_set_target_branch
+        - *deploy_print_diagnostics
     script:
-        - *add_gh_key_remote
-        - git push github HEAD:${CI_COMMIT_REF_NAME}
+        - *deploy_check_github_fast_forward
+        - *deploy_push_commit
