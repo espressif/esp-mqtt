@@ -1,2 +1,18 @@
-build_dir = "$GITHUB_WORKSPACE/build_@t_@n"
-config="sdkconfig.ci"
+config_rules = [
+    'sdkconfig.ci=default',
+    'sdkconfig.ci.*=',
+    '=default',
+]
+
+recursive = true
+keep_going = true
+copy_sdkconfig = true
+
+build_dir = "build_@t_@w"
+build_log_filename = "build_log.txt"
+
+check_manifest_rules = true
+manifest_rootpath = "$IDF_PATH"
+manifest_filepatterns = [
+    '**/.build-test-rules.yml',
+]

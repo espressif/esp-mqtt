@@ -1,118 +1,130 @@
 stages:
-  - build
-  - test
-  - deploy
-
+    - build
+    - test
+    - deploy
 
 variables:
-  IDF_REPO: ${GITLAB_SSH_SERVER}/idf/esp-idf.git
+    IDF_REPO: ${GITLAB_SSH_SERVER}/idf/esp-idf.git
 
-.add_gh_key_remote: &add_gh_key_remote |
-  cit_add_ssh_key "${GH_PUSH_KEY}"
-  git remote remove github || true
-  git remote add github ${GH_PUSH_REPO}
+.deploy_setup_ci_tools: &deploy_setup_ci_tools |
+    set -euo pipefail 2>/dev/null || set -eu
+    curl -sSL "${CIT_LOADER_URL}" | sh
+    source citools/import_functions
+    cit_add_ssh_key "${GH_PUSH_KEY}"
+
+.deploy_set_target_branch: &deploy_set_target_branch |
+    git remote remove github 2>/dev/null || true
+    git remote add github "${GH_PUSH_REPO}"
+    BR="${CI_COMMIT_BRANCH:-${CI_COMMIT_REF_NAME}}"; export BR
+    if [ -z "${BR}" ]; then echo "[diag] No branch context; aborting"; exit 0; fi
+
+.deploy_print_diagnostics: &deploy_print_diagnostics |
+    echo "Deploying commit ${CI_COMMIT_SHA} to ${BR}"
+    echo "[diag] pipeline SHA: ${CI_COMMIT_SHA}"
+    echo "[diag] branch name: ${BR}"
+    echo "[diag] github ls-remote:" && git ls-remote github "refs/heads/${BR}" || true
+
+.deploy_check_github_fast_forward: &deploy_check_github_fast_forward |
+    TARGET="${GITHUB_TARGET:-${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-${BR:-master}}}"
+    if git rev-parse --is-shallow-repository 2>/dev/null | grep -q true; then
+        echo "[diag] Repository is shallow; deepening origin/${TARGET} for ancestry checks"
+        git fetch --no-tags --prune --unshallow origin "${TARGET}" \
+            || git fetch --no-tags --prune --deepen=50 origin "${TARGET}"
+        if git ls-remote --exit-code --heads github "refs/heads/${TARGET}" >/dev/null 2>&1; then
+            echo "[diag] Repository is shallow; deepening github/${TARGET} for ancestry checks"
+            git fetch --no-tags --prune --unshallow github "${TARGET}" \
+                || git fetch --no-tags --prune --deepen=50 github "${TARGET}" || true
+        else
+            echo "[diag] github/${TARGET} missing; skip deepening on github"
+        fi
+    fi
+    if git ls-remote --exit-code --heads github "refs/heads/${TARGET}" >/dev/null 2>&1; then
+        git fetch --no-tags --prune github "${TARGET}" || true
+        GH_TIP=$(git rev-parse "github/${TARGET}" 2>/dev/null || true); echo "[diag] github/${TARGET} tip: ${GH_TIP:-none}"
+        if [ -n "${GH_TIP:-}" ]; then git rev-list --left-right --count "github/${TARGET}...${CI_COMMIT_SHA}" || true; fi
+        if [ -n "${GH_TIP:-}" ] && ! git merge-base --is-ancestor "github/${TARGET}" "${CI_COMMIT_SHA}"; then echo "[diag] GitHub is ahead/diverged on ${TARGET}; aborting"; exit 1; fi
+    else
+        echo "[diag] github/${TARGET} missing; aborting (non-mirrored target branch?)"
+        exit 1
+    fi
+
+.deploy_push_commit: &deploy_push_commit |
+    git push github "${CI_COMMIT_SHA}:refs/heads/${BR}"
 
 before_script:
-  # Use CI Tools
-  - curl -sSL ${CIT_LOADER_URL} | sh
-  - source citools/import_functions
-  # Add gitlab ssh key
-  - mkdir -p ~/.ssh
-  - chmod 700 ~/.ssh
-  - echo -n $GITLAB_KEY > ~/.ssh/id_rsa_base64
-  - base64 --decode --ignore-garbage ~/.ssh/id_rsa_base64 > ~/.ssh/id_rsa
-  - chmod 600 ~/.ssh/id_rsa
-  - echo -e "Host gitlab.espressif.cn\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
-  - PATH=$CI_PROJECT_DIR/esp-idf/tools:$PATH
-  - export MQTT_PATH=$CI_PROJECT_DIR
+    # Use CI Tools
+    - curl -sSL ${CIT_LOADER_URL} | sh
+    - source citools/import_functions
+    # Add gitlab ssh key
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo -n $GITLAB_KEY > ~/.ssh/id_rsa_base64
+    - base64 --decode --ignore-garbage ~/.ssh/id_rsa_base64 > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - echo -e "Host gitlab.espressif.cn\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+    - PATH=$CI_PROJECT_DIR/esp-idf/tools:$PATH
+    - export MQTT_PATH=$CI_PROJECT_DIR
 
 .build_template:
-  stage: build
-  tags:
-    - build
-    - internet
-  script:
-    # Replace the IDF's default esp-mqtt with this version
-    - rm -rf $IDF_PATH/components/mqtt/esp-mqtt && cp -r $MQTT_PATH $IDF_PATH/components/mqtt/
-    # Build the examples
-    - $MQTT_PATH/ci/build_examples.sh
+    stage: build
+    tags:
+        - build
+        - internet
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    variables:
+        IDF_CCACHE_ENABLE: "1"
+    artifacts:
+        paths:
+            - "app_info_*.txt"
+        reports:
+            junit: "build_summary_*.xml"
+        when: always
+        expire_in: 1 week
+    script:
+        - pip install 'idf-build-apps~=2.13'
+        - rm -rf $IDF_PATH/components/mqtt/esp-mqtt && cp -r $MQTT_PATH $IDF_PATH/components/mqtt/
+        - cd $IDF_PATH
+        - >-
+            idf-build-apps build -v
+            --config-file $MQTT_PATH/ci/idf_build_apps.toml
+            --junitxml $MQTT_PATH/build_summary_mqtt.xml
+            --collect-app-info $MQTT_PATH/app_info_mqtt.txt
+            -p examples/protocols/mqtt
+        - >-
+            idf-build-apps build -v
+            --config-file $MQTT_PATH/ci/idf_build_apps.toml
+            --junitxml $MQTT_PATH/build_summary_mqtt5.xml
+            --collect-app-info $MQTT_PATH/app_info_mqtt5.txt
+            -p examples/protocols/mqtt5
 
-build_idf_v5.0:
-  extends: .build_template
-  image: espressif/idf:release-v5.0
+build_idf_v5.2:
+    extends: .build_template
+    image: espressif/idf:release-v5.2
 
-build_idf_v5.1:
-  extends: .build_template
-  image: espressif/idf:release-v5.1
+build_idf_v5.3:
+    extends: .build_template
+    image: espressif/idf:release-v5.3
 
-build_idf_latest:
-  extends: .build_template
-  image: espressif/idf:latest
+build_idf_v5.4:
+    extends: .build_template
+    image: espressif/idf:release-v5.4
 
-build_and_host_test:
-  stage: build
-  image: espressif/idf:latest
-  script:
-    # Replace the IDF's default esp-mqtt with this version
-    - rm -rf $IDF_PATH/components/mqtt/esp-mqtt && cp -r $MQTT_PATH $IDF_PATH/components/mqtt/
-    - cd $IDF_PATH/components/mqtt/esp-mqtt/host_test
-    - idf.py build
-    - build/host_mqtt_client_test.elf
-
-build_and_test_qemu:
-  stage: build
-  image: ${CI_DOCKER_REGISTRY}/qemu-v5.1:1-20220802
-  tags:
-    - build
-    - shiny
-  dependencies: []
-  script:
-    - export IDF_PATH=$CI_PROJECT_DIR/esp-idf
-    - git clone "${IDF_REPO}"
-    # switch to IDF and setup the tools
-    - $MQTT_PATH/ci/set_idf.sh release/v5.1
-    - $IDF_PATH/tools/idf_tools.py install-python-env
-    - cd $IDF_PATH && tools/idf_tools.py --non-interactive install && eval "$(tools/idf_tools.py --non-interactive export)"
-    # Remove `debug_backend` and Add `paho-mqtt` to the required packages
-    - sed '/debug_backend/d;/pygobject/d' $IDF_PATH/tools/requirements/requirements.ttfw.txt > requirements.txt
-    - python -m pip install -r requirements.txt
-    - python -m pip install paho-mqtt
-    - $MQTT_PATH/ci/set_mqtt.sh $CI_COMMIT_SHA
-    # build publish-connect stress test, setup test parameters
-    - cd tools/test_apps/protocols/mqtt/publish_connect_test && cat sdkconfig.qemu | $IDF_PATH/tools/ci/envsubst.py > sdkconfig.defaults && idf.py build
-    - export TEST_PATH=`pwd` && export MQTT_PUBLISH_TEST=1
-    - export PYTHONPATH="$IDF_PATH/tools:$IDF_PATH/tools/ci/python_packages"
-    # run test (with environment->qemu)
-    - cd $IDF_PATH/tools/ci/python_packages/tiny_test_fw/bin
-    # use more relaxed criteria with QEMU tests
-    - export MQTT_PUBLISH_MSG_len_0=0   MQTT_PUBLISH_MSG_repeat_0=5
-    - export MQTT_PUBLISH_MSG_len_1=2   MQTT_PUBLISH_MSG_repeat_1=50
-    - export MQTT_PUBLISH_MSG_len_2=128 MQTT_PUBLISH_MSG_repeat_2=2
-    - export MQTT_PUBLISH_MSG_len_3=20  MQTT_PUBLISH_MSG_repeat_3=20
-    - python Runner.py $TEST_PATH -c $MQTT_PATH/ci/publish_connect_mqtt_qemu.yml -e $TEST_PATH/env.yml
-
-check_remotes_sync:
-  stage: test
-  except:
-    - master
-    - idf
-  script:
-    - *add_gh_key_remote
-    - git fetch --depth=1 origin master
-    - git fetch --depth=1 github master
-    - test "$(git rev-parse origin/master)" == "$(git rev-parse github/master)"
-
-push_master_to_github:
-  stage: deploy
-  image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
-  tags:
-    - build
-  only:
-    - master
-    - idf
-  when: on_success
-  variables:
-    GIT_STRATEGY: clone
-  script:
-    - *add_gh_key_remote
-    - git push github HEAD:${CI_COMMIT_REF_NAME}
+push_to_github:
+    stage: deploy
+    image: ${CI_DOCKER_REGISTRY}/esp32-ci-env
+    tags:
+        - build
+    rules:
+        - if: $CI_COMMIT_REF_NAME == "release/v5.x"
+    when: on_success
+    variables:
+        GIT_STRATEGY: clone
+        GIT_DEPTH: 0
+    before_script:
+        - *deploy_setup_ci_tools
+        - *deploy_set_target_branch
+        - *deploy_print_diagnostics
+    script:
+        - *deploy_check_github_fast_forward
+        - *deploy_push_commit
