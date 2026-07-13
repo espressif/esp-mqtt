@@ -1,43 +1,27 @@
-# Note: No need to run build and test on master branch since we use FastForward merge strategy and so each merge request
-# is tested and then merged onto top of master branch.
+# Including the wrapper component to import IDF images matrix
+
 include:
     - component: $CI_SERVER_FQDN/ci/actions/idf-dynamic-pipeline/ci-component@main
-      rules:
-          - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       inputs:
-          build-job-image: "espressif/idf:latest"
-          test-job-image: "$CI_REGISTRY/ci/images/idf-v6.1-target-test:1"
           build-job-tags: ["brew", "build"]
           job-suffix: ":idf-latest"
     - component: $CI_SERVER_FQDN/ci/actions/idf-dynamic-pipeline/ci-component@main
-      rules:
-          - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       inputs:
-          build-job-image: "espressif/idf:release-v6.0"
-          test-job-image: "$CI_REGISTRY/ci/images/idf-v6.0-target-test:1"
+          build-job-tags: ["brew", "build"]
+          job-suffix: ":idf-v6.1"
+    - component: $CI_SERVER_FQDN/ci/actions/idf-dynamic-pipeline/ci-component@main
+      inputs:
           build-job-tags: ["brew", "build"]
           job-suffix: ":idf-v6.0"
     - component: $CI_SERVER_FQDN/ci/actions/idf-dynamic-pipeline/ci-component@main
-      rules:
-          - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       inputs:
-          build-job-image: "espressif/idf:release-v5.5"
-          test-job-image: "$CI_REGISTRY/ci/images/idf-v5.5-target-test:1"
           build-job-tags: ["brew", "build"]
           job-suffix: ":idf-v5.5"
     - component: $CI_SERVER_FQDN/ci/actions/idf-dynamic-pipeline/ci-component@main
-      rules:
-          - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       inputs:
-          build-job-image: "espressif/idf:release-v5.4"
-          test-job-image: "$CI_REGISTRY/ci/images/idf-v5.4-target-test:1"
           build-job-tags: ["brew", "build"]
           job-suffix: ":idf-v5.4"
     - component: $CI_SERVER_FQDN/ci/actions/idf-dynamic-pipeline/ci-component@main
-      rules:
-          - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       inputs:
-          build-job-image: "espressif/idf:release-v5.3"
-          test-job-image: "$CI_REGISTRY/ci/images/idf-v5.3-target-test:1"
           build-job-tags: ["brew", "build"]
           job-suffix: ":idf-v5.3"
