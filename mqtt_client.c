@@ -1840,8 +1840,6 @@ static esp_err_t mqtt_resend_pubrel(esp_mqtt_client_handle_t client, outbox_item
 
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
-        ESP_LOGI(TAG, "MQTT_MSG_TYPE_PUBREC return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer,
-                                                                                          client->mqtt_state.in_buffer_read_len));
         mqtt5_msg_pubrel(&client->mqtt_state.connection, client->mqtt_state.pending_msg_id);
 #endif
     } else {
