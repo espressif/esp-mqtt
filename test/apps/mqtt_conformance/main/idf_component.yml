@@ -2,5 +2,6 @@ dependencies:
   protocol_examples_common:
     path: ${IDF_PATH}/examples/common_components/protocol_examples_common
   mqtt:
-    version: "*"
-    override_path: "../../../.."
+    version: '*'
+    override_path: ../../../..
+  mittelab/nlohmann-json: ^3.11.3

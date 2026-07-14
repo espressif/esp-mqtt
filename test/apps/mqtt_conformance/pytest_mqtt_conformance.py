@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: Unlicense OR CC0-1.0
 from __future__ import annotations
 
+import base64
 import contextlib
+import json
 import os
 import random
 import re
@@ -47,6 +49,43 @@ if str(PAHO_INTEROP_DIR) not in sys.path:
 def build_topic() -> str:
     suffix = "".join(random.choice(string.ascii_letters) for _ in range(TOPIC_SIZE))
     return f"test/conformance/{suffix}"
+
+
+# Raw esp_mqtt_protocol_ver_t ordinals (see mqtt_client.h): the wire format
+# mirrors the real enum value rather than a human-friendly "3/4/5" mapping.
+MQTT_PROTOCOL_V_3_1_1 = 2
+MQTT_PROTOCOL_V_5 = 3
+
+
+def esp_mqtt_config(
+    *,
+    uri: str,
+    client_id: str | None = None,
+    protocol_ver: int | None = None,
+    disable_auto_reconnect: bool = True,
+) -> str:
+    """Encode an ``mqtt_config`` blob (base64 JSON) for the DUT `init <b64>` command.
+
+    The JSON shape mirrors esp_mqtt_client_config_t's real field nesting
+    (broker.address.uri, credentials.client_id, session.*, network.*).
+    A random ``client_id`` is injected unless the caller supplies one.
+    """
+    client_id = client_id or "esp-" + "".join(random.choices(string.digits + "abcdef", k=8))
+    session: dict[str, object] = {}
+
+    if protocol_ver is not None:
+        session["protocol_ver"] = protocol_ver
+
+    mqtt_config: dict[str, object] = {
+        "broker": {"address": {"uri": uri}},
+        "credentials": {"client_id": client_id},
+        "network": {"disable_auto_reconnect": disable_auto_reconnect},
+    }
+
+    if session:
+        mqtt_config["session"] = session
+
+    return base64.b64encode(json.dumps({"mqtt_config": mqtt_config}).encode()).decode()
 
 
 def require_paho_testing_checked_out() -> None:
@@ -140,8 +179,7 @@ def broker_uri(broker: _BrokerHandle) -> str:
 def mqtt_client(dut: Dut, broker_uri: str):
     require_paho_testing_checked_out()
     dut.expect(re.compile(rb"mqtt>"), timeout=DUT_READY_TIMEOUT)
-    dut.write("init")
-    dut.write(f"set_uri {broker_uri}")
+    dut.write(f"init {esp_mqtt_config(protocol_ver=MQTT_PROTOCOL_V_3_1_1, uri=broker_uri)}")
     yield dut
     dut.write("destroy")
 
