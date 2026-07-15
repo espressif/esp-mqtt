@@ -331,9 +331,8 @@ uint16_t mqtt5_get_id(uint8_t *buffer, size_t length)
     int topiclen = 0;
     uint8_t len_bytes = 0;
     size_t offset = 1;
-    size_t totlen = get_variable_len(buffer, offset, length, &len_bytes);
+    get_variable_len(buffer, offset, length, &len_bytes);
     offset += len_bytes;
-    totlen += offset;
 
     if (offset + 2 > length) {
         return 0;
