@@ -1178,8 +1178,9 @@ int mqtt5_msg_get_reason_code(uint8_t *buffer, size_t length)
     size_t offset = 1; // Message type
     size_t variable_len = get_variable_len(buffer, offset, length, &len_bytes);
     offset += len_bytes;
+    uint8_t type = mqtt5_get_type(buffer);
 
-    switch (mqtt5_get_type(buffer)) {
+    switch (type) {
     case MQTT_MSG_TYPE_PUBACK:
     case MQTT_MSG_TYPE_PUBREC:
     case MQTT_MSG_TYPE_PUBREL:
@@ -1191,7 +1192,7 @@ int mqtt5_msg_get_reason_code(uint8_t *buffer, size_t length)
         offset += 2; //skip the message id
 
         if (offset >= length) {
-            ESP_LOGE(TAG, "Invalid control packet, reason code is absent");
+            ESP_LOGE(TAG, "Invalid control packet type %d, reason code is absent", type);
             return -1;
         }
 
@@ -1209,7 +1210,7 @@ int mqtt5_msg_get_reason_code(uint8_t *buffer, size_t length)
         offset = offset + len_bytes + property_len;
 
         if (offset >= length) {
-            ESP_LOGE(TAG, "Invalid control packet, reason code is absent");
+            ESP_LOGE(TAG, "Invalid control packet type %d, reason code is absent", type);
             return -1;
         }
 
