@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 #include <string.h>
+#include "esp_heap_caps.h"
 #include "mqtt_client.h"
 #include "mqtt_msg.h"
 #include "mqtt_config.h"
@@ -633,7 +634,7 @@ int mqtt_has_valid_msg_hdr(uint8_t *buffer, size_t length)
 esp_err_t mqtt_msg_buffer_init(mqtt_connection_t *connection, int buffer_size)
 {
     memset(&connection->outbound_message, 0, sizeof(mqtt_message_t));
-    connection->buffer = (uint8_t *)calloc(buffer_size, sizeof(uint8_t));
+    connection->buffer = (uint8_t *)heap_caps_calloc(buffer_size, sizeof(uint8_t), MQTT_BUFFER_MEMORY);
 
     if (!connection->buffer) {
         return ESP_ERR_NO_MEM;

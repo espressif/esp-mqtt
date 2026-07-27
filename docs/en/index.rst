@@ -236,6 +236,28 @@ The following settings are available:
 
 - :ref:`CONFIG_MQTT_CUSTOM_OUTBOX`: disable default implementation of mqtt_outbox, so a specific implementation can be supplied
 
+Memory placement
+^^^^^^^^^^^^^^^^
+
+On targets with external RAM (PSRAM), the biggest allocations of the client can be moved out of
+internal RAM:
+
+- :ref:`CONFIG_MQTT_OUTBOX_DATA_ON_EXTERNAL_MEMORY`: place the payloads of the messages kept in the
+  outbox in external memory.
+
+- :ref:`CONFIG_MQTT_BUFFERS_ON_EXTERNAL_MEMORY`: place the client input and output buffers (sized by
+  :cpp:member:`buffer.size <esp_mqtt_client_config_t::buffer_t::size>` and
+  :cpp:member:`buffer.out_size <esp_mqtt_client_config_t::buffer_t::out_size>`) in external memory.
+
+- :ref:`CONFIG_MQTT_TASK_STACK_ON_EXTERNAL_MEMORY`: place the MQTT task stack in external memory. The
+  task control block always stays in internal RAM. This option requires
+  :ref:`CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM`.
+
+External memory is inaccessible while the flash cache is disabled. With the task stack in external
+memory, the MQTT task must therefore not run any code that disables the cache: flash and NVS
+operations, and entering deep or light sleep, are not allowed from the MQTT task context. This
+includes user code running in an event handler dispatched by the MQTT task.
+
 Considerations when using ESP-MQTT with unstable network connection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 When using ESP-MQTT with QoS>0 it does not send the message immediately, but keeps in in the outbox while it's being processed.

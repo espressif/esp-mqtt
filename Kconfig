@@ -159,6 +159,31 @@ menu "ESP-MQTT Configurations"
         help
             Set to true to use external memory for outbox data.
 
+    config MQTT_BUFFERS_ON_EXTERNAL_MEMORY
+        bool "Use external memory for the client buffers"
+        default n
+        depends on SPIRAM
+        help
+            Set to true to allocate the client input and output buffers (see buffer.size and
+            buffer.out_size in the client configuration) in external memory.
+
+    config MQTT_TASK_STACK_ON_EXTERNAL_MEMORY
+        bool "Use external memory for the MQTT task stack"
+        default n
+        depends on SPIRAM
+        # FREERTOS_TASK_CREATE_ALLOW_EXT_MEM is the name from IDF v5.4 onwards, the other one is
+        # used by IDF v5.3.
+        depends on FREERTOS_TASK_CREATE_ALLOW_EXT_MEM || SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY
+        help
+            Set to true to allocate the MQTT task stack in external memory. The task control block
+            is always kept in internal memory.
+
+            External memory is inaccessible while the flash cache is disabled, so with this option
+            the MQTT task must not run any code that disables the cache. In particular, flash and
+            NVS operations, and entering deep or light sleep, are not allowed from the MQTT task
+            context. This includes user code running in an event handler dispatched by the MQTT
+            task.
+
     config MQTT_CUSTOM_OUTBOX
         bool "Enable custom outbox implementation"
         default n
