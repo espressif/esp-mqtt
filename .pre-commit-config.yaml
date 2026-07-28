@@ -68,6 +68,10 @@ repos:
             compile_commands\.json$|
             __pycache__/.*
           )$
+      - id: codespell
+        name: codespell commit message
+        stages: [commit-msg]
+        additional_dependencies: [tomli]
 
   - repo: https://github.com/espressif/astyle_py.git
     rev: v1.1.0
