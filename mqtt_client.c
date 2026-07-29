@@ -488,7 +488,7 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_mqtt_cl
     }
 
     free(client->mqtt_state.in_buffer);
-    client->mqtt_state.in_buffer = (uint8_t *)malloc(buffer_size);
+    client->mqtt_state.in_buffer = (uint8_t *)heap_caps_malloc(buffer_size, MQTT_BUFFER_MEMORY);
     ESP_MEM_CHECK(TAG, client->mqtt_state.in_buffer, goto _mqtt_set_config_failed);
     client->mqtt_state.in_buffer_length = buffer_size;
     client->config->message_retransmit_timeout = config->session.message_retransmit_timeout;
@@ -2186,7 +2186,11 @@ static void esp_mqtt_task(void *pv)
     outbox_delete_all_items(client->outbox);
     client->state = MQTT_STATE_DISCONNECTED;
     xEventGroupSetBits(client->status_bits, STOPPED_BIT);
+#if MQTT_TASK_STACK_ON_EXTERNAL_MEMORY
+    vTaskDeleteWithCaps(NULL);
+#else
     vTaskDelete(NULL);
+#endif
 }
 
 esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
@@ -2207,18 +2211,22 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
     esp_err_t err = ESP_OK;
 #if MQTT_CORE_SELECTION_ENABLED
     ESP_LOGD(TAG, "Core selection enabled on %u", MQTT_TASK_CORE);
+#else
+    ESP_LOGD(TAG, "Core selection disabled");
+#endif
+#if MQTT_TASK_STACK_ON_EXTERNAL_MEMORY
 
-    if (xTaskCreatePinnedToCore(esp_mqtt_task, "mqtt_task", client->config->task_stack, client, client->config->task_prio,
-                                &client->task_handle, MQTT_TASK_CORE) != pdTRUE) {
+    if (xTaskCreatePinnedToCoreWithCaps(esp_mqtt_task, "mqtt_task", client->config->task_stack, client,
+                                        client->config->task_prio, &client->task_handle, MQTT_TASK_AFFINITY,
+                                        MALLOC_CAP_SPIRAM) != pdTRUE) {
         ESP_LOGE(TAG, "Error create mqtt task");
         err = ESP_FAIL;
     }
 
 #else
-    ESP_LOGD(TAG, "Core selection disabled");
 
-    if (xTaskCreate(esp_mqtt_task, "mqtt_task", client->config->task_stack, client, client->config->task_prio,
-                    &client->task_handle) != pdTRUE) {
+    if (xTaskCreatePinnedToCore(esp_mqtt_task, "mqtt_task", client->config->task_stack, client,
+                                client->config->task_prio, &client->task_handle, MQTT_TASK_AFFINITY) != pdTRUE) {
         ESP_LOGE(TAG, "Error create mqtt task");
         err = ESP_FAIL;
     }
