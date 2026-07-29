@@ -843,6 +843,43 @@ static inline esp_err_t esp_mqtt_write(esp_mqtt_client_handle_t client)
     return ESP_OK;
 }
 
+#ifdef MQTT_PROTOCOL_5
+static void mqtt_requeue_transmitted_messages(esp_mqtt_client_handle_t client)
+{
+    outbox_item_handle_t item;
+
+    // Receive Maximum is scoped to the network connection. Requeue previous
+    // inflight packets so the new connection admits and counts them once.
+    //
+    // [MQTT-4.4.0-1] only sanctions resending unacknowledged QoS>0 PUBLISH and
+    // PUBREL packets, so requeuing subscribe and unsubscribe is not correct.
+    // It is kept because it is what the client has always done: the periodic
+    // retransmit path resends any TRANSMITTED packet regardless of type, so
+    // dropping them here would silently break subscriptions that work today.
+    while ((item = outbox_dequeue(client->outbox, TRANSMITTED, NULL)) != NULL) {
+        size_t len;
+        uint16_t msg_id;
+        int msg_type;
+        int msg_qos;
+        uint8_t *data = outbox_item_get_data(item, &len, &msg_id, &msg_type, &msg_qos);
+
+        if (data == NULL) {
+            ESP_LOGE(TAG, "Failed to read transmitted outbox item");
+            break;
+        }
+
+        if (msg_type == MQTT_MSG_TYPE_PUBLISH && msg_qos > 0) {
+            mqtt_set_dup(data);
+        }
+
+        if (outbox_set_pending(client->outbox, msg_id, QUEUED) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to requeue transmitted message id=%d", msg_id);
+            break;
+        }
+    }
+}
+#endif
+
 static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms)
 {
     int read_len, connect_rsp_code = 0;
@@ -909,6 +946,7 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
 
         if (esp_mqtt5_parse_connack(client, &connect_rsp_code) == ESP_OK) {
             client->send_publish_packet_count = 0;
+            mqtt_requeue_transmitted_messages(client);
             return ESP_OK;
         }
 
@@ -1690,14 +1728,14 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
         break;
 
     case MQTT_MSG_TYPE_PUBACK:
+        if (remove_initiator_message(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
 #ifdef MQTT_PROTOCOL_5
-        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-            esp_mqtt5_decrement_packet_counter(client);
-        }
+
+            if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
+                esp_mqtt5_decrement_packet_counter(client);
+            }
 
 #endif
-
-        if (remove_initiator_message(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
             ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBACK, finish QoS1 publish");
 #ifdef MQTT_PROTOCOL_5
             esp_mqtt5_parse_puback(client);
@@ -1753,15 +1791,15 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
 
     case MQTT_MSG_TYPE_PUBCOMP:
         ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBCOMP");
-#ifdef MQTT_PROTOCOL_5
-
-        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-            esp_mqtt5_decrement_packet_counter(client);
-        }
-
-#endif
 
         if (remove_initiator_message(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
+#ifdef MQTT_PROTOCOL_5
+
+            if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
+                esp_mqtt5_decrement_packet_counter(client);
+            }
+
+#endif
             ESP_LOGD(TAG, "Receive MQTT_MSG_TYPE_PUBCOMP, finish QoS2 publish");
 #ifdef MQTT_PROTOCOL_5
             esp_mqtt5_parse_pubcomp(client);
@@ -1831,6 +1869,25 @@ static esp_err_t mqtt_resend_queued(esp_mqtt_client_handle_t client, outbox_item
 
     return ESP_OK;
 }
+
+#ifdef MQTT_PROTOCOL_5
+static outbox_item_handle_t mqtt_get_queued_qos0(outbox_handle_t outbox)
+{
+    outbox_item_handle_t item = outbox_get(outbox, 0);
+    size_t len;
+    uint16_t msg_id;
+    int msg_type;
+    int msg_qos;
+
+    if (item && outbox_item_get_pending(item) == QUEUED &&
+            outbox_item_get_data(item, &len, &msg_id, &msg_type, &msg_qos) != NULL &&
+            msg_id == 0 && msg_type == MQTT_MSG_TYPE_PUBLISH && msg_qos == 0) {
+        return item;
+    }
+
+    return NULL;
+}
+#endif
 
 static esp_err_t mqtt_resend_pubrel(esp_mqtt_client_handle_t client, outbox_item_handle_t item)
 {
@@ -2021,6 +2078,23 @@ static void esp_mqtt_task(void *pv)
 
             // resend all non-transmitted messages first
             outbox_item_handle_t item = outbox_dequeue(client->outbox, QUEUED, NULL);
+#ifdef MQTT_PROTOCOL_5
+
+            if (item && client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5 &&
+                    esp_mqtt5_client_check_inflight_maximum(client) != ESP_OK) {
+                size_t len;
+                uint16_t msg_id;
+                int msg_type = 0;
+                int msg_qos = 0;
+
+                if (outbox_item_get_data(item, &len, &msg_id, &msg_type, &msg_qos) != NULL &&
+                        msg_type == MQTT_MSG_TYPE_PUBLISH && msg_qos > 0) {
+                    // Receive Maximum applies only to QoS 1 and QoS 2.
+                    item = mqtt_get_queued_qos0(client->outbox);
+                }
+            }
+
+#endif
 
             if (item) {
                 if (mqtt_resend_queued(client, item) == ESP_OK) {
@@ -2029,14 +2103,13 @@ static void esp_mqtt_task(void *pv)
                         if (outbox_delete_item(client->outbox, item) != ESP_OK) {
                             ESP_LOGE(TAG, "Failed to remove queued qos0 message from the outbox");
                         }
-                    }
-
-                    if (client->mqtt_state.pending_publish_qos > 0 &&
-                            mqtt_get_type(client->mqtt_state.connection.outbound_message.data) == MQTT_MSG_TYPE_PUBLISH) {
+                    } else {
+                        outbox_set_tick(client->outbox, client->mqtt_state.pending_msg_id, platform_tick_get_ms());
                         outbox_set_pending(client->outbox, client->mqtt_state.pending_msg_id, TRANSMITTED);
 #ifdef MQTT_PROTOCOL_5
 
-                        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
+                        if (client->mqtt_state.pending_msg_type == MQTT_MSG_TYPE_PUBLISH &&
+                                client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
                             esp_mqtt5_increment_packet_counter(client);
                         }
 
@@ -2050,36 +2123,13 @@ static void esp_mqtt_task(void *pv)
                 item = outbox_dequeue(client->outbox, TRANSMITTED, &msg_tick);
 
                 if (item && (last_retransmit - msg_tick > client->config->message_retransmit_timeout))  {
-                    if (mqtt_resend_queued(client, item) == ESP_OK) {
-#ifdef MQTT_PROTOCOL_5
-
-                        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5 &&
-                                client->mqtt_state.pending_publish_qos > 0 &&
-                                mqtt_get_type(client->mqtt_state.connection.outbound_message.data) == MQTT_MSG_TYPE_PUBLISH) {
-                            esp_mqtt5_increment_packet_counter(client);
-                        }
-
-#endif
-                    }
+                    mqtt_resend_queued(client, item);
                 }
 
                 item = outbox_dequeue(client->outbox, ACKNOWLEDGED, &msg_tick);
 
                 if (item && (last_retransmit - msg_tick > client->config->message_retransmit_timeout))  {
-                    if (mqtt_resend_pubrel(client, item) == ESP_OK) {
-#ifdef MQTT_PROTOCOL_5
-
-                        // Do not count PUBREL as a new inflight PUBLISH
-                        // Only PUBLISH QoS>0 contributes to inflight limitation
-                        // (outbound_message here is PUBREL, so this condition will be false)
-                        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5 &&
-                                client->mqtt_state.pending_publish_qos > 0 &&
-                                mqtt_get_type(client->mqtt_state.connection.outbound_message.data) == MQTT_MSG_TYPE_PUBLISH) {
-                            esp_mqtt5_increment_packet_counter(client);
-                        }
-
-#endif
-                    }
+                    mqtt_resend_pubrel(client, item);
                 }
             }
 
@@ -2311,6 +2361,8 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
     }
 
     MQTT_API_LOCK(client);
+    // Reset pending state to avoid inheriting previous PUBLISH QoS or type
+    mqtt_reset_pending_message(client);
 
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
@@ -2572,6 +2624,17 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         goto cannot_publish;
     }
 
+#ifdef MQTT_PROTOCOL_5
+
+    if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5 && qos > 0) {
+        if (esp_mqtt5_client_check_inflight_maximum(client) != ESP_OK) {
+            ESP_LOGW(TAG, "Unable to publish now: maximum inflight messages reached");
+            MQTT_API_UNLOCK(client);
+            return pending_msg_id;
+        }
+    }
+
+#endif
     /* Provide support for sending fragmented message if it doesn't fit buffer */
     int remaining_len = len;
     const char *current_data = data;

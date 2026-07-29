@@ -204,6 +204,31 @@ TEST_CASE("Outbox lookup by msg_id")
         outbox_enqueue(outbox.handle, &message, 0);
         REQUIRE(outbox_get(outbox.handle, 999) == nullptr);
     }
+    SECTION("msg_id zero finds queued QoS 0 behind a QoS 1 head") {
+        auto qos1 = make_msg(1, 1, 3, "qos1", 4);
+        auto qos0_first = make_msg(0, 0, 3, "first", 5);
+        auto qos0_second = make_msg(0, 0, 3, "second", 6);
+        outbox_enqueue(outbox.handle, &qos1, 0);
+        outbox_enqueue(outbox.handle, &qos0_first, 0);
+        outbox_enqueue(outbox.handle, &qos0_second, 0);
+        REQUIRE(outbox_dequeue(outbox.handle, QUEUED, nullptr) == outbox_get(outbox.handle, 1));
+        outbox_item_handle_t item = outbox_get(outbox.handle, 0);
+        REQUIRE(item != nullptr);
+        REQUIRE(outbox_item_get_pending(item) == QUEUED);
+        uint16_t id;
+        int type, qos;
+        size_t len;
+        auto *data = outbox_item_get_data(item, &len, &id, &type, &qos);
+        REQUIRE(id == 0);
+        REQUIRE(type == 3);
+        REQUIRE(qos == 0);
+        REQUIRE(std::string(reinterpret_cast<char *>(data), len) == "first");
+        REQUIRE(outbox_delete_item(outbox.handle, item) == ESP_OK);
+        item = outbox_get(outbox.handle, 0);
+        REQUIRE(item != nullptr);
+        data = outbox_item_get_data(item, &len, &id, &type, &qos);
+        REQUIRE(std::string(reinterpret_cast<char *>(data), len) == "second");
+    }
 }
 
 TEST_CASE("Outbox delete by msg_id and type")
