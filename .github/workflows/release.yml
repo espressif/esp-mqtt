@@ -38,7 +38,6 @@ jobs:
         with:
           components: "mqtt: ."
           namespace: "espressif"
-          api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
           dry_run: true
 
   upload_components_release:
@@ -48,6 +47,9 @@ jobs:
       github.ref_name == 'master' &&
       needs.release-please.outputs.releases_created == 'true'
     needs: [release-please]
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,9 +57,8 @@ jobs:
       - name: Upload component to the component registry
         uses: espressif/upload-components-ci-action@v2
         with:
-          components: ${{ join(fromJSON(needs.release-please.outputs.paths_released), '\n') }}
+          components: "mqtt: ."
           namespace: "espressif"
-          api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
           dry_run: ${{ github.repository_owner != 'espressif' }}
 
   update_mirror_tags:
@@ -70,14 +71,12 @@ jobs:
         with:
           fetch-depth: 0
           submodules: 'false'
-      - name: Sync tags to Gitlab
+      - name: Sync release commit and tags to GitLab
         run: |
-          echo "Syncing tags to Gitlab"
+          echo "Syncing release commit and tags to GitLab"
 
-          GITLAB_URL=$(echo "${{ secrets.GITLAB_URL }}" | sed 's|https://||')
+          git remote add gitlab https://oauth2:${{ secrets.GITLAB_TOKEN }}@${{ secrets.GITLAB_URL }}/${{ github.repository }}.git
 
-          git remote add gitlab https://oauth2:${{ secrets.GITLAB_TOKEN }}@${GITLAB_URL}/${{ github.repository }}.git
+          git push --atomic gitlab HEAD:master --tags
 
-          git push gitlab --tags
-
-          echo "Tags successfully synced to GitLab"
+          echo "Release commit and tags successfully synced to GitLab"
