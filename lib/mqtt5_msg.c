@@ -401,6 +401,11 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
 
     *property_len = get_variable_len(buffer, offset, buffer_length, &len_bytes);
     offset += len_bytes;
+
+    if (offset > buffer_length || *property_len > (buffer_length - offset)) {
+        return NULL;
+    }
+
     uint16_t len = 0, property_offset = 0;
     uint8_t *property = (buffer + offset);
 
@@ -455,8 +460,18 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
             continue;
 
         case MQTT5_PROPERTY_CORRELATION_DATA:
+            if (!mqtt5_property_has_bytes(property_offset, 2, *property_len)) {
+                return NULL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(resp_property->correlation_data_len, property[property_offset ++],
                                           property[property_offset ++])
+
+            if (resp_property->correlation_data_len > MQTT5_MAX_PROPERTY_STRING_LEN ||
+                    !mqtt5_property_has_bytes(property_offset, resp_property->correlation_data_len, *property_len)) {
+                return NULL;
+            }
+
             resp_property->correlation_data = (char *)(property + property_offset);
             property_offset += resp_property->correlation_data_len;
             ESP_LOGD(TAG, "MQTT5_PROPERTY_CORRELATION_DATA length %d", resp_property->correlation_data_len);
@@ -474,8 +489,18 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
             continue;
 
         case MQTT5_PROPERTY_CONTENT_TYPE:
+            if (!mqtt5_property_has_bytes(property_offset, 2, *property_len)) {
+                return NULL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(resp_property->content_type_len, property[property_offset ++],
                                           property[property_offset ++])
+
+            if (resp_property->content_type_len > MQTT5_MAX_PROPERTY_STRING_LEN ||
+                    !mqtt5_property_has_bytes(property_offset, resp_property->content_type_len, *property_len)) {
+                return NULL;
+            }
+
             resp_property->content_type = (char *)(property + property_offset);
             property_offset += resp_property->content_type_len;
             ESP_LOGD(TAG, "MQTT5_PROPERTY_CONTENT_TYPE  %.*s", resp_property->content_type_len, resp_property->content_type);
