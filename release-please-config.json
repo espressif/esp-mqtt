@@ -24,7 +24,8 @@
   ],
   "packages": {
     ".": {
-      "release-type": "simple"
+      "release-type": "simple",
+      "pull-request-title-pattern": "chore: release ${version}"
     }
   }
 }
