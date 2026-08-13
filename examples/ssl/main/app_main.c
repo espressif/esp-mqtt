@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2025-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -26,25 +26,28 @@
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "esp_tls.h"
+#if !CONFIG_IDF_TARGET_LINUX
 #include "esp_ota_ops.h"
+#endif
 #include <sys/param.h>
 
 static const char *TAG = "mqtts_example";
 
 #if CONFIG_BROKER_CERTIFICATE_OVERRIDDEN == 1
-static const uint8_t mqtt_eclipseprojects_io_pem_start[]  = "-----BEGIN CERTIFICATE-----\n"
-                                                            CONFIG_BROKER_CERTIFICATE_OVERRIDE "\n-----END CERTIFICATE-----";
+static const uint8_t mosquitto_org_crt_start[]  = "-----BEGIN CERTIFICATE-----\n"
+                                                  CONFIG_BROKER_CERTIFICATE_OVERRIDE "\n-----END CERTIFICATE-----";
 #else
-extern const uint8_t mqtt_eclipseprojects_io_pem_start[]   asm("_binary_mqtt_eclipseprojects_io_pem_start");
+extern const uint8_t mosquitto_org_crt_start[]   asm("_binary_mosquitto_org_crt_start");
 #endif
-extern const uint8_t mqtt_eclipseprojects_io_pem_end[]   asm("_binary_mqtt_eclipseprojects_io_pem_end");
+extern const uint8_t mosquitto_org_crt_end[]   asm("_binary_mosquitto_org_crt_end");
 
 //
 // Note: this function is for testing purposes only publishing part of the active partition
-//       (to be checked against the original binary)
+//       (to be checked against the original binary). No-op on Linux target.
 //
 static void send_binary(esp_mqtt_client_handle_t client)
 {
+#if !CONFIG_IDF_TARGET_LINUX
     esp_partition_mmap_handle_t out_handle;
     const void *binary_address;
     const esp_partition_t *partition = esp_ota_get_running_partition();
@@ -53,6 +56,9 @@ static void send_binary(esp_mqtt_client_handle_t client)
     int binary_size = MIN(CONFIG_BROKER_BIN_SIZE_TO_SEND, partition->size);
     int msg_id = esp_mqtt_client_publish(client, "topic/binary", binary_address, binary_size, 0, 0);
     ESP_LOGI(TAG, "binary sent with msg_id=%d", msg_id);
+#else
+    (void)client;
+#endif
 }
 
 /*
@@ -140,7 +146,7 @@ static void mqtt_app_start(void)
     const esp_mqtt_client_config_t mqtt_cfg = {
         .broker = {
             .address.uri = CONFIG_BROKER_URI,
-            .verification.certificate = (const char *)mqtt_eclipseprojects_io_pem_start,
+            .verification.certificate = (const char *)mosquitto_org_crt_start,
         },
     };
     ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());

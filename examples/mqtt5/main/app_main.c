@@ -218,8 +218,6 @@ static void mqtt5_app_start(void)
         .broker.address.uri = CONFIG_BROKER_URL,
         .session.protocol_ver = MQTT_PROTOCOL_V_5,
         .network.disable_auto_reconnect = true,
-        .credentials.username = "123",
-        .credentials.authentication.password = "456",
         .session.last_will.topic = "topic/will",
         .session.last_will.msg = "i will leave",
         .session.last_will.msg_len = 12,
