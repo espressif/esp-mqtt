@@ -5,14 +5,18 @@
  */
 #include "platform.h"
 
-#ifdef ESP_PLATFORM
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "soc/soc_caps.h"
-#include "esp_timer.h"
 #include "esp_random.h"
+#if CONFIG_IDF_TARGET_LINUX
+#include <sys/time.h>
+#else
+#include "esp_timer.h"
+#endif
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
 
 static const char *TAG = "platform";
 
@@ -25,6 +29,7 @@ static const char *TAG = "platform";
 #elif defined SOC_IEEE802154_SUPPORTED
 #define MAC_TYPE ESP_MAC_IEEE802154
 #endif
+
 char *platform_create_id_string(void)
 {
     char *id_string = calloc(1, MAX_ID_STRING);
@@ -47,7 +52,12 @@ int platform_random(int max)
 
 uint64_t platform_tick_get_ms(void)
 {
+#if CONFIG_IDF_TARGET_LINUX
+    /* IDF linux does not always provide a linked esp_timer implementation. */
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (uint64_t)tv.tv_sec * 1000ULL + (uint64_t)(tv.tv_usec / 1000);
+#else
     return esp_timer_get_time() / (int64_t)1000;
-}
-
 #endif
+}

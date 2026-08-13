@@ -1,4 +1,4 @@
-set(srcs mqtt_client.c lib/mqtt_msg.c lib/platform_esp32_idf.c)
+set(srcs mqtt_client.c lib/mqtt_msg.c lib/platform.c)
 
 if(CONFIG_MQTT_PROTOCOL_5)
     list(APPEND srcs lib/mqtt5_msg.c mqtt5_client.c)

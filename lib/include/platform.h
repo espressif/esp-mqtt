@@ -11,9 +11,20 @@
 #ifndef _PLATFORM_H__
 #define _PLATFORM_H__
 
-//Support ESP32
-#ifdef ESP_PLATFORM
-#include "platform_esp32_idf.h"
-#endif
+#include <stdint.h>
+
+char *platform_create_id_string(void);
+int platform_random(int max);
+uint64_t platform_tick_get_ms(void);
+
+#define ESP_MEM_CHECK(TAG, a, action) if (!(a)) {                                                      \
+        ESP_LOGE(TAG,"%s(%d): %s",  __FUNCTION__, __LINE__, "Memory exhausted"); \
+        action;                                                                                         \
+        }
+
+#define ESP_OK_CHECK(TAG, a, action) if ((a) != ESP_OK) {                                                     \
+        ESP_LOGE(TAG,"%s(%d): %s", __FUNCTION__, __LINE__, "Failed"); \
+        action;                                                                                               \
+        }
 
 #endif
