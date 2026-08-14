@@ -208,10 +208,11 @@ typedef struct {
  * @param client            mqtt client handle
  * @param connect_property  connect property
  *
- * @return ESP_ERR_NO_MEM if failed to allocate
- *         ESP_ERR_INVALID_ARG on wrong initialization
- *         ESP_FAIL on fail
- *         ESP_OK on success
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_NO_MEM if failed to allocate
+ *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client,
                                                 const esp_mqtt5_connection_property_config_t *connect_property);
@@ -225,9 +226,10 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
  * @param client            mqtt client handle
  * @param property          publish property
  *
- * @return ESP_ERR_INVALID_ARG on wrong initialization
- *         ESP_FAIL on fail
- *         ESP_OK on success
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client,
                                                 const esp_mqtt5_publish_property_config_t *property);
@@ -241,9 +243,10 @@ esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client
  * @param client            mqtt client handle
  * @param property          subscribe property
  *
- * @return ESP_ERR_INVALID_ARG on wrong initialization
- *         ESP_FAIL on fail
- *         ESP_OK on success
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t client,
                                                   const esp_mqtt5_subscribe_property_config_t *property);
@@ -257,9 +260,10 @@ esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t clie
  * @param client            mqtt client handle
  * @param property          unsubscribe property
  *
- * @return ESP_ERR_INVALID_ARG on wrong initialization
- *         ESP_FAIL on fail
- *         ESP_OK on success
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_unsubscribe_property(esp_mqtt5_client_handle_t client,
                                                     const esp_mqtt5_unsubscribe_property_config_t *property);
@@ -273,10 +277,11 @@ esp_err_t esp_mqtt5_client_set_unsubscribe_property(esp_mqtt5_client_handle_t cl
  * @param client            mqtt client handle
  * @param property          disconnect property
  *
- * @return ESP_ERR_NO_MEM if failed to allocate
- *         ESP_ERR_INVALID_ARG on wrong initialization
- *         ESP_FAIL on fail
- *         ESP_OK on success
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_NO_MEM if failed to allocate
+ *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_disconnect_property(esp_mqtt5_client_handle_t client,
                                                    const esp_mqtt5_disconnect_property_config_t *property);
@@ -292,9 +297,10 @@ esp_err_t esp_mqtt5_client_set_disconnect_property(esp_mqtt5_client_handle_t cli
  * @param item                     array of user property data (eg. {{"var","val"},{"other","2"}})
  * @param item_num                 number of items in user property data
  *
- * @return ESP_ERR_NO_MEM if failed to allocate
- *         ESP_FAIL on fail
- *         ESP_OK on success
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_NO_MEM if failed to allocate
+ *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_user_property(mqtt5_user_property_handle_t *user_property,
                                              esp_mqtt5_user_property_item_t item[], uint8_t item_num);
@@ -310,9 +316,10 @@ esp_err_t esp_mqtt5_client_set_user_property(mqtt5_user_property_handle_t *user_
  * And malloc number of count item array memory to store the user property data.
  * Please DO NOT forget the item memory, key and value point in item memory when get user property data successfully.
  *
- * @return ESP_ERR_NO_MEM if failed to allocate
- *         ESP_FAIL on fail
- *         ESP_OK on success
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_NO_MEM if failed to allocate
+ *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_get_user_property(mqtt5_user_property_handle_t user_property,
                                              esp_mqtt5_user_property_item_t *item, uint8_t *item_num);
@@ -321,7 +328,8 @@ esp_err_t esp_mqtt5_client_get_user_property(mqtt5_user_property_handle_t user_p
  * @brief Get MQTT5 client user property list count
  *
  * @param user_property            user_property handle
- * @return user property list count
+ * @return
+ *         - number of items in the user property list
  */
 uint8_t esp_mqtt5_client_get_user_property_count(mqtt5_user_property_handle_t user_property);
 

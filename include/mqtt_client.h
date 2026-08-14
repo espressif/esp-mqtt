@@ -411,7 +411,9 @@ typedef struct topic_t {
  *
  * @param config    *MQTT* configuration structure
  *
- * @return mqtt_client_handle if successfully created, NULL on error
+ * @return
+ *         - MQTT client handle on success
+ *         - NULL on error
  */
 esp_mqtt_client_handle_t
 esp_mqtt_client_init(const esp_mqtt_client_config_t *config);
@@ -423,7 +425,9 @@ esp_mqtt_client_init(const esp_mqtt_client_config_t *config);
  * @param client    *MQTT* client handle
  * @param uri
  *
- * @return ESP_FAIL if URI parse error, ESP_OK on success
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_FAIL if URI parse error
  */
 esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client,
                                   const char *uri);
@@ -433,9 +437,10 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client,
  *
  * @param client    *MQTT* client handle
  *
- * @return ESP_OK on success
- *         ESP_ERR_INVALID_ARG on wrong initialization
- *         ESP_FAIL on other error
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_FAIL on other error
  */
 esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client);
 
@@ -444,9 +449,10 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client);
  *
  * @param client    *MQTT* client handle
  *
- * @return ESP_OK on success
- *         ESP_ERR_INVALID_ARG on wrong initialization
- *         ESP_FAIL if client is not waiting for reconnection
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_FAIL if client is not waiting for reconnection
  */
 esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client);
 
@@ -455,8 +461,9 @@ esp_err_t esp_mqtt_client_reconnect(esp_mqtt_client_handle_t client);
  *
  * @param client    *MQTT* client handle
  *
- * @return ESP_OK on success
- *         ESP_ERR_INVALID_ARG on wrong initialization
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_INVALID_ARG on wrong initialization
  */
 esp_err_t esp_mqtt_client_disconnect(esp_mqtt_client_handle_t client);
 
@@ -468,9 +475,10 @@ esp_err_t esp_mqtt_client_disconnect(esp_mqtt_client_handle_t client);
  *
  * @param client    *MQTT* client handle
  *
- * @return ESP_OK on success
- *         ESP_ERR_INVALID_ARG on wrong initialization
- *         ESP_FAIL if client is in invalid state
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_FAIL if client is in invalid state
  */
 esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
 
@@ -490,9 +498,10 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
  * @param topic_type Needs to be char* for single subscription or `esp_mqtt_topic_t` for multiple topics
  * @param qos_or_size It's either a qos when subscribing to a single topic or the size of the subscription array when subscribing to multiple topics.
  *
- * @return message_id of the subscribe message on success
- *         -1 on failure
- *         -2 in case of full outbox.
+ * @return
+ *         - MQTT Packet Identifier of the SUBSCRIBE packet on success (>= 0)
+ *         - -1 on failure
+ *         - -2 if the outbox is full
  */
 #define esp_mqtt_client_subscribe(client_handle, topic_type, qos_or_size) _Generic((topic_type), \
       char *: esp_mqtt_client_subscribe_single, \
@@ -516,9 +525,10 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
  * @param topic topic filter to subscribe
  * @param qos Max qos level of the subscription
  *
- * @return message_id of the subscribe message on success
- *         -1 on failure
- *         -2 in case of full outbox.
+ * @return
+ *         - MQTT Packet Identifier of the SUBSCRIBE packet on success (>= 0)
+ *         - -1 on failure
+ *         - -2 if the outbox is full
  */
 int esp_mqtt_client_subscribe_single(esp_mqtt_client_handle_t client,
                                      const char *topic, int qos);
@@ -537,9 +547,10 @@ int esp_mqtt_client_subscribe_single(esp_mqtt_client_handle_t client,
  * @param topic_list List of topics to subscribe
  * @param size size of topic_list
  *
- * @return message_id of the subscribe message on success
- *         -1 on failure
- *         -2 in case of full outbox.
+ * @return
+ *         - MQTT Packet Identifier of the SUBSCRIBE packet on success (>= 0)
+ *         - -1 on failure
+ *         - -2 if the outbox is full
  */
 int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
                                        const esp_mqtt_topic_t *topic_list, int size);
@@ -554,8 +565,9 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
  * @param client    *MQTT* client handle
  * @param topic
  *
- * @return message_id of the subscribe message on success
- *         -1 on failure
+ * @return
+ *         - MQTT Packet Identifier of the UNSUBSCRIBE packet on success (>= 0)
+ *         - -1 on failure
  */
 int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client,
                                 const char *topic);
@@ -586,8 +598,10 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client,
  * @param qos       QoS of publish message
  * @param retain    retain flag
  *
- * @return message_id of the publish message (for QoS 0 message_id will always
- * be zero) on success. -1 on failure, -2 in case of full outbox.
+ * @return
+ *         - MQTT Packet Identifier of the PUBLISH packet on success (>= 0; 0 for QoS 0)
+ *         - -1 on failure
+ *         - -2 if the outbox is full
  */
 int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic,
                             const char *data, int len, int qos, int retain);
@@ -614,7 +628,10 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic,
  * @param store     if true, all messages are enqueued; otherwise only QoS 1 and
  * QoS 2 are enqueued
  *
- * @return message_id if queued successfully, -1 on failure, -2 in case of full outbox.
+ * @return
+ *         - MQTT Packet Identifier of the queued PUBLISH packet on success (>= 0)
+ *         - -1 on failure
+ *         - -2 if the outbox is full
  */
 int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic,
                             const char *data, int len, int qos, int retain,
@@ -628,8 +645,9 @@ int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic,
  *
  * @param client    *MQTT* client handle
  *
- * @return ESP_OK
- *         ESP_ERR_INVALID_ARG on wrong initialization
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_INVALID_ARG on wrong initialization
  */
 esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client);
 
@@ -644,9 +662,10 @@ esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client);
  *
  * @param config    *MQTT* configuration structure
  *
- * @return ESP_ERR_NO_MEM if failed to allocate
- *         ESP_ERR_INVALID_ARG if conflicts on transport configuration.
- *         ESP_OK on success
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_INVALID_ARG if conflicts on transport configuration
+ *         - ESP_ERR_NO_MEM if failed to allocate
  */
 esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client,
                               const esp_mqtt_client_config_t *config);
@@ -659,9 +678,10 @@ esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client,
  * @param event_handler     handler callback
  * @param event_handler_arg handlers context
  *
- * @return ESP_ERR_NO_MEM if failed to allocate
- *         ESP_ERR_INVALID_ARG on wrong initialization
- *         ESP_OK on success
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_ERR_NO_MEM if failed to allocate
  */
 esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client,
                                          esp_mqtt_event_id_t event,
@@ -675,9 +695,10 @@ esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client,
  * @param event             event ID
  * @param event_handler     handler to unregister
  *
- * @return ESP_ERR_NO_MEM if failed to allocate
- *         ESP_ERR_INVALID_ARG on invalid event ID
- *         ESP_OK on success
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_INVALID_ARG on invalid event ID
+ *         - ESP_ERR_NO_MEM if failed to allocate
  */
 esp_err_t esp_mqtt_client_unregister_event(esp_mqtt_client_handle_t client, esp_mqtt_event_id_t event,
                                            esp_event_handler_t event_handler);
@@ -686,8 +707,9 @@ esp_err_t esp_mqtt_client_unregister_event(esp_mqtt_client_handle_t client, esp_
  * @brief Get outbox size
  *
  * @param client            *MQTT* client handle
- * @return outbox size
- *         0 on wrong initialization
+ * @return
+ *         - outbox size in bytes
+ *         - 0 on wrong initialization
  */
 int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client);
 
@@ -696,8 +718,9 @@ int esp_mqtt_client_get_outbox_size(esp_mqtt_client_handle_t client);
  *
  * @param client            *MQTT* client handle
  * @param event             *MQTT* event handle structure
- * @return ESP_OK on success
- *         ESP_ERR_TIMEOUT if the event couldn't be queued (ref also CONFIG_MQTT_EVENT_QUEUE_SIZE)
+ * @return
+ *         - ESP_OK on success
+ *         - ESP_ERR_TIMEOUT if the event couldn't be queued (see also CONFIG_MQTT_EVENT_QUEUE_SIZE)
  */
 esp_err_t esp_mqtt_dispatch_custom_event(esp_mqtt_client_handle_t client, esp_mqtt_event_t *event);
 
@@ -717,8 +740,9 @@ esp_err_t esp_mqtt_dispatch_custom_event(esp_mqtt_client_handle_t client, esp_mq
  *
  * @param client            *MQTT* client handle
  * @param transport_scheme  Transport handle to search for.
- * @return the transport handle
- *         NULL in case of error
+ * @return
+ *         - transport handle on success
+ *         - NULL on error
  *
 */
 esp_transport_handle_t esp_mqtt_client_get_transport(esp_mqtt_client_handle_t client, char *transport_scheme);
@@ -730,8 +754,9 @@ esp_transport_handle_t esp_mqtt_client_get_transport(esp_mqtt_client_handle_t cl
  * reconnection, or disconnected.
  *
  * @param client            *MQTT* client handle
- * @return MQTT client state on success
- *         MQTT_CLIENT_STATE_INVALID in case of error
+ * @return
+ *         - MQTT client state on success
+ *         - MQTT_CLIENT_STATE_INVALID on error
  */
 esp_mqtt_client_connection_state_t esp_mqtt_client_get_state(esp_mqtt_client_handle_t client);
 
