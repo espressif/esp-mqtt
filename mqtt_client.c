@@ -1041,6 +1041,7 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
         goto _mqtt_init_failed;
     }
 
+    atomic_init(&client->task_running, false);
 #ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
     esp_event_loop_args_t no_task_loop = {
         .queue_size = MQTT_EVENT_QUEUE_SIZE,
@@ -2184,7 +2185,11 @@ static void esp_mqtt_task(void *pv)
 
     esp_transport_close(client->transport);
     outbox_delete_all_items(client->outbox);
+    MQTT_API_LOCK(client);
     client->state = MQTT_STATE_DISCONNECTED;
+    client->task_handle = NULL;
+    atomic_store(&client->task_running, false);
+    MQTT_API_UNLOCK(client);
     xEventGroupSetBits(client->status_bits, STOPPED_BIT);
 #if MQTT_TASK_STACK_ON_EXTERNAL_MEMORY
     vTaskDeleteWithCaps(NULL);
@@ -2209,6 +2214,7 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
     }
 
     esp_err_t err = ESP_OK;
+    client->state = MQTT_STATE_INIT;
 #if MQTT_CORE_SELECTION_ENABLED
     ESP_LOGD(TAG, "Core selection enabled on %u", MQTT_TASK_CORE);
 #else
@@ -2232,6 +2238,7 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
     }
 
 #endif
+    atomic_store(&client->task_running, err == ESP_OK);
     MQTT_API_UNLOCK(client);
     return err;
 }
@@ -2851,31 +2858,29 @@ esp_mqtt_client_connection_state_t esp_mqtt_client_get_state(esp_mqtt_client_han
         return MQTT_CLIENT_STATE_NOT_INITIALIZED;
     }
 
-    if (client->task_handle == NULL) {
-        return MQTT_CLIENT_STATE_NOT_STARTED;
-    }
+    esp_mqtt_client_connection_state_t ret = MQTT_CLIENT_STATE_DISCONNECTED;
 
-    MQTT_API_LOCK(client);
-    esp_mqtt_client_connection_state_t ret = MQTT_CLIENT_STATE_NOT_INITIALIZED;
-
-    switch (client->state) {
-    case MQTT_STATE_INIT:
+    if (!atomic_load(&client->task_running)) {
         ret = MQTT_CLIENT_STATE_NOT_STARTED;
-        break;
+    } else {
+        switch (atomic_load(&client->state)) {
+        case MQTT_STATE_INIT:
+            ret = MQTT_CLIENT_STATE_CONNECTING;
+            break;
 
-    case MQTT_STATE_CONNECTED:
-        ret = MQTT_CLIENT_STATE_CONNECTED;
-        break;
+        case MQTT_STATE_CONNECTED:
+            ret = MQTT_CLIENT_STATE_CONNECTED;
+            break;
 
-    case MQTT_STATE_WAIT_RECONNECT:
-        ret = MQTT_CLIENT_STATE_WAITING_RECONNECT;
-        break;
+        case MQTT_STATE_WAIT_RECONNECT:
+            ret = MQTT_CLIENT_STATE_WAITING_RECONNECT;
+            break;
 
-    case MQTT_STATE_DISCONNECTED:
-        ret = MQTT_CLIENT_STATE_DISCONNECTED;
-        break;
+        case MQTT_STATE_DISCONNECTED:
+            ret = MQTT_CLIENT_STATE_DISCONNECTED;
+            break;
+        }
     }
 
-    MQTT_API_UNLOCK(client);
     return ret;
 }

@@ -413,6 +413,19 @@ def started_client(dut: Dut) -> Generator[Dut, None, None]:
         stop_client(dut)
 
 
+# esp_mqtt_client_connection_state_t integer values
+MQTT_CLIENT_STATE_NOT_STARTED = 1
+MQTT_CLIENT_STATE_CONNECTED = 3
+MQTT_CLIENT_STATE_WAITING_RECONNECT = 4
+MQTT_CLIENT_STATE_CONNECTING = 5
+
+
+def assert_client_state(dut: Dut, expected: int) -> None:
+    """Issue get_state and assert the DUT reports the expected numeric state."""
+    dut.write("get_state")
+    dut.expect(re.compile(f"CLIENT_STATE={expected}(?![0-9])".encode()), timeout=DUT_CMD_TIMEOUT)
+
+
 def case_timeout(
     *,
     connect_operations: int = 0,
@@ -498,6 +511,46 @@ def expect_n(
                 seen[key] += 1
                 break
     return seen
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=1,
+        event_wait_operations=1,
+    )
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+def test_client_state_transitions(dut: Dut) -> None:
+    """
+    Verify esp_mqtt_client_get_state across the observable lifecycle:
+    NOT_STARTED → CONNECTING → CONNECTED → WAITING_RECONNECT → NOT_STARTED.
+
+    Holding CONNACK makes the otherwise short CONNECTING state deterministic.
+    """
+    with (
+        broker_started(hold_packet_types=(MqttPacketType.CONNACK,)) as broker,
+        initialized_mqtt_client(dut, broker.uri) as client,
+    ):
+        assert_client_state(client, MQTT_CLIENT_STATE_NOT_STARTED)
+
+        client.write("start")
+        try:
+            broker.wait_for_held_packets(MqttPacketType.CONNACK, 1, timeout=DUT_CONNECT_TIMEOUT)
+            assert_client_state(client, MQTT_CLIENT_STATE_CONNECTING)
+        finally:
+            broker.release_held_packets(MqttPacketType.CONNACK)
+
+        client.expect(re.compile(rb"MQTT_EVENT_CONNECTED"), timeout=DUT_CONNECT_TIMEOUT)
+        assert_client_state(client, MQTT_CLIENT_STATE_CONNECTED)
+
+        client.write("disconnect")
+        client.expect(re.compile(rb"MQTT_EVENT_DISCONNECTED"), timeout=DUT_EVENT_TIMEOUT)
+        assert_client_state(client, MQTT_CLIENT_STATE_WAITING_RECONNECT)
+
+        client.write("stop")
+        client.expect(re.compile(rb"Mqtt client stopped"), timeout=DUT_CMD_TIMEOUT)
+        assert_client_state(client, MQTT_CLIENT_STATE_NOT_STARTED)
 
 
 @pytest.mark.eth_ip101

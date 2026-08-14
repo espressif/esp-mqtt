@@ -206,6 +206,20 @@ flash cache 被禁用时无法访问外部内存。因此，当任务栈位于�
 任务分发的事件处理函数中运行的用户代码。
 
 
+查询客户端状态
+---------------------
+
+使用 :cpp:func:`esp_mqtt_client_get_state` 可读取客户端句柄的当前生命周期。常见返回值如下：
+
+* ``MQTT_CLIENT_STATE_NOT_INITIALIZED`` — 句柄为 ``NULL``。
+* ``MQTT_CLIENT_STATE_NOT_STARTED`` — 客户端已初始化，但其任务未运行（从未启动，或已经停止）。
+* ``MQTT_CLIENT_STATE_CONNECTING`` — 任务正在运行，并且正在尝试连接。
+* ``MQTT_CLIENT_STATE_CONNECTED`` — 客户端已连接到服务器。
+* ``MQTT_CLIENT_STATE_WAITING_RECONNECT`` — 客户端正在等待重连超时（或调用 :cpp:func:`esp_mqtt_client_reconnect`）。
+* ``MQTT_CLIENT_STATE_DISCONNECTED`` — 任务仍在运行，但客户端未连接到服务器（例如 ``stop`` 尚未完成时）。
+
+该查询独立于事件处理函数：需要重新配置服务器 URI 或运行看门狗的应用，无需镜像全部事件即可判断客户端是已停止、正在连接、已连接，还是正在等待重连。
+
 事件
 ------------
 MQTT 客户端可能会发布以下事件：
