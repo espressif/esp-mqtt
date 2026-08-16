@@ -2351,8 +2351,137 @@ static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client)
     return ESP_OK;
 }
 
+#ifdef MQTT_PROTOCOL_5
+static void mqtt5_merge_publish_property(const esp_mqtt5_publish_property_config_t *base,
+                                         const esp_mqtt5_publish_property_config_t *override,
+                                         esp_mqtt5_publish_property_config_t *out)
+{
+    if (base) {
+        *out = *base;
+    } else {
+        memset(out, 0, sizeof(*out));
+    }
+
+    if (!override) {
+        return;
+    }
+
+    if (override->payload_format_indicator) {
+        out->payload_format_indicator = override->payload_format_indicator;
+    }
+
+    if (override->message_expiry_interval) {
+        out->message_expiry_interval = override->message_expiry_interval;
+    }
+
+    if (override->topic_alias) {
+        out->topic_alias = override->topic_alias;
+    }
+
+    if (override->response_topic) {
+        out->response_topic = override->response_topic;
+    }
+
+    if (override->correlation_data && override->correlation_data_len) {
+        out->correlation_data = override->correlation_data;
+        out->correlation_data_len = override->correlation_data_len;
+    }
+
+    if (override->content_type) {
+        out->content_type = override->content_type;
+    }
+
+    if (override->user_property) {
+        out->user_property = override->user_property;
+    }
+}
+
+static void mqtt5_merge_subscribe_property(const esp_mqtt5_subscribe_property_config_t *base,
+                                           const esp_mqtt5_subscribe_property_config_t *override,
+                                           esp_mqtt5_subscribe_property_config_t *out)
+{
+    if (base) {
+        *out = *base;
+    } else {
+        memset(out, 0, sizeof(*out));
+    }
+
+    if (!override) {
+        return;
+    }
+
+    if (override->subscribe_id) {
+        out->subscribe_id = override->subscribe_id;
+    }
+
+    if (override->no_local_flag) {
+        out->no_local_flag = override->no_local_flag;
+    }
+
+    if (override->retain_as_published_flag) {
+        out->retain_as_published_flag = override->retain_as_published_flag;
+    }
+
+    if (override->retain_handle) {
+        out->retain_handle = override->retain_handle;
+    }
+
+    if (override->is_share_subscribe) {
+        out->is_share_subscribe = override->is_share_subscribe;
+    }
+
+    if (override->share_name) {
+        out->share_name = override->share_name;
+    }
+
+    if (override->user_property) {
+        out->user_property = override->user_property;
+    }
+}
+
+static void mqtt5_merge_unsubscribe_property(const esp_mqtt5_unsubscribe_property_config_t *base,
+                                             const esp_mqtt5_unsubscribe_property_config_t *override,
+                                             esp_mqtt5_unsubscribe_property_config_t *out)
+{
+    if (base) {
+        *out = *base;
+    } else {
+        memset(out, 0, sizeof(*out));
+    }
+
+    if (!override) {
+        return;
+    }
+
+    if (override->is_share_subscribe) {
+        out->is_share_subscribe = override->is_share_subscribe;
+    }
+
+    if (override->share_name) {
+        out->share_name = override->share_name;
+    }
+
+    if (override->user_property) {
+        out->user_property = override->user_property;
+    }
+}
+#endif
 int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
                                        const esp_mqtt_topic_t *topic_list, int size)
+{
+#ifdef MQTT_PROTOCOL_5
+    return mqtt_client_subscribe_multiple_internal(client, topic_list, size, NULL);
+#else
+    return mqtt_client_subscribe_multiple_internal(client, topic_list, size);
+#endif
+}
+
+static int mqtt_client_subscribe_multiple_internal(esp_mqtt_client_handle_t client,
+                                                   const esp_mqtt_topic_t *topic_list, int size
+#ifdef MQTT_PROTOCOL_5
+                                                   , const esp_mqtt5_subscribe_property_config_t *subscribe_property
+#endif
+                                                  )
 {
     if (!client) {
         ESP_LOGE(TAG, "Client was not initialized");
@@ -2388,9 +2517,17 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
             return -1;
         }
 
+        esp_mqtt5_subscribe_property_config_t merged_property;
+        const esp_mqtt5_subscribe_property_config_t *property = client->mqtt5_config->subscribe_property_info;
+
+        if (subscribe_property) {
+            mqtt5_merge_subscribe_property(client->mqtt5_config->subscribe_property_info, subscribe_property, &merged_property);
+            property = &merged_property;
+        }
+
         mqtt5_msg_subscribe(&client->mqtt_state.connection,
                             topic_list, size,
-                            &client->mqtt_state.pending_msg_id, client->mqtt5_config->subscribe_property_info);
+                            &client->mqtt_state.pending_msg_id, property);
 
         if (client->mqtt_state.connection.outbound_message.length) {
             client->mqtt5_config->subscribe_property_info = NULL;
@@ -2436,7 +2573,36 @@ int esp_mqtt_client_subscribe_single(esp_mqtt_client_handle_t client, const char
     return esp_mqtt_client_subscribe_multiple(client, &user_topic, 1);
 }
 
+#ifdef MQTT_PROTOCOL_5
+int esp_mqtt_client_subscribe5(esp_mqtt_client_handle_t client, const char *topic, int qos,
+                               const esp_mqtt5_subscribe_property_config_t *subscribe_property)
+{
+    esp_mqtt_topic_t user_topic = {.filter = topic, .qos = qos};
+    return mqtt_client_subscribe_multiple_internal(client, &user_topic, 1, subscribe_property);
+}
+#endif
+
 int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *topic)
+{
+#ifdef MQTT_PROTOCOL_5
+    return esp_mqtt_client_unsubscribe5(client, topic, NULL);
+#else
+    return esp_mqtt_client_unsubscribe_internal(client, topic);
+#endif
+}
+
+#ifdef MQTT_PROTOCOL_5
+int esp_mqtt_client_unsubscribe5(esp_mqtt_client_handle_t client, const char *topic,
+                                 const esp_mqtt5_unsubscribe_property_config_t *unsubscribe_property)
+{
+    return esp_mqtt_client_unsubscribe_internal(client, topic, unsubscribe_property);
+}
+
+static int esp_mqtt_client_unsubscribe_internal(esp_mqtt_client_handle_t client, const char *topic,
+                                                const esp_mqtt5_unsubscribe_property_config_t *unsubscribe_property)
+#else
+static int esp_mqtt_client_unsubscribe_internal(esp_mqtt_client_handle_t client, const char *topic)
+#endif
 {
     if (!client) {
         ESP_LOGE(TAG, "Client was not initialized");
@@ -2454,9 +2620,17 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
 
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
+        esp_mqtt5_unsubscribe_property_config_t merged_property;
+        const esp_mqtt5_unsubscribe_property_config_t *property = client->mqtt5_config->unsubscribe_property_info;
+
+        if (unsubscribe_property) {
+            mqtt5_merge_unsubscribe_property(client->mqtt5_config->unsubscribe_property_info, unsubscribe_property, &merged_property);
+            property = &merged_property;
+        }
+
         mqtt5_msg_unsubscribe(&client->mqtt_state.connection,
                               topic,
-                              &client->mqtt_state.pending_msg_id, client->mqtt5_config->unsubscribe_property_info);
+                              &client->mqtt_state.pending_msg_id, property);
 
         if (client->mqtt_state.connection.outbound_message.length) {
             client->mqtt5_config->unsubscribe_property_info = NULL;
@@ -2497,17 +2671,30 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
     return pending_msg_id;
 }
 
+
 static int make_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data,
-                        int len, int qos, int retain)
+                        int len, int qos, int retain
+#ifdef MQTT_PROTOCOL_5
+                        , const esp_mqtt5_publish_property_config_t *publish_property
+#endif
+                       )
 {
     uint16_t pending_msg_id = 0;
 
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
+        esp_mqtt5_publish_property_config_t merged_property;
+        const esp_mqtt5_publish_property_config_t *property = client->mqtt5_config->publish_property_info;
+
+        if (publish_property) {
+            mqtt5_merge_publish_property(client->mqtt5_config->publish_property_info, publish_property, &merged_property);
+            property = &merged_property;
+        }
+
         mqtt5_msg_publish(&client->mqtt_state.connection,
                           topic, data, len,
                           qos, retain,
-                          &pending_msg_id, client->mqtt5_config->publish_property_info,
+                          &pending_msg_id, property,
                           client->mqtt5_config->server_resp_property_info.response_info);
 
         if (client->mqtt_state.connection.outbound_message.length) {
@@ -2530,9 +2717,17 @@ static int make_publish(esp_mqtt_client_handle_t client, const char *topic, cons
     return pending_msg_id;
 }
 static inline int mqtt_client_enqueue_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data,
-                                              int len, int qos, int retain, bool store)
+                                              int len, int qos, int retain, bool store
+#ifdef MQTT_PROTOCOL_5
+                                              , const esp_mqtt5_publish_property_config_t *publish_property
+#endif
+                                             )
 {
-    int pending_msg_id = make_publish(client, topic, data, len, qos, retain);
+    int pending_msg_id = make_publish(client, topic, data, len, qos, retain
+#ifdef MQTT_PROTOCOL_5
+                                      , publish_property
+#endif
+                                     );
 
     if (pending_msg_id < 0) {
         return -1;
@@ -2567,6 +2762,124 @@ static inline int mqtt_client_enqueue_publish(esp_mqtt_client_handle_t client, c
 
 int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos,
                             int retain)
+{
+#ifdef MQTT_PROTOCOL_5
+    return esp_mqtt_client_publish5(client, topic, data, len, qos, retain, NULL);
+#else
+    if (!client) {
+        ESP_LOGE(TAG, "Client was not initialized");
+        return -1;
+    }
+
+#if MQTT_SKIP_PUBLISH_IF_DISCONNECTED
+
+    if (client->state != MQTT_STATE_CONNECTED) {
+        ESP_LOGI(TAG, "Publishing skipped: client is not connected");
+        return -1;
+    }
+
+#endif
+    MQTT_API_LOCK(client);
+
+    /* Acceptable publish messages:
+        data == NULL, len == 0: publish null message
+        data valid,   len == 0: publish all data, payload len is determined from string length
+        data valid,   len >  0: publish data with defined length
+     */
+    if (len <= 0 && data != NULL) {
+        len = strlen(data);
+    }
+
+    if (client->config->outbox_limit > 0 && qos > 0) {
+        if (len + outbox_get_size(client->outbox) > client->config->outbox_limit) {
+            MQTT_API_UNLOCK(client);
+            return -2;
+        }
+    }
+
+    int pending_msg_id = mqtt_client_enqueue_publish(client, topic, data, len, qos, retain, false
+#ifdef MQTT_PROTOCOL_5
+                                                    , NULL
+#endif
+                                                   );
+
+    if (pending_msg_id < 0) {
+        MQTT_API_UNLOCK(client);
+        return -1;
+    }
+
+    int ret = 0;
+
+    /* Skip sending if not connected (rely on resending) */
+    if (client->state != MQTT_STATE_CONNECTED) {
+        ESP_LOGD(TAG, "Publish: client is not connected");
+
+        if (qos > 0) {
+            ret = pending_msg_id;
+        } else {
+            ret = -1;
+        }
+
+        goto cannot_publish;
+    }
+
+    /* Provide support for sending fragmented message if it doesn't fit buffer */
+    int remaining_len = len;
+    const char *current_data = data;
+    bool sending = true;
+
+    while (sending)  {
+        if (esp_mqtt_write(client) != ESP_OK) {
+            esp_mqtt_abort_connection(client);
+            ret = -1;
+            goto cannot_publish;
+        }
+
+        int data_sent = client->mqtt_state.connection.outbound_message.length -
+                        client->mqtt_state.connection.outbound_message.fragmented_msg_data_offset;
+        client->mqtt_state.connection.outbound_message.fragmented_msg_data_offset = 0;
+        client->mqtt_state.connection.outbound_message.fragmented_msg_total_length = 0;
+        remaining_len -= data_sent;
+        current_data +=  data_sent;
+
+        if (remaining_len > 0) {
+            mqtt_connection_t *connection = &client->mqtt_state.connection;
+            ESP_LOGD(TAG, "Sending fragmented message, remains to send %d bytes of %d", remaining_len, len);
+            int write_len = remaining_len > connection->buffer_length ? connection->buffer_length : remaining_len;
+            memcpy(connection->buffer, current_data, write_len);
+            connection->outbound_message.data = connection->buffer;
+            connection->outbound_message.length = write_len;
+            sending = true;
+        } else {
+            // Message was sent correctly
+            sending = false;
+        }
+    }
+
+    if (qos > 0) {
+        //Tick is set after transmit to avoid retransmitting too early due slow network speed / big messages
+        outbox_set_tick(client->outbox, pending_msg_id, platform_tick_get_ms());
+        outbox_set_pending(client->outbox, pending_msg_id, TRANSMITTED);
+    }
+
+    MQTT_API_UNLOCK(client);
+    return pending_msg_id;
+cannot_publish:
+    // clear out possible fragmented publish if failed or skipped
+    client->mqtt_state.connection.outbound_message.fragmented_msg_total_length = 0;
+
+    if (qos == 0) {
+        ESP_LOGW(TAG, "Publish: Losing qos0 data when client not connected");
+    }
+
+    MQTT_API_UNLOCK(client);
+    return ret;
+#endif
+}
+
+#ifdef MQTT_PROTOCOL_5
+int esp_mqtt_client_publish5(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos,
+                             int retain, const esp_mqtt5_publish_property_config_t *publish_property)
 {
     if (!client) {
         ESP_LOGE(TAG, "Client was not initialized");
@@ -2610,7 +2923,7 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         }
     }
 
-    int pending_msg_id = mqtt_client_enqueue_publish(client, topic, data, len, qos, retain, false);
+    int pending_msg_id = mqtt_client_enqueue_publish(client, topic, data, len, qos, retain, false, publish_property);
 
     if (pending_msg_id < 0) {
         MQTT_API_UNLOCK(client);
@@ -2702,9 +3015,28 @@ cannot_publish:
     MQTT_API_UNLOCK(client);
     return ret;
 }
+#endif
+
+#ifdef MQTT_PROTOCOL_5
+int esp_mqtt_client_enqueue5(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos,
+                             int retain, bool store, const esp_mqtt5_publish_property_config_t *publish_property)
+{
+    return esp_mqtt_client_enqueue_internal(client, topic, data, len, qos, retain, store, publish_property);
+}
 
 int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos,
                             int retain, bool store)
+{
+    return esp_mqtt_client_enqueue_internal(client, topic, data, len, qos, retain, store, NULL);
+}
+
+static int esp_mqtt_client_enqueue_internal(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len,
+                                            int qos, int retain, bool store,
+                                            const esp_mqtt5_publish_property_config_t *publish_property)
+#else
+int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos,
+                            int retain, bool store)
+#endif
 {
     if (!client) {
         ESP_LOGE(TAG, "Client was not initialized");
@@ -2738,7 +3070,11 @@ int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic, 
     }
 
 #endif
-    int ret = mqtt_client_enqueue_publish(client, topic, data, len, qos, retain, store);
+    int ret = mqtt_client_enqueue_publish(client, topic, data, len, qos, retain, store
+#ifdef MQTT_PROTOCOL_5
+                                          , publish_property
+#endif
+                                          );
     MQTT_API_UNLOCK(client);
 
     if (ret == 0 && store == false) {

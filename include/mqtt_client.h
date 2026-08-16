@@ -522,6 +522,32 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client);
  */
 int esp_mqtt_client_subscribe_single(esp_mqtt_client_handle_t client,
                                      const char *topic, int qos);
+
+#ifdef CONFIG_MQTT_PROTOCOL_5
+/**
+ * @brief Subscribe the client to a defined topic with defined qos, overriding
+ * the MQTT v5 subscribe properties for this single message.
+ *
+ * Same behavior as `esp_mqtt_client_subscribe_single`, but the subscribe
+ * properties (including user properties) passed in `property` are applied
+ * directly to this message atomically. Properties set via
+ * `esp_mqtt5_client_set_subscribe_property` still apply as a base for this
+ * message, and any field present in `property` overrides it.
+ *
+ * @param client    *MQTT* client handle
+ * @param topic topic filter to subscribe
+ * @param qos Max qos level of the subscription
+ * @param property  subscribe properties for this message, may be NULL to use the
+ * properties set via `esp_mqtt5_client_set_subscribe_property`
+ *
+ * @return message_id of the subscribe message on success
+ *         -1 on failure
+ *         -2 in case of full outbox.
+ */
+int esp_mqtt_client_subscribe5(esp_mqtt_client_handle_t client,
+                               const char *topic, int qos,
+                               const esp_mqtt5_subscribe_property_config_t *property);
+#endif
 /**
  * @brief Subscribe the client to a list of defined topics with defined qos
  *
@@ -560,6 +586,30 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
 int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client,
                                 const char *topic);
 
+#ifdef CONFIG_MQTT_PROTOCOL_5
+/**
+ * @brief Unsubscribe the client from defined topic, overriding the MQTT v5
+ * unsubscribe properties for this single message.
+ *
+ * Same behavior as `esp_mqtt_client_unsubscribe`, but the unsubscribe
+ * properties (including user properties) passed in `property` are applied
+ * directly to this message atomically. Properties set via
+ * `esp_mqtt5_client_set_unsubscribe_property` still apply as a base for this
+ * message, and any field present in `property` overrides it.
+ *
+ * @param client    *MQTT* client handle
+ * @param topic
+ * @param property  unsubscribe properties for this message, may be NULL to use
+ * the properties set via `esp_mqtt5_client_set_unsubscribe_property`
+ *
+ * @return message_id of the subscribe message on success
+ *         -1 on failure
+ */
+int esp_mqtt_client_unsubscribe5(esp_mqtt_client_handle_t client,
+                                 const char *topic,
+                                 const esp_mqtt5_unsubscribe_property_config_t *property);
+#endif
+
 /**
  * @brief Client to send a publish message to the broker
  *
@@ -592,6 +642,36 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client,
 int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic,
                             const char *data, int len, int qos, int retain);
 
+#ifdef CONFIG_MQTT_PROTOCOL_5
+/**
+ * @brief Client to send a publish message to the broker, overriding the
+ * MQTT v5 publish properties for this single message.
+ *
+ * Same behavior as `esp_mqtt_client_publish`, but the publish properties
+ * (including user properties) passed in `property` are applied directly to this
+ * message atomically (no separate `esp_mqtt5_client_set_publish_property` call
+ * is required, so it is safe to call from multiple tasks). Properties set via
+ * `esp_mqtt5_client_set_publish_property` still apply as a base for this
+ * message, and any field present in `property` overrides it.
+ *
+ * @param client    *MQTT* client handle
+ * @param topic     topic string
+ * @param data      payload string (set to NULL, sending empty payload message)
+ * @param len       data length, if set to 0, length is calculated from payload
+ * string
+ * @param qos       QoS of publish message
+ * @param retain    retain flag
+ * @param property  publish properties for this message, may be NULL to use the
+ * properties set via `esp_mqtt5_client_set_publish_property`
+ *
+ * @return message_id of the publish message (for QoS 0 message_id will always
+ * be zero) on success. -1 on failure, -2 in case of full outbox.
+ */
+int esp_mqtt_client_publish5(esp_mqtt_client_handle_t client, const char *topic,
+                             const char *data, int len, int qos, int retain,
+                             const esp_mqtt5_publish_property_config_t *property);
+#endif
+
 /**
  * @brief Enqueue a message to the outbox, to be sent later. Typically used for
  * messages with qos>0, but could be also used for qos=0 messages if store=true.
@@ -619,6 +699,37 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic,
 int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic,
                             const char *data, int len, int qos, int retain,
                             bool store);
+
+#ifdef CONFIG_MQTT_PROTOCOL_5
+/**
+ * @brief Enqueue a message to the outbox, to be sent later, overriding the
+ * MQTT v5 publish properties for this single message.
+ *
+ * Same behavior as `esp_mqtt_client_enqueue`, but the publish properties
+ * (including user properties) passed in `property` are applied directly to this
+ * message atomically. Properties set via `esp_mqtt5_client_set_publish_property`
+ * still apply as a base for this message, and any field present in `property`
+ * overrides it.
+ *
+ * @param client    *MQTT* client handle
+ * @param topic     topic string
+ * @param data      payload string (set to NULL, sending empty payload message)
+ * @param len       data length, if set to 0, length is calculated from payload
+ * string
+ * @param qos       QoS of publish message
+ * @param retain    retain flag
+ * @param store     if true, all messages are enqueued; otherwise only QoS 1 and
+ * QoS 2 are enqueued
+ * @param property  publish properties for this message, may be NULL to use the
+ * properties set via `esp_mqtt5_client_set_publish_property`
+ *
+ * @return message_id if queued successfully, -1 on failure, -2 in case of full outbox.
+ */
+int esp_mqtt_client_enqueue5(esp_mqtt_client_handle_t client, const char *topic,
+                             const char *data, int len, int qos, int retain,
+                             bool store,
+                             const esp_mqtt5_publish_property_config_t *property);
+#endif
 
 /**
  * @brief Destroys the client handle
