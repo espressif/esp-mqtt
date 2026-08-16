@@ -2466,6 +2466,13 @@ static void mqtt5_merge_unsubscribe_property(const esp_mqtt5_unsubscribe_propert
     }
 }
 #endif
+static int mqtt_client_subscribe_multiple_internal(esp_mqtt_client_handle_t client,
+                                                   const esp_mqtt_topic_t *topic_list, int size
+#ifdef MQTT_PROTOCOL_5
+                                                   , const esp_mqtt5_subscribe_property_config_t *subscribe_property
+#endif
+                                                  );
+
 int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
                                        const esp_mqtt_topic_t *topic_list, int size)
 {
@@ -2475,13 +2482,6 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
     return mqtt_client_subscribe_multiple_internal(client, topic_list, size);
 #endif
 }
-
-static int mqtt_client_subscribe_multiple_internal(esp_mqtt_client_handle_t client,
-                                                   const esp_mqtt_topic_t *topic_list, int size
-#ifdef MQTT_PROTOCOL_5
-                                                   , const esp_mqtt5_subscribe_property_config_t *subscribe_property
-#endif
-                                                  );
 
 static int mqtt_client_subscribe_multiple_internal(esp_mqtt_client_handle_t client,
                                                    const esp_mqtt_topic_t *topic_list, int size
