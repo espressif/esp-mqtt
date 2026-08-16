@@ -2481,6 +2481,13 @@ static int mqtt_client_subscribe_multiple_internal(esp_mqtt_client_handle_t clie
 #ifdef MQTT_PROTOCOL_5
                                                    , const esp_mqtt5_subscribe_property_config_t *subscribe_property
 #endif
+                                                  );
+
+static int mqtt_client_subscribe_multiple_internal(esp_mqtt_client_handle_t client,
+                                                   const esp_mqtt_topic_t *topic_list, int size
+#ifdef MQTT_PROTOCOL_5
+                                                   , const esp_mqtt5_subscribe_property_config_t *subscribe_property
+#endif
                                                   )
 {
     if (!client) {
@@ -2580,6 +2587,13 @@ int esp_mqtt_client_subscribe5(esp_mqtt_client_handle_t client, const char *topi
     esp_mqtt_topic_t user_topic = {.filter = topic, .qos = qos};
     return mqtt_client_subscribe_multiple_internal(client, &user_topic, 1, subscribe_property);
 }
+#endif
+
+#ifdef MQTT_PROTOCOL_5
+static int esp_mqtt_client_unsubscribe_internal(esp_mqtt_client_handle_t client, const char *topic,
+                                                const esp_mqtt5_unsubscribe_property_config_t *unsubscribe_property);
+#else
+static int esp_mqtt_client_unsubscribe_internal(esp_mqtt_client_handle_t client, const char *topic);
 #endif
 
 int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *topic)
@@ -3015,6 +3029,15 @@ cannot_publish:
     MQTT_API_UNLOCK(client);
     return ret;
 }
+#endif
+
+#ifdef MQTT_PROTOCOL_5
+static int esp_mqtt_client_enqueue_internal(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len,
+                                            int qos, int retain, bool store,
+                                            const esp_mqtt5_publish_property_config_t *publish_property);
+#else
+static int esp_mqtt_client_enqueue_internal(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len,
+                                            int qos, int retain, bool store);
 #endif
 
 #ifdef MQTT_PROTOCOL_5
