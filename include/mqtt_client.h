@@ -530,9 +530,19 @@ int esp_mqtt_client_subscribe_single(esp_mqtt_client_handle_t client,
  *
  * Same behavior as `esp_mqtt_client_subscribe_single`, but the subscribe
  * properties (including user properties) passed in `property` are applied
- * directly to this message atomically. Properties set via
- * `esp_mqtt5_client_set_subscribe_property` still apply as a base for this
- * message, and any field present in `property` overrides it.
+ * directly to this message atomically, so no separate
+ * `esp_mqtt5_client_set_subscribe_property` call is required and it is safe to
+ * call from multiple tasks.
+ *
+ * A non-NULL `property` is used *instead of* anything staged via
+ * `esp_mqtt5_client_set_subscribe_property` — the two are not merged, and the
+ * staged property is left in place for the next plain subscribe. Passing NULL
+ * falls back to the staged property (and consumes it) exactly like
+ * `esp_mqtt_client_subscribe_single`.
+ *
+ * `property` is validated the same way `esp_mqtt5_client_set_subscribe_property`
+ * validates it (shared-subscription rules, `retain_handle` range); an invalid
+ * property is rejected instead of being put on the wire.
  *
  * @param client    *MQTT* client handle
  * @param topic topic filter to subscribe
@@ -541,7 +551,7 @@ int esp_mqtt_client_subscribe_single(esp_mqtt_client_handle_t client,
  * properties set via `esp_mqtt5_client_set_subscribe_property`
  *
  * @return message_id of the subscribe message on success
- *         -1 on failure
+ *         -1 on failure, including an invalid `property`
  *         -2 in case of full outbox.
  */
 int esp_mqtt_client_subscribe5(esp_mqtt_client_handle_t client,
@@ -593,17 +603,27 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client,
  *
  * Same behavior as `esp_mqtt_client_unsubscribe`, but the unsubscribe
  * properties (including user properties) passed in `property` are applied
- * directly to this message atomically. Properties set via
- * `esp_mqtt5_client_set_unsubscribe_property` still apply as a base for this
- * message, and any field present in `property` overrides it.
+ * directly to this message atomically, so no separate
+ * `esp_mqtt5_client_set_unsubscribe_property` call is required and it is safe to
+ * call from multiple tasks.
+ *
+ * A non-NULL `property` is used *instead of* anything staged via
+ * `esp_mqtt5_client_set_unsubscribe_property` — the two are not merged, and the
+ * staged property is left in place for the next plain unsubscribe. Passing NULL
+ * falls back to the staged property (and consumes it) exactly like
+ * `esp_mqtt_client_unsubscribe`.
+ *
+ * `property` is validated the same way `esp_mqtt5_client_set_unsubscribe_property`
+ * validates it (shared-subscription rules); an invalid property is rejected
+ * instead of being put on the wire.
  *
  * @param client    *MQTT* client handle
  * @param topic
  * @param property  unsubscribe properties for this message, may be NULL to use
  * the properties set via `esp_mqtt5_client_set_unsubscribe_property`
  *
- * @return message_id of the subscribe message on success
- *         -1 on failure
+ * @return message_id of the unsubscribe message on success
+ *         -1 on failure, including an invalid `property`
  */
 int esp_mqtt_client_unsubscribe5(esp_mqtt_client_handle_t client,
                                  const char *topic,
@@ -649,10 +669,18 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic,
  *
  * Same behavior as `esp_mqtt_client_publish`, but the publish properties
  * (including user properties) passed in `property` are applied directly to this
- * message atomically (no separate `esp_mqtt5_client_set_publish_property` call
- * is required, so it is safe to call from multiple tasks). Properties set via
- * `esp_mqtt5_client_set_publish_property` still apply as a base for this
- * message, and any field present in `property` overrides it.
+ * message atomically, so no separate `esp_mqtt5_client_set_publish_property`
+ * call is required and it is safe to call from multiple tasks.
+ *
+ * A non-NULL `property` is used *instead of* anything staged via
+ * `esp_mqtt5_client_set_publish_property` — the two are not merged, and the
+ * staged property is left in place for the next plain publish. Passing NULL
+ * falls back to the staged property (and consumes it) exactly like
+ * `esp_mqtt_client_publish`.
+ *
+ * `property` is validated the same way `esp_mqtt5_client_set_publish_property`
+ * validates it (`topic_alias` against the server maximum); an invalid property
+ * is rejected instead of being put on the wire.
  *
  * @param client    *MQTT* client handle
  * @param topic     topic string
@@ -665,7 +693,8 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic,
  * properties set via `esp_mqtt5_client_set_publish_property`
  *
  * @return message_id of the publish message (for QoS 0 message_id will always
- * be zero) on success. -1 on failure, -2 in case of full outbox.
+ * be zero) on success. -1 on failure (including an invalid `property`), -2 in
+ * case of full outbox.
  */
 int esp_mqtt_client_publish5(esp_mqtt_client_handle_t client, const char *topic,
                              const char *data, int len, int qos, int retain,
@@ -707,9 +736,18 @@ int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic,
  *
  * Same behavior as `esp_mqtt_client_enqueue`, but the publish properties
  * (including user properties) passed in `property` are applied directly to this
- * message atomically. Properties set via `esp_mqtt5_client_set_publish_property`
- * still apply as a base for this message, and any field present in `property`
- * overrides it.
+ * message atomically, so no separate `esp_mqtt5_client_set_publish_property`
+ * call is required and it is safe to call from multiple tasks.
+ *
+ * A non-NULL `property` is used *instead of* anything staged via
+ * `esp_mqtt5_client_set_publish_property` — the two are not merged, and the
+ * staged property is left in place for the next plain enqueue. Passing NULL
+ * falls back to the staged property (and consumes it) exactly like
+ * `esp_mqtt_client_enqueue`.
+ *
+ * `property` is validated the same way `esp_mqtt5_client_set_publish_property`
+ * validates it (`topic_alias` against the server maximum); an invalid property
+ * is rejected instead of being put on the wire.
  *
  * @param client    *MQTT* client handle
  * @param topic     topic string
@@ -723,7 +761,8 @@ int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic,
  * @param property  publish properties for this message, may be NULL to use the
  * properties set via `esp_mqtt5_client_set_publish_property`
  *
- * @return message_id if queued successfully, -1 on failure, -2 in case of full outbox.
+ * @return message_id if queued successfully, -1 on failure (including an
+ * invalid `property`), -2 in case of full outbox.
  */
 int esp_mqtt_client_enqueue5(esp_mqtt_client_handle_t client, const char *topic,
                              const char *data, int len, int qos, int retain,
