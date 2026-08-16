@@ -2685,7 +2685,6 @@ static int esp_mqtt_client_unsubscribe_internal(esp_mqtt_client_handle_t client,
     return pending_msg_id;
 }
 
-
 #ifdef MQTT_PROTOCOL_5
 static int make_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data,
                         int len, int qos, int retain,
@@ -2784,6 +2783,7 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
 #ifdef MQTT_PROTOCOL_5
     return esp_mqtt_client_publish5(client, topic, data, len, qos, retain, NULL);
 #else
+
     if (!client) {
         ESP_LOGE(TAG, "Client was not initialized");
         return -1;
