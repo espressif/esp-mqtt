@@ -2686,12 +2686,14 @@ static int esp_mqtt_client_unsubscribe_internal(esp_mqtt_client_handle_t client,
 }
 
 
-static int make_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data,
-                        int len, int qos, int retain
 #ifdef MQTT_PROTOCOL_5
-                        , const esp_mqtt5_publish_property_config_t *publish_property
+static int make_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data,
+                        int len, int qos, int retain,
+                        const esp_mqtt5_publish_property_config_t *publish_property)
+#else
+static int make_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data,
+                        int len, int qos, int retain)
 #endif
-                       )
 {
     uint16_t pending_msg_id = 0;
 
@@ -2730,12 +2732,14 @@ static int make_publish(esp_mqtt_client_handle_t client, const char *topic, cons
 
     return pending_msg_id;
 }
-static inline int mqtt_client_enqueue_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data,
-                                              int len, int qos, int retain, bool store
 #ifdef MQTT_PROTOCOL_5
-                                              , const esp_mqtt5_publish_property_config_t *publish_property
+static inline int mqtt_client_enqueue_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data,
+                                              int len, int qos, int retain, bool store,
+                                              const esp_mqtt5_publish_property_config_t *publish_property)
+#else
+static inline int mqtt_client_enqueue_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data,
+                                              int len, int qos, int retain, bool store)
 #endif
-                                             )
 {
     int pending_msg_id = make_publish(client, topic, data, len, qos, retain
 #ifdef MQTT_PROTOCOL_5
@@ -2811,11 +2815,7 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
         }
     }
 
-    int pending_msg_id = mqtt_client_enqueue_publish(client, topic, data, len, qos, retain, false
-#ifdef MQTT_PROTOCOL_5
-                                                    , NULL
-#endif
-                                                   );
+    int pending_msg_id = mqtt_client_enqueue_publish(client, topic, data, len, qos, retain, false);
 
     if (pending_msg_id < 0) {
         MQTT_API_UNLOCK(client);
@@ -3097,7 +3097,7 @@ int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic, 
 #ifdef MQTT_PROTOCOL_5
                                           , publish_property
 #endif
-                                          );
+                                         );
     MQTT_API_UNLOCK(client);
 
     if (ret == 0 && store == false) {
