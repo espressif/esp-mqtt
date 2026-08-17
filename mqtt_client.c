@@ -31,9 +31,9 @@ static const char *TAG = "mqtt_client";
 ESP_EVENT_DEFINE_BASE(MQTT_EVENTS);
 #endif
 
-const static int STOPPED_BIT = (1 << 0);
-const static int RECONNECT_BIT = (1 << 1);
-const static int DISCONNECT_BIT = (1 << 2);
+static const int STOPPED_BIT = (1 << 0);
+static const int RECONNECT_BIT = (1 << 1);
+static const int DISCONNECT_BIT = (1 << 2);
 
 static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_dispatch_event_with_msgid(esp_mqtt_client_handle_t client);

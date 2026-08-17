@@ -29,7 +29,7 @@
 static const char *TAG = "publish_test";
 
 static EventGroupHandle_t mqtt_event_group;
-const static int CONNECTED_BIT = BIT0;
+static const int CONNECTED_BIT = BIT0;
 #define CLIENT_ID_SUFFIX_SIZE 12
 #if CONFIG_EXAMPLE_BROKER_CERTIFICATE_OVERRIDDEN == 1
 static const uint8_t mqtt_eclipseprojects_io_pem_start[]  = "-----BEGIN CERTIFICATE-----\n"
