@@ -21,6 +21,12 @@
 #include "esp_log.h"
 #include "mqtt_conformance.hpp"
 
+#if CONFIG_ESP_GCOV_ENABLE
+extern "C" {
+#include "esp_gcov.h"
+}
+#endif
+
 namespace
 {
 
@@ -297,6 +303,18 @@ int do_publish(int argc, char **argv)
     return 0;
 }
 
+#if CONFIG_ESP_GCOV_ENABLE
+int do_gcov_dump(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    ESP_LOGI(TAG, "GCOV dump waiting for host");
+    esp_gcov_dump();
+    ESP_LOGI(TAG, "GCOV dump complete");
+    return 0;
+}
+#endif
+
 void register_commands()
 {
     init_args.b64 = arg_str1(nullptr, nullptr, "<base64_json>", "JSON config blob (base64-encoded)");
@@ -414,6 +432,17 @@ void register_commands()
         .func_w_context = nullptr,
         .context = nullptr,
     };
+#if CONFIG_ESP_GCOV_ENABLE
+    const esp_console_cmd_t gcov_dump = {
+        .command = "gcov",
+        .help = "Dump coverage data through OpenOCD",
+        .hint = nullptr,
+        .func = &do_gcov_dump,
+        .argtable = nullptr,
+        .func_w_context = nullptr,
+        .context = nullptr,
+    };
+#endif
     ESP_ERROR_CHECK(esp_console_cmd_register(&init));
     ESP_ERROR_CHECK(esp_console_cmd_register(&config_cmd));
     ESP_ERROR_CHECK(esp_console_cmd_register(&start));
@@ -425,6 +454,9 @@ void register_commands()
     ESP_ERROR_CHECK(esp_console_cmd_register(&subscribe));
     ESP_ERROR_CHECK(esp_console_cmd_register(&unsubscribe));
     ESP_ERROR_CHECK(esp_console_cmd_register(&publish));
+#if CONFIG_ESP_GCOV_ENABLE
+    ESP_ERROR_CHECK(esp_console_cmd_register(&gcov_dump));
+#endif
 }
 
 } // namespace

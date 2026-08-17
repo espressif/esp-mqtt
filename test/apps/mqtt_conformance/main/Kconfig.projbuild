@@ -1,0 +1,11 @@
+menu "MQTT conformance configuration"
+
+    config MQTT_CONFORMANCE_GCOV
+        bool "Enable on-target GCOV collection"
+        imply ESP_GCOV_ENABLE
+        default n
+        help
+            Add the esp_gcov component for GCOV data transfer from the target
+            through OpenOCD. This option requires ESP-IDF 6.0 or newer.
+
+endmenu
