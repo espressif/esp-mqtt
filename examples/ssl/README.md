@@ -5,8 +5,8 @@
 
 (See the README.md file in the upper level 'examples' directory for more information about examples.)
 
-This example connects to the broker mqtt.eclipseprojects.io using ssl transport and as a demonstration subscribes/unsubscribes and send a message on certain topic.
-(Please note that the public broker is maintained by the community so may not be always available, for details please see this [disclaimer](https://iot.eclipse.org/getting-started/#sandboxes))
+This example connects to the broker test.mosquitto.org using ssl transport and as a demonstration subscribes/unsubscribes and send a message on certain topic.
+(Please note that the public broker is maintained by the community so may not be always available, for details please visit http://test.mosquitto.org)
 
 It uses ESP-MQTT library which implements mqtt client to connect to mqtt broker.
 
@@ -21,14 +21,7 @@ This example can be executed on any ESP32 board, the only required interface is 
 * Open the project configuration menu (`idf.py menuconfig`)
 * Configure Wi-Fi or Ethernet under "Example Connection Configuration" menu. See "Establishing Wi-Fi or Ethernet Connection" section in [examples/protocols/README.md](../../README.md) for more details.
 
-PEM certificate for this example could be extracted from an openssl `s_client` command connecting to mqtt.eclipseprojects.io.
-In case a host operating system has `openssl` and `sed` packages installed, one could execute the following command to download and save the root certificate to a file (Note for Windows users: Both Linux like environment or Windows native packages may be used).
-```
-echo "" | openssl s_client -showcerts -connect mqtt.eclipseprojects.io:8883 | sed -n "1,/Root/d; /BEGIN/,/END/p" | openssl x509 -outform PEM >mqtt_eclipse_org.pem
-```
-Please note that this is not a general command for downloading a root certificate for an arbitrary host;
-this command works with mqtt.eclipseprojects.io as the site provides root certificate in the chain, which then could be extracted
-with text operation.
+The default broker URI is `mqtts://test.mosquitto.org:8883`. As documented on [test.mosquitto.org](http://test.mosquitto.org), port 8883 should be verified with the Mosquitto certificate authority file `mosquitto.org.crt`. That CA is included as `main/mosquitto.org.crt` and can be downloaded from [mosquitto.org.crt](https://test.mosquitto.org/ssl/mosquitto.org.crt).
 
 ### Build and Flash
 

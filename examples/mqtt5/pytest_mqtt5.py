@@ -16,7 +16,7 @@ def test_examples_protocol_mqtt5(dut: Dut) -> None:
     """
     steps: |
       1. join AP
-      2. connect to mqtt://mqtt.eclipseprojects.io
+      2. connect to mqtt://test.mosquitto.org
       3. check connection success
     """
     # check and log bin size
