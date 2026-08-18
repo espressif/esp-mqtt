@@ -86,6 +86,22 @@ using unique_mqtt_client =
     esp_mqtt_client_destroy(client);
 }) >;
 
+static BaseType_t create_fake_task(TaskFunction_t, const char *const, const uint32_t,
+                                   void *const, UBaseType_t, TaskHandle_t *const created_task,
+                                   const BaseType_t, int)
+{
+    static int fake_task_storage;
+    *created_task = reinterpret_cast<TaskHandle_t>(&fake_task_storage);
+    return pdTRUE;
+}
+
+static BaseType_t fail_to_create_fake_task(TaskFunction_t, const char *const, const uint32_t,
+                                           void *const, UBaseType_t, TaskHandle_t *const,
+                                           const BaseType_t, int)
+{
+    return pdFALSE;
+}
+
 SCENARIO("MQTT Client Operation")
 {
     // Set expectations for the mocked calls.
@@ -318,6 +334,37 @@ SCENARIO("MQTT Client Operation")
                 REQUIRE_THAT(log, HasMessageIn("mqtt_client", "Core selection"));
                 // Only need to start the client, destroy is called automatically at the
                 // end of scope
+            }
+            SECTION("get_state reports client lifecycle correctly") {
+                SECTION("returns NOT_INITIALIZED for null handle") {
+                    REQUIRE(esp_mqtt_client_get_state(nullptr) ==
+                            MQTT_CLIENT_STATE_NOT_INITIALIZED);
+                }
+                SECTION("returns NOT_STARTED before esp_mqtt_client_start is called") {
+                    REQUIRE(esp_mqtt_client_get_state(client.get()) ==
+                            MQTT_CLIENT_STATE_NOT_STARTED);
+                }
+                SECTION("returns CONNECTING after start, not NOT_STARTED") {
+                    /* After start the task handle is non-NULL but the task never
+                     * runs in the mock environment, so client->state stays at
+                     * MQTT_STATE_INIT (=0 from calloc). This is precisely the
+                     * condition that was buggy: get_state must return
+                     * MQTT_CLIENT_STATE_CONNECTING, not MQTT_CLIENT_STATE_NOT_STARTED.
+                     *
+                     * Use Stub (not ExpectAnyArgs) so the fake task handle is set
+                     * regardless of any stale expectations queued by sibling sections. */
+                    xTaskCreatePinnedToCore_Stub(create_fake_task);
+                    REQUIRE(esp_mqtt_client_start(client.get()) == ESP_OK);
+                    auto state = esp_mqtt_client_get_state(client.get());
+                    REQUIRE(state == MQTT_CLIENT_STATE_CONNECTING);
+                    REQUIRE(state != MQTT_CLIENT_STATE_NOT_STARTED);
+                }
+                SECTION("returns NOT_STARTED when task creation fails") {
+                    xTaskCreatePinnedToCore_Stub(fail_to_create_fake_task);
+                    REQUIRE(esp_mqtt_client_start(client.get()) == ESP_FAIL);
+                    REQUIRE(esp_mqtt_client_get_state(client.get()) ==
+                            MQTT_CLIENT_STATE_NOT_STARTED);
+                }
             }
         }
         SECTION("Client with all allocating configuration set") {

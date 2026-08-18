@@ -158,10 +158,11 @@ typedef enum esp_mqtt_protocol_ver_t {
  */
 typedef enum esp_mqtt_client_connection_state_t {
     MQTT_CLIENT_STATE_NOT_INITIALIZED = 0,  /*!< MQTT Client is not initialized */
-    MQTT_CLIENT_STATE_NOT_STARTED,          /*!< MQTT Client is initialized, but not started */
-    MQTT_CLIENT_STATE_DISCONNECTED,         /*!< MQTT Client is started, but not connected to the broker */
+    MQTT_CLIENT_STATE_NOT_STARTED,          /*!< MQTT Client is initialized, but the client task is not running */
+    MQTT_CLIENT_STATE_DISCONNECTED,         /*!< MQTT Client task is running, but not connected to the broker */
     MQTT_CLIENT_STATE_CONNECTED,            /*!< MQTT Client is connected to the broker */
     MQTT_CLIENT_STATE_WAITING_RECONNECT,    /*!< MQTT Client is waiting for reconnection request */
+    MQTT_CLIENT_STATE_CONNECTING,           /*!< MQTT Client is connecting to the broker */
 } esp_mqtt_client_connection_state_t;
 
 /**
@@ -750,13 +751,16 @@ esp_transport_handle_t esp_mqtt_client_get_transport(esp_mqtt_client_handle_t cl
 /**
  * @brief Get MQTT client's current state
  *
- * Get the current state of MQTT client. Returns a value to indicate whether is it initialized, connected, waiting for
- * reconnection, or disconnected.
+ * Get the current state of MQTT client.
  *
  * @param client            *MQTT* client handle
  * @return
- *         - MQTT client state on success
- *         - MQTT_CLIENT_STATE_INVALID on error
+ *         - MQTT_CLIENT_STATE_NOT_INITIALIZED  if client handle is NULL
+ *         - MQTT_CLIENT_STATE_NOT_STARTED      if the client task is not running
+ *         - MQTT_CLIENT_STATE_CONNECTING       if connecting to the broker
+ *         - MQTT_CLIENT_STATE_DISCONNECTED     if started but not connected to the broker
+ *         - MQTT_CLIENT_STATE_CONNECTED        if connected to the broker
+ *         - MQTT_CLIENT_STATE_WAITING_RECONNECT if waiting for the reconnection timeout
  */
 esp_mqtt_client_connection_state_t esp_mqtt_client_get_state(esp_mqtt_client_handle_t client);
 

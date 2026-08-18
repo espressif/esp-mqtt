@@ -308,6 +308,20 @@ This function is used only for forcing the reconnect request, if you have an act
 
 To disconnect from the broker use `esp_mqtt_client_disconnect`. It will perform a clean disconnect and if MQTT 5 is used and the client is configured to will send a disconnect message.
 
+Querying client state
+---------------------
+
+Use :cpp:func:`esp_mqtt_client_get_state` to read the current lifecycle of a client handle. Typical values:
+
+* ``MQTT_CLIENT_STATE_NOT_INITIALIZED`` — the handle is ``NULL``.
+* ``MQTT_CLIENT_STATE_NOT_STARTED`` — the client is initialized, but its task is not running (never started, or already stopped).
+* ``MQTT_CLIENT_STATE_CONNECTING`` — the task is running and a connection attempt is in progress.
+* ``MQTT_CLIENT_STATE_CONNECTED`` — the client is connected to the broker.
+* ``MQTT_CLIENT_STATE_WAITING_RECONNECT`` — the client is waiting for the reconnect timeout (or a call to :cpp:func:`esp_mqtt_client_reconnect`).
+* ``MQTT_CLIENT_STATE_DISCONNECTED`` — the task is still running, but the client is not connected (for example while ``stop`` is completing).
+
+This query is independent of event handlers: applications that reconfigure the broker URI or run a watchdog can ask whether the client is stopped, connecting, connected, or waiting to reconnect without mirroring every event.
+
 Events
 ------
 The following events may be posted by the MQTT client:

@@ -145,6 +145,17 @@ int do_stop(int argc, char **argv)
     return 0;
 }
 
+int do_get_state(int argc, char **argv)
+{
+    if (!client_available()) {
+        return 1;
+    }
+
+    auto state = esp_mqtt_client_get_state(command_context.mqtt_client);
+    ESP_LOGI(TAG, "CLIENT_STATE=%d", static_cast<int>(state));
+    return 0;
+}
+
 int do_disconnect(int argc, char **argv)
 {
     (void)argc;
@@ -328,6 +339,15 @@ void register_commands()
         .func_w_context = nullptr,
         .context = nullptr,
     };
+    const esp_console_cmd_t get_state = {
+        .command = "get_state",
+        .help = "Print current MQTT client connection state as CLIENT_STATE=<N>",
+        .hint = nullptr,
+        .func = &do_get_state,
+        .argtable = nullptr,
+        .func_w_context = nullptr,
+        .context = nullptr,
+    };
     const esp_console_cmd_t disconnect = {
         .command = "disconnect",
         .help = "Disconnect mqtt client",
@@ -398,6 +418,7 @@ void register_commands()
     ESP_ERROR_CHECK(esp_console_cmd_register(&config_cmd));
     ESP_ERROR_CHECK(esp_console_cmd_register(&start));
     ESP_ERROR_CHECK(esp_console_cmd_register(&stop));
+    ESP_ERROR_CHECK(esp_console_cmd_register(&get_state));
     ESP_ERROR_CHECK(esp_console_cmd_register(&disconnect));
     ESP_ERROR_CHECK(esp_console_cmd_register(&reconnect));
     ESP_ERROR_CHECK(esp_console_cmd_register(&destroy));

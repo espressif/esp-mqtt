@@ -8,6 +8,7 @@ This app exposes a console API for pytest-embedded HIL tests that target MQTT co
 - `config <base64_json>`: Apply base64-encoded JSON config to initialized client
 - `start`: Start MQTT client
 - `stop`: Stop MQTT client
+- `get_state`: Print the current MQTT client connection state
 - `disconnect`: Request disconnect
 - `reconnect`: Request reconnect
 - `destroy`: Destroy MQTT client
