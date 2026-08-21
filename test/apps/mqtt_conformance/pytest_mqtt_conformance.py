@@ -18,7 +18,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Generator, Protocol
+from typing import Any, Generator, Protocol
 
 import pexpect
 import pytest
@@ -142,6 +142,21 @@ class MqttPacketType(enum.IntEnum):
     AUTH = 15
 
 
+def mqtt_packet_identifier_of(packet: object) -> int:
+    ident = getattr(packet, "packetIdentifier", None)
+    if ident is None:
+        ident = getattr(packet, "messageIdentifier")
+    return int(ident)
+
+
+def mqtt_packet_type_of(packet: object) -> MqttPacketType:
+    fh = getattr(packet, "fh")
+    raw = getattr(fh, "PacketType", None)
+    if raw is None:
+        raw = getattr(fh, "MessageType")
+    return MqttPacketType(raw)
+
+
 class BrokerInterface(Protocol):
     uri: str
 
@@ -157,6 +172,14 @@ class BrokerInterface(Protocol):
         keep_holding: bool = False,
     ) -> None: ...
 
+    def release_held_packet(
+        self,
+        packet_type: MqttPacketType,
+        packet_identifier: int,
+        *,
+        keep_holding: bool = True,
+    ) -> None: ...
+
     def release_all_held_packets(self) -> None: ...
 
     def held_packet_identifiers(self, packet_type: MqttPacketType) -> list[int]: ...
@@ -164,6 +187,10 @@ class BrokerInterface(Protocol):
     def inject_ack(self, packet_type: MqttPacketType, packet_identifier: int) -> None: ...
 
     def discard_held_packets(self) -> None: ...
+
+    def wait_for_inbound_packets(self, packet_type: MqttPacketType, count: int, timeout: float) -> None: ...
+
+    def inbound_packet_identifiers(self, packet_type: MqttPacketType) -> list[int]: ...
 
     def set_receive_maximum(self, receive_maximum: int) -> None: ...
 
@@ -177,6 +204,7 @@ def _start_paho_broker(
     port: int = 0,
     receive_maximum: int = DEFAULT_BROKER_RECEIVE_MAXIMUM,
     hold_packet_types: tuple[MqttPacketType, ...] = (),
+    record_inbound_types: tuple[MqttPacketType, ...] = (),
 ) -> BrokerInterface:
     """Start paho V311+V5 broker in-process and return its control handle.
 
@@ -217,17 +245,19 @@ def _start_paho_broker(
     server = TCPListeners.create(port=port, host="", serve_forever=False)
     bound_port = server.socket.getsockname()[1]
 
-    original_respond = None
+    v5_original_respond = None
     v5_brokers_mod = None
-    held_packets: dict[MqttPacketType, list[tuple[object, object, int]]] = {}
+    v3_original_respond = None
+    v3_brokers_mod = None
+    held_packets: dict[MqttPacketType, list[tuple[object, object, int | None]]] = {}
     held_packets_condition = threading.Condition()
     active_hold_packet_types = set(hold_packet_types)
     if hold_packet_types:
         v5_brokers_mod = importlib.import_module("mqtt.brokers.V5.MQTTBrokers")
-        original_respond = v5_brokers_mod.respond
+        v5_original_respond = v5_brokers_mod.respond
 
         def controlled_respond(sock, packet, maximumPacketSize=500):
-            packet_type = MqttPacketType(packet.fh.PacketType)
+            packet_type = mqtt_packet_type_of(packet)
             with held_packets_condition:
                 if packet_type in active_hold_packet_types:
                     # paho mutates some packet objects after respond() returns
@@ -237,9 +267,46 @@ def _start_paho_broker(
                     held_packets.setdefault(packet_type, []).append(held_packet)
                     held_packets_condition.notify_all()
                     return
-            original_respond(sock, packet, maximumPacketSize)
+            v5_original_respond(sock, packet, maximumPacketSize)
 
         v5_brokers_mod.respond = controlled_respond  # type: ignore[attr-defined]
+
+        v3_brokers_mod = importlib.import_module("mqtt.brokers.V311.MQTTBrokers")
+        v3_original_respond = v3_brokers_mod.respond
+
+        def controlled_respond_v3(sock, packet):
+            packet_type = mqtt_packet_type_of(packet)
+            with held_packets_condition:
+                if packet_type in active_hold_packet_types:
+                    held_packets.setdefault(packet_type, []).append((sock, copy.deepcopy(packet), None))
+                    held_packets_condition.notify_all()
+                    return
+            v3_original_respond(sock, packet)
+
+        v3_brokers_mod.respond = controlled_respond_v3  # type: ignore[attr-defined]
+
+    inbound_packets: dict[MqttPacketType, list[object]] = {}
+    inbound_condition = threading.Condition()
+    original_handle_packet_v5 = None
+    original_handle_packet_v3 = None
+    if record_inbound_types:
+        record_inbound = set(record_inbound_types)
+        original_handle_packet_v5 = broker5.handlePacket
+        original_handle_packet_v3 = broker3.handlePacket
+
+        def make_inbound_recorder(original):  # type: ignore[no-untyped-def]
+            def recording_handle_packet(packet, sock):  # type: ignore[no-untyped-def]
+                packet_type = mqtt_packet_type_of(packet)
+                if packet_type in record_inbound:
+                    with inbound_condition:
+                        inbound_packets.setdefault(packet_type, []).append(copy.deepcopy(packet))
+                        inbound_condition.notify_all()
+                return original(packet, sock)
+
+            return recording_handle_packet
+
+        broker5.handlePacket = make_inbound_recorder(original_handle_packet_v5)
+        broker3.handlePacket = make_inbound_recorder(original_handle_packet_v3)
 
     class _Broker:
         def __init__(self) -> None:
@@ -248,7 +315,11 @@ def _start_paho_broker(
             self._broker5 = broker5
             self._server = server
             self._v5_brokers_mod = v5_brokers_mod
-            self._original_respond = original_respond
+            self._v5_original_respond = v5_original_respond
+            self._v3_brokers_mod = v3_brokers_mod
+            self._v3_original_respond = v3_original_respond
+            self._original_handle_packet_v5 = original_handle_packet_v5
+            self._original_handle_packet_v3 = original_handle_packet_v3
 
         def wait_for_held_packets(self, packet_type: MqttPacketType, count: int, timeout: float) -> None:
             deadline = time.monotonic() + timeout
@@ -268,12 +339,12 @@ def _start_paho_broker(
 
         def held_packet_identifiers(self, packet_type: MqttPacketType) -> list[int]:
             with held_packets_condition:
-                return [int(getattr(packet, "packetIdentifier")) for _, packet, _ in held_packets.get(packet_type, ())]
+                return [mqtt_packet_identifier_of(packet) for _, packet, _ in held_packets.get(packet_type, ())]
 
         def inject_ack(self, packet_type: MqttPacketType, packet_identifier: int) -> None:
             if packet_type not in (MqttPacketType.PUBACK, MqttPacketType.PUBCOMP):
                 raise ValueError(f"Cannot inject {packet_type.name}; expected PUBACK or PUBCOMP")
-            respond = self._original_respond
+            respond = self._v5_original_respond
             if respond is None:
                 raise RuntimeError("Cannot inject acknowledgements unless packet holding is enabled")
 
@@ -292,6 +363,22 @@ def _start_paho_broker(
             with held_packets_condition:
                 held_packets.clear()
 
+        def wait_for_inbound_packets(self, packet_type: MqttPacketType, count: int, timeout: float) -> None:
+            deadline = time.monotonic() + timeout
+            with inbound_condition:
+                while len(inbound_packets.get(packet_type, ())) < count:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        inbound_count = len(inbound_packets.get(packet_type, ()))
+                        raise TimeoutError(
+                            f"Timed out waiting for {count} inbound {packet_type.name} packets; got {inbound_count}"
+                        )
+                    inbound_condition.wait(remaining)
+
+        def inbound_packet_identifiers(self, packet_type: MqttPacketType) -> list[int]:
+            with inbound_condition:
+                return [mqtt_packet_identifier_of(packet) for packet in inbound_packets.get(packet_type, ())]
+
         def set_receive_maximum(self, receive_maximum: int) -> None:
             if not 1 <= receive_maximum <= 0xFFFF:
                 raise ValueError("Receive Maximum must be in the range 1..65535")
@@ -301,14 +388,19 @@ def _start_paho_broker(
         def disconnect_clients(self) -> None:
             with lock:
                 self._broker5.disconnectAll()
+                self._broker3.disconnectAll()
 
-        def _send_held_packets(self, pending_packets: list[tuple[object, object, int]]) -> None:
-            respond = self._original_respond
-            if pending_packets and respond is None:
-                raise RuntimeError("Cannot release held packets without the broker response callback")
-            if respond is None:
-                return
+        def _send_held_packets(self, pending_packets: list[tuple[object, object, int | None]]) -> None:
             for sock, packet, maximum_packet_size in pending_packets:
+                if maximum_packet_size is None:
+                    respond_v3 = self._v3_original_respond
+                    if respond_v3 is None:
+                        raise RuntimeError("Cannot release MQTT 3.1.1 held packets without broker response callback")
+                    respond_v3(sock, packet)
+                    continue
+                respond = self._v5_original_respond
+                if respond is None:
+                    raise RuntimeError("Cannot release held packets without the broker response callback")
                 respond(sock, packet, maximum_packet_size)
 
         def release_held_packets(
@@ -333,6 +425,35 @@ def _start_paho_broker(
                     held_packets.pop(packet_type, None)
             self._send_held_packets(pending_packets)
 
+        def release_held_packet(
+            self,
+            packet_type: MqttPacketType,
+            packet_identifier: int,
+            *,
+            keep_holding: bool = True,
+        ) -> None:
+            with held_packets_condition:
+                if not keep_holding:
+                    active_hold_packet_types.discard(packet_type)
+                packet_queue = held_packets.get(packet_type, [])
+                match_index = next(
+                    (
+                        index
+                        for index, (_, packet, _) in enumerate(packet_queue)
+                        if mqtt_packet_identifier_of(packet) == packet_identifier
+                    ),
+                    None,
+                )
+                if match_index is None:
+                    held_ids = [mqtt_packet_identifier_of(packet) for _, packet, _ in packet_queue]
+                    raise ValueError(
+                        f"No held {packet_type.name} with packet identifier {packet_identifier}; held {held_ids}"
+                    )
+                pending_packets = [packet_queue.pop(match_index)]
+                if not packet_queue:
+                    held_packets.pop(packet_type, None)
+            self._send_held_packets(pending_packets)
+
         def release_all_held_packets(self) -> None:
             with held_packets_condition:
                 active_hold_packet_types.clear()
@@ -342,8 +463,14 @@ def _start_paho_broker(
 
         def shutdown(self) -> None:
             self.release_all_held_packets()
-            if self._original_respond is not None and self._v5_brokers_mod is not None:
-                self._v5_brokers_mod.respond = self._original_respond  # type: ignore[attr-defined]
+            if self._v5_original_respond is not None and self._v5_brokers_mod is not None:
+                self._v5_brokers_mod.respond = self._v5_original_respond  # type: ignore[attr-defined]
+            if self._v3_original_respond is not None and self._v3_brokers_mod is not None:
+                self._v3_brokers_mod.respond = self._v3_original_respond  # type: ignore[attr-defined]
+            if self._original_handle_packet_v5 is not None:
+                self._broker5.handlePacket = self._original_handle_packet_v5
+            if self._original_handle_packet_v3 is not None:
+                self._broker3.handlePacket = self._original_handle_packet_v3
             self._broker3.shutdown()
             self._broker5.shutdown()
             if self._server:
@@ -358,6 +485,7 @@ def broker_started(
     *,
     receive_maximum: int = DEFAULT_BROKER_RECEIVE_MAXIMUM,
     hold_packet_types: tuple[MqttPacketType, ...] = (),
+    record_inbound_types: tuple[MqttPacketType, ...] = (),
 ) -> Generator[BrokerInterface, None, None]:
     """Start an in-process paho broker and guarantee shutdown on exit."""
     require_paho_testing_checked_out()
@@ -367,6 +495,7 @@ def broker_started(
         port=port,
         receive_maximum=receive_maximum,
         hold_packet_types=hold_packet_types,
+        record_inbound_types=record_inbound_types,
     )
     try:
         yield paho_broker
@@ -511,6 +640,48 @@ def expect_n(
                 seen[key] += 1
                 break
     return seen
+
+
+def reference_client(protocol: str, client_id: str):  # type: ignore[no-untyped-def]
+    """Create a paho reference client (V311 or V5).
+
+    Used to drive the DUT client's receive path (publish to the DUT).
+    Imports are deferred so idf-ci collection-time mocking does not replace paho.
+    """
+    if protocol == "mqtt5":
+        import mqtt.clients.V5 as paho_client  # noqa: PLC0415
+    else:
+        import mqtt.clients.V311 as paho_client  # type: ignore[no-redef]  # noqa: PLC0415
+
+    client = paho_client.Client(client_id.encode("utf-8"))
+    client.registerCallback(paho_client.Callback())
+    return client
+
+
+@contextlib.contextmanager
+def host_publisher(
+    *,
+    protocol: str,
+    client_id: str,
+    host: str,
+    port: int,
+) -> Generator[Any, None, None]:
+    """Connect a host-side paho reference client for one test step and disconnect on exit.
+
+    Yields the paho client. Use it to publish to the DUT (verifying the DUT's
+    receive path) — the DUT client remains the system under test.
+    """
+    require_paho_testing_checked_out()
+    client = reference_client(protocol, client_id)
+    if protocol == "mqtt5":
+        client.connect(host=host, port=port, cleanstart=True)
+    else:
+        client.connect(host=host, port=port, cleansession=True)
+    try:
+        yield client
+    finally:
+        with contextlib.suppress(Exception):
+            client.disconnect()
 
 
 @pytest.mark.eth_ip101
@@ -1145,4 +1316,246 @@ def test_subscribe_and_qos1_publish__sec_3_8_4_and_4_3(dut: Dut, protocol_ver: i
                 b"MQTT_EVENT_DATA_COMPLETE": 1,
             },
             timeout=DUT_EVENT_TIMEOUT,
+        )
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=1,
+        subscribe_operations=1,
+        publish_operations=3,
+        event_wait_operations=2,
+    )
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+@pytest.mark.parametrize(
+    "protocol_ver, host_protocol",
+    [
+        (MQTT_PROTOCOL_V_3_1_1, "mqtt311"),
+        (MQTT_PROTOCOL_V_5, "mqtt5"),
+    ],
+    ids=["v311", "v5"],
+)
+@pytest.mark.parametrize(
+    "qos, inbound_ack, spec_id",
+    [
+        (1, MqttPacketType.PUBACK, "MQTT-4.6.0-2"),
+        (2, MqttPacketType.PUBREC, "MQTT-4.6.0-3"),
+    ],
+    ids=["qos1-puback", "qos2-pubrec"],
+)
+def test_client_acks_in_publish_receive_order__sec_4_6(
+    dut: Dut,
+    protocol_ver: int,
+    host_protocol: str,
+    qos: int,
+    inbound_ack: MqttPacketType,
+    spec_id: str,
+) -> None:
+    """Client QoS completion packets follow the order PUBLISH packets were received.
+
+    MQTT 5.0 / 3.1.1 §4.6:
+    - [MQTT-4.6.0-2] the Client MUST send PUBACK packets in the order the
+      corresponding PUBLISH packets were received (QoS 1)
+    - [MQTT-4.6.0-3] the Client MUST send PUBREC packets in the order the
+      corresponding PUBLISH packets were received (QoS 2)
+
+    The broker holds outbound PUBLISH so the DUT receive order is known, then
+    records inbound PUBACK/PUBREC packet identifiers from the DUT.
+    """
+    topic = build_topic()
+    n_messages = 3
+    inbound_ack_name = inbound_ack.name
+
+    with (
+        broker_started(
+            receive_maximum=n_messages,
+            hold_packet_types=(MqttPacketType.PUBLISH,),
+            record_inbound_types=(inbound_ack,),
+        ) as broker,
+        initialized_mqtt_client(dut, broker.uri, protocol_ver=protocol_ver) as client,
+        started_client(client),
+    ):
+        subscribed_to(client, topic, qos)
+        host, _, port = broker.uri.removeprefix("mqtt://").partition(":")
+        with host_publisher(
+            protocol=host_protocol,
+            client_id="paho-ordering-pub",
+            host=host,
+            port=int(port),
+        ) as pub:
+            for i in range(n_messages):
+                pub.publish(topic, f"msg{i:03d}".encode(), qos)
+
+        broker.wait_for_held_packets(MqttPacketType.PUBLISH, n_messages, timeout=DUT_EVENT_TIMEOUT)
+        publish_ids = broker.held_packet_identifiers(MqttPacketType.PUBLISH)
+        assert len(publish_ids) == n_messages
+
+        try:
+            broker.release_held_packets(MqttPacketType.PUBLISH)
+            broker.wait_for_inbound_packets(inbound_ack, n_messages, timeout=DUT_EVENT_TIMEOUT)
+        finally:
+            broker.release_all_held_packets()
+
+        ack_ids = broker.inbound_packet_identifiers(inbound_ack)
+        assert ack_ids[:n_messages] == publish_ids, (
+            f"{spec_id}: DUT {inbound_ack_name} order {ack_ids[:n_messages]} "
+            f"does not match PUBLISH receive order {publish_ids}"
+        )
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=2,
+        publish_operations=3,
+        event_wait_operations=3,
+    )
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+@pytest.mark.parametrize(
+    "protocol_ver",
+    [
+        pytest.param(
+            MQTT_PROTOCOL_V_3_1_1,
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason=(
+                    "MQTT-4.6.0-1: When the Client re-sends any PUBLISH packets, it MUST "
+                    "re-send them in the order in which the original PUBLISH packets were sent "
+                    "(QoS 1 and QoS 2). MQTT 3.1.1 reconnect resends the first unacked PUBLISH "
+                    "repeatedly instead of the inflight set. Follow-up: fix v311 outbox resend."
+                ),
+            ),
+        ),
+        MQTT_PROTOCOL_V_5,
+    ],
+    ids=["v311", "v5"],
+)
+@pytest.mark.parametrize(
+    "qos, completion_packet",
+    [
+        (1, MqttPacketType.PUBACK),
+        (2, MqttPacketType.PUBREC),
+    ],
+    ids=["qos1", "qos2"],
+)
+def test_client_resends_publish_in_original_order__mqtt_4_6_0_1(
+    dut: Dut,
+    protocol_ver: int,
+    qos: int,
+    completion_packet: MqttPacketType,
+) -> None:
+    """Resent PUBLISH packets keep the original send order.
+
+    Claim ID: MQTT-4.6.0-1
+    Version: 3.1.1, 5.0
+    Section: 4.6 Message ordering
+    Party: Client
+    Quote: When the Client re-sends any PUBLISH packets, it MUST re-send them in
+      the order in which the original PUBLISH packets were sent (this applies to
+      QoS 1 and QoS 2 messages)
+    DUT observable: with N unacked QoS 1 or QoS 2 PUBLISH, after a broker drop and
+      reconnect the inbound resent PUBLISH packet identifiers match original send order
+    Violating DUT still passes?: no — a DUT that resends LIFO or shuffled ids fails
+    """
+    topic = build_topic()
+    n_messages = 3
+
+    with (
+        broker_started(
+            receive_maximum=n_messages,
+            hold_packet_types=(completion_packet,),
+            record_inbound_types=(MqttPacketType.PUBLISH,),
+        ) as broker,
+        initialized_mqtt_client(dut, broker.uri, protocol_ver=protocol_ver) as client,
+        started_client(client),
+    ):
+        try:
+            publish_from_dut(client, topic, qos, payload_prefix="order", message_count=n_messages)
+            expect_n(client, {b"Publish requested, msg_id=": n_messages}, timeout=DUT_CMD_TIMEOUT)
+            broker.wait_for_held_packets(completion_packet, n_messages, timeout=DUT_EVENT_TIMEOUT)
+            broker.wait_for_inbound_packets(MqttPacketType.PUBLISH, n_messages, timeout=DUT_EVENT_TIMEOUT)
+            original_ids = broker.inbound_packet_identifiers(MqttPacketType.PUBLISH)[:n_messages]
+            inbound_before_drop = len(broker.inbound_packet_identifiers(MqttPacketType.PUBLISH))
+
+            broker.discard_held_packets()
+            broker.disconnect_clients()
+            client.expect(re.compile(rb"MQTT_EVENT_DISCONNECTED"), timeout=DUT_EVENT_TIMEOUT)
+            client.write("reconnect")
+            client.expect(re.compile(rb"MQTT_EVENT_CONNECTED"), timeout=DUT_CONNECT_TIMEOUT)
+
+            broker.wait_for_inbound_packets(
+                MqttPacketType.PUBLISH,
+                inbound_before_drop + n_messages,
+                timeout=DUT_EVENT_TIMEOUT,
+            )
+            resent_ids = broker.inbound_packet_identifiers(MqttPacketType.PUBLISH)[
+                inbound_before_drop : inbound_before_drop + n_messages
+            ]
+            assert resent_ids == original_ids, (
+                f"MQTT-4.6.0-1: resent PUBLISH order {resent_ids} does not match original send order {original_ids}"
+            )
+        finally:
+            broker.release_all_held_packets()
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=1,
+        publish_operations=3,
+        event_wait_operations=2,
+    )
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+@pytest.mark.parametrize(
+    "protocol_ver",
+    [MQTT_PROTOCOL_V_3_1_1, MQTT_PROTOCOL_V_5],
+    ids=["v311", "v5"],
+)
+def test_client_pubrel_follows_pubrec_receive_order__mqtt_4_6_0_4(dut: Dut, protocol_ver: int) -> None:
+    """PUBREL order follows PUBREC receive order, not original PUBLISH order.
+
+    Claim ID: MQTT-4.6.0-4
+    Version: 3.1.1, 5.0
+    Section: 4.6 Message ordering
+    Party: Client
+    Quote: The Client MUST send PUBREL packets in the order in which the
+      corresponding PUBREC packets were received (QoS 2 messages)
+    DUT observable: three inflight QoS 2 PUBLISH; PUBREC released as last, first,
+      middle; inbound PUBREL packet identifiers match that PUBREC order
+    Violating DUT still passes?: no — a DUT that PUBRELs in publish order fails
+      the permuted assertion
+    """
+    topic = build_topic()
+    n_messages = 3
+
+    with (
+        broker_started(
+            receive_maximum=n_messages,
+            hold_packet_types=(MqttPacketType.PUBREC,),
+            record_inbound_types=(MqttPacketType.PUBLISH, MqttPacketType.PUBREL),
+        ) as broker,
+        initialized_mqtt_client(dut, broker.uri, protocol_ver=protocol_ver) as client,
+        started_client(client),
+    ):
+        try:
+            publish_from_dut(client, topic, 2, payload_prefix="pubrel", message_count=n_messages)
+            expect_n(client, {b"Publish requested, msg_id=": n_messages}, timeout=DUT_CMD_TIMEOUT)
+            broker.wait_for_held_packets(MqttPacketType.PUBREC, n_messages, timeout=DUT_EVENT_TIMEOUT)
+            broker.wait_for_inbound_packets(MqttPacketType.PUBLISH, n_messages, timeout=DUT_EVENT_TIMEOUT)
+            publish_ids = broker.inbound_packet_identifiers(MqttPacketType.PUBLISH)[:n_messages]
+            pubrec_release_order = [publish_ids[2], publish_ids[0], publish_ids[1]]
+
+            for packet_identifier in pubrec_release_order:
+                broker.release_held_packet(MqttPacketType.PUBREC, packet_identifier, keep_holding=True)
+            broker.wait_for_inbound_packets(MqttPacketType.PUBREL, n_messages, timeout=DUT_EVENT_TIMEOUT)
+        finally:
+            broker.release_all_held_packets()
+
+        pubrel_ids = broker.inbound_packet_identifiers(MqttPacketType.PUBREL)[:n_messages]
+        assert pubrel_ids == pubrec_release_order, (
+            f"MQTT-4.6.0-4: PUBREL order {pubrel_ids} does not match PUBREC receive order {pubrec_release_order}"
         )
