@@ -34,6 +34,7 @@ extern "C" {
 #include "Mockidf_additions.h"
 #endif
 #include "Mockesp_timer.h"
+    void test_mqtt_client_enter_reconnect_wait(esp_mqtt_client_handle_t client);
     /*
      * The following functions are not directly called but the generation of them
      * from cmock is broken, so we need to define them here.
@@ -100,6 +101,42 @@ static BaseType_t fail_to_create_fake_task(TaskFunction_t, const char *const, co
                                            const BaseType_t, int)
 {
     return pdFALSE;
+}
+
+struct stop_wake_trace_t {
+    EventGroupHandle_t event_group;
+    int phase;
+    bool invalid_call;
+};
+
+static stop_wake_trace_t stop_wake_trace;
+
+static EventBits_t track_event_group_set_bits(EventGroupHandle_t event_group,
+                                              EventBits_t bits, int)
+{
+    static constexpr EventBits_t reconnect_bit = 1U << 1;
+
+    if (event_group != stop_wake_trace.event_group || bits != reconnect_bit ||
+            stop_wake_trace.phase != 0) {
+        stop_wake_trace.invalid_call = true;
+    }
+    stop_wake_trace.phase = 1;
+    return bits;
+}
+
+static EventBits_t track_event_group_wait_bits(EventGroupHandle_t event_group,
+                                               EventBits_t bits, BaseType_t clear_on_exit,
+                                               BaseType_t wait_for_all, TickType_t ticks_to_wait,
+                                               int)
+{
+    static constexpr EventBits_t stopped_bit = 1U << 0;
+
+    if (event_group != stop_wake_trace.event_group || bits != stopped_bit || clear_on_exit ||
+            !wait_for_all || ticks_to_wait != portMAX_DELAY || stop_wake_trace.phase != 1) {
+        stop_wake_trace.invalid_call = true;
+    }
+    stop_wake_trace.phase = 2;
+    return stopped_bit;
 }
 
 SCENARIO("MQTT Client Operation")
@@ -334,6 +371,19 @@ SCENARIO("MQTT Client Operation")
                 REQUIRE_THAT(log, HasMessageIn("mqtt_client", "Core selection"));
                 // Only need to start the client, destroy is called automatically at the
                 // end of scope
+            }
+            SECTION("Stop wakes a client waiting to reconnect") {
+                test_mqtt_client_enter_reconnect_wait(client.get());
+                stop_wake_trace = {
+                    reinterpret_cast<EventGroupHandle_t>(&event_group), 0, false
+                };
+                xTaskGetCurrentTaskHandle_IgnoreAndReturn(nullptr);
+                xEventGroupSetBits_Stub(track_event_group_set_bits);
+                xEventGroupWaitBits_Stub(track_event_group_wait_bits);
+
+                REQUIRE(esp_mqtt_client_stop(client.get()) == ESP_OK);
+                REQUIRE(stop_wake_trace.phase == 2);
+                REQUIRE_FALSE(stop_wake_trace.invalid_call);
             }
             SECTION("get_state reports client lifecycle correctly") {
                 SECTION("returns NOT_INITIALIZED for null handle") {
