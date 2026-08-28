@@ -47,6 +47,23 @@ void esp_mqtt5_client_destory(esp_mqtt5_client_handle_t client);
 esp_err_t esp_mqtt5_client_check_inflight_maximum(esp_mqtt5_client_handle_t client);
 esp_err_t esp_mqtt5_client_publish_check(esp_mqtt5_client_handle_t client, int qos, int retain);
 esp_err_t esp_mqtt5_client_subscribe_check(esp_mqtt5_client_handle_t client, int qos);
+
+/*
+ * Property validators. These are the single source of truth for what makes a property set
+ * legal to put on the wire, and they are shared by the `esp_mqtt5_client_set_*_property()`
+ * setters and by the per-message `esp_mqtt_client_*5()` entry points. A property set that
+ * reaches mqtt5_msg_*() without passing through the matching validator can crash the
+ * encoder (NULL share name) or emit a packet the broker answers with a protocol-error
+ * DISCONNECT.
+ *
+ * A NULL `property` is valid and means "no properties"; the caller must hold the API lock.
+ */
+esp_err_t esp_mqtt5_client_validate_publish_property(esp_mqtt5_client_handle_t client,
+                                                     const esp_mqtt5_publish_property_config_t *property);
+esp_err_t esp_mqtt5_client_validate_subscribe_property(esp_mqtt5_client_handle_t client,
+                                                       const esp_mqtt5_subscribe_property_config_t *property);
+esp_err_t esp_mqtt5_client_validate_unsubscribe_property(esp_mqtt5_client_handle_t client,
+                                                         const esp_mqtt5_unsubscribe_property_config_t *property);
 esp_err_t esp_mqtt5_create_default_config(esp_mqtt5_client_handle_t client);
 esp_err_t esp_mqtt5_get_publish_data(esp_mqtt5_client_handle_t client, uint8_t *msg_buf, size_t msg_read_len,
                                      char **msg_topic, size_t *msg_topic_len, char **msg_data, size_t *msg_data_len);
