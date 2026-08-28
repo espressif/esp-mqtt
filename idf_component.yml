@@ -1,5 +1,5 @@
 name: mqtt
-version: 1.1.0
+version: 1.2.0
 description: >-
   ESP-MQTT - A robust MQTT client library for ESP32 microcontrollers supporting
   MQTT 3.1.1 and 5.0 protocols with multiple transport layers
