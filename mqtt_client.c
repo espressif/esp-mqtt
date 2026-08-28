@@ -2330,6 +2330,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 
         client->run = false;
         client->state = MQTT_STATE_DISCONNECTED;
+        xEventGroupSetBits(client->status_bits, RECONNECT_BIT);
         MQTT_API_UNLOCK(client);
         xEventGroupWaitBits(client->status_bits, STOPPED_BIT, false, true, portMAX_DELAY);
         return ESP_OK;
