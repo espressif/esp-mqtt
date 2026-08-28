@@ -131,6 +131,26 @@ between tests and there's no port to configure/coordinate.
 - `MQTT_CONFORMANCE_RETRY_BACKOFF_SEC` — backoff between connect retries, in seconds
   (default: 2).
 
+## On-target coverage
+
+The default sdkconfig enables gcov collection automatically on ESP-IDF 6.0 or newer.
+Use an ESP32-Ethernet-Kit with JTAG enabled (on-board FT2232H channel A):
+
+```bash
+cd test/apps/mqtt_conformance
+idf.py -B build_esp32_default \
+    -DIDF_TARGET=esp32 \
+    -DSDKCONFIG=build_esp32_default/sdkconfig \
+    -DSDKCONFIG_DEFAULTS=sdkconfig.ci.default \
+    build flash
+pytest --target esp32 --build-dir build_esp32_default --timeout 180
+idf.py -B build_esp32_default gcovr-report
+```
+
+After each test, the application calls `esp_gcov_dump()` and OpenOCD retrieves the data
+with `esp gcov dump`. Repeated dumps merge coverage even when the application is reflashed
+between tests.
+
 ### Timeouts
 
 Tests use **operation-based timeouts** (not a flat 60 s wait): the budget is computed

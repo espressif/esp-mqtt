@@ -103,6 +103,13 @@ test/apps/mqtt_conformance:
     enable:
         - if: IDF_TARGET in ["esp32"]
           reason: Integration test for conformance scenarios
+    disable:
+        # On-target coverage (esp_gcov) is captured once, on the pinned latest IDF line.
+        # The default config is instrumented, so this is also the single functional run.
+        # PINNED: bump the minor when the idf-latest image advances (e.g. 6.2 -> 6.3).
+        - if: IDF_VERSION_MAJOR != 6 or IDF_VERSION_MINOR != 2
+          temporary: false
+          reason: Conformance and coverage run once on the pinned latest IDF (6.2)
     disable_test:
         - if: IDF_TARGET != "esp32"
           temporary: false

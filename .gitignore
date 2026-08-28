@@ -40,13 +40,7 @@ dependencies.lock
 managed_components/
 
 # ESP-IDF build directories (but not source directories like build_test)
-**/build/
-**/build_esp32*/
-**/build_esp32c*/
-**/build_esp32s*/
-**/build_esp32h*/
-**/build_esp32p*/
-**/build_linux*/
+**/build*
 
 # Examples and test app builds
 examples/**/build/
@@ -82,6 +76,8 @@ test/host/managed_components/
 # idf-ci generated files
 app_info_*.txt
 size_info_*.txt
+non_test_related_apps.txt
+test_related_apps.txt
 test_child_pipeline.yml
 compile_commands.json
 *.log
@@ -94,9 +90,11 @@ __pycache__/
 .cache/
 
 # Coverage and test results
+**/test_logs/
 **/coverage.xml
 **/coverage.html
 **/junit.xml
+**/XUNIT_RESULT_*.xml
 **/pytest_*.xml
 **/test_results_*.xml
 

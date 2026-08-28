@@ -6,6 +6,7 @@ host_tests:
     variables:
         GIT_DEPTH: 1
     needs: []
+    coverage: '/^lines:\s+(\d+\.\d+)\%/'
     artifacts:
         paths:
             - "**/build*/build.log"
@@ -37,4 +38,4 @@ host_tests:
         cd ../mqtt_outbox_host_test
         ./build_linux_coverage/mqtt_outbox_host_test.elf
         cd ../..
-        gcovr --gcov-ignore-parse-errors -g -k -r . --html coverage.html -x coverage.xml
+        gcovr --gcov-ignore-parse-errors -k -r . --exclude '.*/managed_components/.*' --print-summary --html coverage.html -x coverage.xml

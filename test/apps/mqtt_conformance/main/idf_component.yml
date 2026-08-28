@@ -5,3 +5,8 @@ dependencies:
     version: '*'
     override_path: ../../../..
   mittelab/nlohmann-json: ^3.11.3
+  espressif/esp_gcov:
+    version: ^1.0.5
+    rules:
+      - if: "idf_version >=6.0"
+      - if: "$CONFIG{MQTT_CONFORMANCE_GCOV} == True"
