@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.2.0](https://github.com/espressif/esp-mqtt/compare/v1.1.0...v1.2.0) (2026-08-28)
+
+
+### Features
+
+* Adds a state to reported states to differentiate init ([078081e](https://github.com/espressif/esp-mqtt/commit/078081edcc2613c46f2e5d36beb1699db6c7f9aa)), closes [#307](https://github.com/espressif/esp-mqtt/issues/307)
+
+
+### Bug Fixes
+
+* Examples to use available mosquitto broker ([6694e60](https://github.com/espressif/esp-mqtt/commit/6694e60134ccffc3e36599c4468373140af455aa))
+* **mqtt5:** Prevent OOB read from mqtt 5 property ([bfa16b9](https://github.com/espressif/esp-mqtt/commit/bfa16b9236f44443dba7b46e834a477d380ec759))
+
+
+### Documentation
+
+* Fix documentation formatting to improve reading ([5dc88a6](https://github.com/espressif/esp-mqtt/commit/5dc88a64920205fe148f6fcb0d2d61ca751b3c6e)), closes [#336](https://github.com/espressif/esp-mqtt/issues/336)
+
 ## [1.1.0](https://github.com/espressif/esp-mqtt/compare/v1.0.0...v1.1.0) (2026-07-30)
 
 
