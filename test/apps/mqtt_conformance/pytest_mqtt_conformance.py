@@ -157,6 +157,14 @@ def mqtt_packet_type_of(packet: object) -> MqttPacketType:
     return MqttPacketType(raw)
 
 
+def mqtt_fixed_header_qos(packet: object) -> int:
+    return int(getattr(getattr(packet, "fh"), "QoS"))
+
+
+def mqtt_fixed_header_dup(packet: object) -> bool:
+    return bool(getattr(getattr(packet, "fh"), "DUP"))
+
+
 class BrokerInterface(Protocol):
     uri: str
 
@@ -191,6 +199,8 @@ class BrokerInterface(Protocol):
     def wait_for_inbound_packets(self, packet_type: MqttPacketType, count: int, timeout: float) -> None: ...
 
     def inbound_packet_identifiers(self, packet_type: MqttPacketType) -> list[int]: ...
+
+    def inbound_packets(self, packet_type: MqttPacketType) -> list[object]: ...
 
     def set_receive_maximum(self, receive_maximum: int) -> None: ...
 
@@ -378,6 +388,10 @@ def _start_paho_broker(
         def inbound_packet_identifiers(self, packet_type: MqttPacketType) -> list[int]:
             with inbound_condition:
                 return [mqtt_packet_identifier_of(packet) for packet in inbound_packets.get(packet_type, ())]
+
+        def inbound_packets(self, packet_type: MqttPacketType) -> list[object]:
+            with inbound_condition:
+                return list(inbound_packets.get(packet_type, ()))
 
         def set_receive_maximum(self, receive_maximum: int) -> None:
             if not 1 <= receive_maximum <= 0xFFFF:
@@ -1559,3 +1573,153 @@ def test_client_pubrel_follows_pubrec_receive_order__mqtt_4_6_0_4(dut: Dut, prot
         assert pubrel_ids == pubrec_release_order, (
             f"MQTT-4.6.0-4: PUBREL order {pubrel_ids} does not match PUBREC receive order {pubrec_release_order}"
         )
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=1,
+        publish_operations=1,
+        event_wait_operations=2,
+    )
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+@pytest.mark.parametrize(
+    "protocol_ver",
+    [MQTT_PROTOCOL_V_3_1_1, MQTT_PROTOCOL_V_5],
+    ids=["v311", "v5"],
+)
+@pytest.mark.parametrize("qos", [0, 1, 2], ids=["qos0", "qos1", "qos2"])
+def test_mqtt_publish_subscribe_at_all_qos_levels(dut: Dut, protocol_ver: int, qos: int) -> None:
+    """DUT PUBLISH on the wire uses the requested QoS flow (sender role).
+
+    Claim ID: MQTT-4.3.1-1 (qos 0); MQTT-4.3.2-1 / MQTT-4.3.2-2 (qos 1);
+      MQTT-4.3.3-1 / MQTT-4.3.3-2 / MQTT-4.3.3-4 (qos 2)
+    Version: 3.1.1, 5.0
+    Section: 4.3 Quality of Service levels and protocol flows
+    Party: Client (sender)
+    Quote: QoS 0 sender MUST send PUBLISH with QoS 0 and DUP 0 [MQTT-4.3.1-1].
+      QoS 1 sender MUST assign an unused Packet Identifier and send PUBLISH with
+      QoS 1 and DUP 0 [MQTT-4.3.2-1] [MQTT-4.3.2-2].
+      QoS 2 sender MUST assign an unused Packet Identifier, send PUBLISH with
+      QoS 2 and DUP 0, and send PUBREL with that identifier after PUBREC
+      [MQTT-4.3.3-1] [MQTT-4.3.3-2] [MQTT-4.3.3-4].
+    DUT observable: inbound PUBLISH fh.QoS and DUP; qos>0 unused packet id;
+      qos 2 inbound PUBREL with the same packet id
+    Violating DUT still passes?: no — a DUT that sends the wrong QoS, sets DUP
+      on a new publish, omits a packet id, or skips PUBREL fails the wire asserts
+    """
+    topic = build_topic()
+    record_types: tuple[MqttPacketType, ...] = (MqttPacketType.PUBLISH,)
+    if qos == 2:
+        record_types = (MqttPacketType.PUBLISH, MqttPacketType.PUBREL)
+
+    with (
+        broker_started(record_inbound_types=record_types) as broker,
+        initialized_mqtt_client(dut, broker.uri, protocol_ver=protocol_ver) as client,
+        started_client(client),
+    ):
+        publish_from_dut(client, topic, qos, payload_prefix=f"qos{qos}", message_count=1)
+        expect_n(client, {b"Publish requested, msg_id=": 1}, timeout=DUT_CMD_TIMEOUT)
+        broker.wait_for_inbound_packets(MqttPacketType.PUBLISH, 1, timeout=DUT_EVENT_TIMEOUT)
+        publish_pkt = broker.inbound_packets(MqttPacketType.PUBLISH)[0]
+        assert mqtt_fixed_header_qos(publish_pkt) == qos, (
+            f"MQTT-4.3: inbound PUBLISH QoS {mqtt_fixed_header_qos(publish_pkt)} != {qos}"
+        )
+        assert mqtt_fixed_header_dup(publish_pkt) is False, "MQTT-4.3: new PUBLISH MUST have DUP 0"
+
+        if qos == 0:
+            return
+
+        packet_id = mqtt_packet_identifier_of(publish_pkt)
+        assert packet_id != 0, "MQTT-4.3.2/4.3.3: QoS > 0 PUBLISH MUST carry a Packet Identifier"
+
+        if qos == 1:
+            expect_n(client, {b"MQTT_EVENT_PUBLISHED": 1}, timeout=DUT_EVENT_TIMEOUT)
+            return
+
+        broker.wait_for_inbound_packets(MqttPacketType.PUBREL, 1, timeout=DUT_EVENT_TIMEOUT)
+        pubrel_id = broker.inbound_packet_identifiers(MqttPacketType.PUBREL)[0]
+        assert pubrel_id == packet_id, (
+            f"MQTT-4.3.3-4: PUBREL id {pubrel_id} != PUBLISH id {packet_id}"
+        )
+        expect_n(client, {b"MQTT_EVENT_PUBLISHED": 1}, timeout=DUT_EVENT_TIMEOUT)
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=1,
+        subscribe_operations=1,
+        event_wait_operations=2,
+    )
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+@pytest.mark.parametrize(
+    "protocol_ver",
+    [MQTT_PROTOCOL_V_3_1_1, MQTT_PROTOCOL_V_5],
+    ids=["v311", "v5"],
+)
+def test_mqtt_large_payload_fragmentation(dut: Dut, protocol_ver: int) -> None:
+    """Inbound payload larger than the rx buffer is delivered as offset chunks.
+
+    Claim ID: API (not an MQTT SHALL) — esp-mqtt MQTT_EVENT_DATA reassembly
+    Version: 3.1.1, 5.0
+    Section: n/a (client rx buffer MQTT_BUFFER_SIZE_BYTE, default 1024)
+    Party: Client (application delivery)
+    Quote: n/a — MQTT delivers one Application Message; this asserts the DUT
+      splits it into MQTT_EVENT_DATA chunks and reports MQTT_EVENT_DATA_COMPLETE
+    DUT observable: two or more MQTT_EVENT_DATA lines with offset 0, 0+len, …
+      covering total=5000, then MQTT_EVENT_DATA_COMPLETE total=5000
+    Violating DUT still passes?: no — a single DATA event with total=5000 fails
+      the chunk-count assert; gaps or a wrong total fail the offset walk
+    """
+    topic = build_topic()
+    payload_size = 5000
+    payload = b"X" * payload_size
+    data_line = re.compile(rb"MQTT_EVENT_DATA .*qos=\d+ len=(\d+) offset=(\d+) total=(\d+)")
+
+    with (
+        broker_started() as broker,
+        initialized_mqtt_client(dut, broker.uri, protocol_ver=protocol_ver) as client,
+        started_client(client),
+    ):
+        subscribed_to(client, topic, 1)
+        host, _, port = broker.uri.removeprefix("mqtt://").partition(":")
+        protocol = "mqtt5" if protocol_ver == MQTT_PROTOCOL_V_5 else "mqtt311"
+        with host_publisher(
+            protocol=protocol,
+            client_id="paho-large-payload-pub",
+            host=host,
+            port=int(port),
+        ) as pub:
+            pub.publish(topic, payload, 1)
+            chunks: list[tuple[int, int, int]] = []
+            deadline = time.monotonic() + DUT_EVENT_TIMEOUT
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise pexpect.TIMEOUT(f"Timed out collecting DATA chunks; got {chunks}")
+                match = client.expect(data_line, timeout=remaining)
+                length = int(match.group(1))
+                offset = int(match.group(2))
+                total = int(match.group(3))
+                chunks.append((offset, length, total))
+                if offset + length == total:
+                    break
+
+            assert len(chunks) >= 2, f"expected multiple DATA chunks, got {chunks}"
+            assert chunks[0][0] == 0, f"first DATA offset must be 0, got {chunks}"
+            assert all(total == payload_size for _, _, total in chunks), (
+                f"DATA total must stay {payload_size}, got {chunks}"
+            )
+            for index in range(len(chunks) - 1):
+                offset, length, _ = chunks[index]
+                next_offset = chunks[index + 1][0]
+                assert offset + length == next_offset, f"DATA offsets not contiguous: {chunks}"
+            last_offset, last_length, _ = chunks[-1]
+            assert last_offset + last_length == payload_size
+            client.expect(
+                re.compile(rb"MQTT_EVENT_DATA_COMPLETE msg_id=\d+ total=" + str(payload_size).encode()),
+                timeout=DUT_CMD_TIMEOUT,
+            )
