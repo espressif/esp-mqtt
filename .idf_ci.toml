@@ -1,8 +1,9 @@
 # ESP-MQTT idf-ci Configuration
 #
-# Requires idf-ci >= 1.2.2. That release forwards nested pipeline images and
-# job-name suffixes, so this file does not copy gitlab.build_pipeline.yaml_jinja.
-# idf-dynamic-pipeline@main sets both build and test job_name_suffix from job-suffix.
+# Requires idf-ci >= 1.2.2, and >= 1.3.0 for the idf-latest coverage job.
+# Keep the default generated jobs; mqtt-only behavior is injected through
+# the build template and test pipeline hooks.
+# idf-dynamic-pipeline@main sets build and test job_name_suffix from job-suffix.
 
 [gitlab.artifacts.native]
 build_job_filepatterns = [
@@ -24,6 +25,8 @@ test_job_filepatterns = [
 ]
 
 [gitlab.build_pipeline]
+runs_per_job = 15
+# generate_test_child_pipeline extends this template and overrides its script.
 job_template_jinja = """
 {{ settings.gitlab.build_pipeline.job_template_name }}:
   stage: "{{ settings.gitlab.build_pipeline.job_stage }}"
@@ -42,7 +45,13 @@ job_template_jinja = """
     expire_in: "1 week"
     when: "always"
   before_script:
-    - pip install -U 'idf-ci>=1.2.2,<2'
+    - CONSTRAINT_FILE="$(ls -1 ${IDF_TOOLS_PATH}/espidf.constraints.v*.txt 2>/dev/null | tail -1)"
+    - test -f "${CONSTRAINT_FILE}"
+{% if settings.gitlab.build_pipeline.job_name_suffix == ":idf-latest" %}
+    - pip install -U 'idf-ci>=1.3.0,<2' -c "${CONSTRAINT_FILE}"
+{% else %}
+    - pip install -U 'idf-ci>=1.2.2,<2' -c "${CONSTRAINT_FILE}"
+{% endif %}
   script: |
     set -euo pipefail
     ORIG_DIR="${CI_PROJECT_DIR:-$(pwd)}"
@@ -65,7 +74,6 @@ job_template_jinja = """
     done
     git worktree remove -f mqtt || rm -rf mqtt
 """
-runs_per_job = 15
 
 [gitlab.test_pipeline]
 job_before_script_extra = [
@@ -74,26 +82,9 @@ job_before_script_extra = [
 pre_yaml_jinja = """
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-"""
-
-# jobs_jinja is Jinja-rendered; pre_yaml_jinja is inserted as plain YAML.
-jobs_jinja = """
-{% for job in jobs %}
-{{ job['name'] }}{{ settings.gitlab.test_pipeline.job_name_suffix }}:
-  extends:
-    - "{{ settings.gitlab.test_pipeline.job_template_name }}"
-    {%- for extra_extend in job.get('extra_extends', []) %}
-    - "{{ extra_extend }}"
-    {%- endfor %}
-  tags: {{ job['tags'] }}
-{%- if job['parallel_count'] > 1 %}
-  parallel: {{ job['parallel_count'] }}
-{%- endif %}
-  variables:
-    nodes: {{ job['nodes'] }}
+default:
   after_script:
     - |
-      {%- raw %}
       shard="gcov_shards/${CI_NODE_INDEX:-${CI_JOB_ID}}"
       mkdir -p "${shard}"
       if [ -d test/apps/mqtt_conformance ]; then
@@ -105,9 +96,8 @@ jobs_jinja = """
           cp "${f}" "${dest}"
         done
       fi
-      {%- endraw %}
-{% endfor %}
-
+"""
+extra_jobs_jinja = """
 {% if settings.gitlab.test_pipeline.job_name_suffix == ":idf-latest" %}
 mqtt_conformance_coverage_report{{ settings.gitlab.test_pipeline.job_name_suffix }}:
   stage: "{{ settings.gitlab.test_pipeline.job_stage }}"
@@ -116,6 +106,7 @@ mqtt_conformance_coverage_report{{ settings.gitlab.test_pipeline.job_name_suffix
   needs:
     - job: "esp32 - eth_ip101{{ settings.gitlab.test_pipeline.job_name_suffix }}"
       artifacts: true
+  after_script: []
   before_script:
     - pip install -U gcovr
   coverage: '/^lines:\\s+(\\d+\\.\\d+)%/'

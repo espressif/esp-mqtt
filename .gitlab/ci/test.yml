@@ -20,7 +20,9 @@ host_tests:
                 coverage_format: cobertura
                 path: "**/coverage.xml"
     before_script:
-        - pip install -U gcovr 'idf-ci>=1,<2'
+        - CONSTRAINT_FILE="$(ls -1 ${IDF_TOOLS_PATH}/espidf.constraints.v*.txt 2>/dev/null | tail -1)"
+        - test -f "${CONSTRAINT_FILE}"
+        - pip install -U gcovr 'idf-ci>=1.2.2,<2' -c "${CONSTRAINT_FILE}"
     script: |
         set -euo pipefail
         ORIG_DIR="${CI_PROJECT_DIR:-$(pwd)}"
