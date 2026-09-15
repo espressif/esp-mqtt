@@ -232,6 +232,7 @@ MQTT 客户端可能会发布以下事件：
 * ``MQTT_EVENT_PUBLISHED``：服务器已确认客户端的发布消息。消息将仅针对 QoS 级别 1 和 2 发布，因为级别 0 不会进行确认。事件数据将包含发布消息的消息 ID。
 * ``MQTT_EVENT_DATA``：客户端已收到发布消息。事件数据包含：消息 ID、发布消息所属主题名称、收到的数据及其长度。对于超出内部缓冲区的数据，将发布多个 ``MQTT_EVENT_DATA``，并更新事件数据的 :cpp:member:`current_data_offset <esp_mqtt_event_t::current_data_offset>` 和 :cpp:member:`total_data_len<esp_mqtt_event_t::total_data_len>` 以跟踪碎片化消息。
 * ``MQTT_EVENT_ERROR``：客户端遇到错误。使用事件数据 :cpp:type:`error_handle <esp_mqtt_error_codes_t>` 字段中的 :cpp:type:`error_type <esp_mqtt_error_type_t>`，可以发现错误。错误类型决定 :cpp:type:`error_handle <esp_mqtt_error_codes_t>` 结构体的哪些部分会被填充。
+* ``MQTT_EVENT_KEEPALIVE``：客户端已发送 keepalive ``PINGREQ`` 或已收到 ``PINGRESP``。:cpp:member:`data <esp_mqtt_event_t::data>` 指向一个 :cpp:type:`esp_mqtt_keepalive_kind_t` 字节（``MQTT_KEEPALIVE_PINGREQ`` 或 ``MQTT_KEEPALIVE_PINGRESP``），:cpp:member:`data_len <esp_mqtt_event_t::data_len>` 为 1。Keepalive 超时以及发送 ``PINGREQ`` 失败仍会发布 ``MQTT_EVENT_DISCONNECTED``（传输写入失败时还会发布 ``MQTT_EVENT_ERROR``），不会发布本事件。
 
 API 参考
 -------------

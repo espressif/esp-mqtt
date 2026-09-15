@@ -193,6 +193,17 @@ void conformance_mqtt_event_handler(void *, esp_event_base_t, int32_t event_id,
 
         break;
 
+    case MQTT_EVENT_KEEPALIVE:
+        if (event->data && event->data_len == 1) {
+            const auto kind = static_cast<esp_mqtt_keepalive_kind_t>(
+                                  static_cast<uint8_t>(event->data[0]));
+            ESP_LOGI(TAG, "MQTT_EVENT_KEEPALIVE kind=%d", static_cast<int>(kind));
+        } else {
+            ESP_LOGI(TAG, "MQTT_EVENT_KEEPALIVE");
+        }
+
+        break;
+
     default:
         ESP_LOGI(TAG, "Other event id:%d", event->event_id);
         break;
