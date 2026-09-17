@@ -500,6 +500,106 @@ static esp_err_t esp_mqtt5_user_property_copy(mqtt5_user_property_handle_t user_
     return ESP_OK;
 }
 
+/* Common to every property type: properties only exist on the v5 wire. */
+static esp_err_t esp_mqtt5_client_validate_protocol(esp_mqtt5_client_handle_t client)
+{
+    if (client->mqtt_state.connection.information.protocol_ver != MQTT_PROTOCOL_V_5) {
+        ESP_LOGE(TAG, "MQTT protocol version is not v5");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+/* Shared by subscribe and unsubscribe: $share/{share_name}/{topic} needs a usable name,
+   and the encoder dereferences share_name unconditionally once is_share_subscribe is set. */
+static esp_err_t esp_mqtt5_client_validate_share(esp_mqtt5_client_handle_t client, const char *share_name)
+{
+    if (!client->mqtt5_config->server_resp_property_info.shared_subscribe_available) {
+        ESP_LOGE(TAG, "MQTT broker not support shared subscribe");
+        return ESP_FAIL;
+    }
+
+    if (!share_name || !strlen(share_name)) {
+        ESP_LOGE(TAG, "Share name can't be empty for shared subscribe");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t esp_mqtt5_client_validate_publish_property(esp_mqtt5_client_handle_t client,
+                                                     const esp_mqtt5_publish_property_config_t *property)
+{
+    if (!property) {
+        return ESP_OK;
+    }
+
+    if (esp_mqtt5_client_validate_protocol(client) != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    /* Check topic alias less than server maximum topic alias */
+    if (property->topic_alias > client->mqtt5_config->server_resp_property_info.topic_alias_maximum) {
+        ESP_LOGE(TAG, "Topic alias %d is bigger than server support %d", property->topic_alias,
+                 client->mqtt5_config->server_resp_property_info.topic_alias_maximum);
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t esp_mqtt5_client_validate_subscribe_property(esp_mqtt5_client_handle_t client,
+                                                       const esp_mqtt5_subscribe_property_config_t *property)
+{
+    if (!property) {
+        return ESP_OK;
+    }
+
+    if (esp_mqtt5_client_validate_protocol(client) != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    if (property->retain_handle > 2) {
+        ESP_LOGE(TAG, "retain_handle only support 0, 1, 2");
+        return ESP_FAIL;
+    }
+
+    if (property->is_share_subscribe) {
+        if (property->no_local_flag) {
+            // MQTT-3.8.3-4 not allow that No Local bit to 1 on a Shared Subscription
+            ESP_LOGE(TAG, "Protocol error that no local flag set on shared subscription");
+            return ESP_FAIL;
+        }
+
+        if (esp_mqtt5_client_validate_share(client, property->share_name) != ESP_OK) {
+            return ESP_FAIL;
+        }
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t esp_mqtt5_client_validate_unsubscribe_property(esp_mqtt5_client_handle_t client,
+                                                         const esp_mqtt5_unsubscribe_property_config_t *property)
+{
+    if (!property) {
+        return ESP_OK;
+    }
+
+    if (esp_mqtt5_client_validate_protocol(client) != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    if (property->is_share_subscribe) {
+        if (esp_mqtt5_client_validate_share(client, property->share_name) != ESP_OK) {
+            return ESP_FAIL;
+        }
+    }
+
+    return ESP_OK;
+}
+
 esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client,
                                                 const esp_mqtt5_publish_property_config_t *property)
 {
@@ -510,17 +610,7 @@ esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client
 
     MQTT_API_LOCK(client);
 
-    /* Check protocol version */
-    if (client->mqtt_state.connection.information.protocol_ver != MQTT_PROTOCOL_V_5) {
-        ESP_LOGE(TAG, "MQTT protocol version is not v5");
-        MQTT_API_UNLOCK(client);
-        return ESP_FAIL;
-    }
-
-    /* Check topic alias less than server maximum topic alias */
-    if (property->topic_alias > client->mqtt5_config->server_resp_property_info.topic_alias_maximum) {
-        ESP_LOGE(TAG, "Topic alias %d is bigger than server support %d", property->topic_alias,
-                 client->mqtt5_config->server_resp_property_info.topic_alias_maximum);
+    if (esp_mqtt5_client_validate_publish_property(client, property) != ESP_OK) {
         MQTT_API_UNLOCK(client);
         return ESP_FAIL;
     }
@@ -538,39 +628,11 @@ esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t clie
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (property->retain_handle > 2) {
-        ESP_LOGE(TAG, "retain_handle only support 0, 1, 2");
-        return -1;
-    }
-
     MQTT_API_LOCK(client);
 
-    /* Check protocol version */
-    if (client->mqtt_state.connection.information.protocol_ver != MQTT_PROTOCOL_V_5) {
-        ESP_LOGE(TAG, "MQTT protocol version is not v5");
+    if (esp_mqtt5_client_validate_subscribe_property(client, property) != ESP_OK) {
         MQTT_API_UNLOCK(client);
         return ESP_FAIL;
-    }
-
-    if (property->is_share_subscribe) {
-        if (property->no_local_flag) {
-            // MQTT-3.8.3-4 not allow that No Local bit to 1 on a Shared Subscription
-            ESP_LOGE(TAG, "Protocol error that no local flag set on shared subscription");
-            MQTT_API_UNLOCK(client);
-            return ESP_FAIL;
-        }
-
-        if (!client->mqtt5_config->server_resp_property_info.shared_subscribe_available) {
-            ESP_LOGE(TAG, "MQTT broker not support shared subscribe");
-            MQTT_API_UNLOCK(client);
-            return ESP_FAIL;
-        }
-
-        if (!property->share_name || !strlen(property->share_name)) {
-            ESP_LOGE(TAG, "Share name can't be empty for shared subscribe");
-            MQTT_API_UNLOCK(client);
-            return ESP_FAIL;
-        }
     }
 
     client->mqtt5_config->subscribe_property_info = property;
@@ -588,25 +650,9 @@ esp_err_t esp_mqtt5_client_set_unsubscribe_property(esp_mqtt5_client_handle_t cl
 
     MQTT_API_LOCK(client);
 
-    /* Check protocol version */
-    if (client->mqtt_state.connection.information.protocol_ver != MQTT_PROTOCOL_V_5) {
-        ESP_LOGE(TAG, "MQTT protocol version is not v5");
+    if (esp_mqtt5_client_validate_unsubscribe_property(client, property) != ESP_OK) {
         MQTT_API_UNLOCK(client);
         return ESP_FAIL;
-    }
-
-    if (property->is_share_subscribe) {
-        if (!client->mqtt5_config->server_resp_property_info.shared_subscribe_available) {
-            ESP_LOGE(TAG, "MQTT broker not support shared subscribe");
-            MQTT_API_UNLOCK(client);
-            return ESP_FAIL;
-        }
-
-        if (!property->share_name || !strlen(property->share_name)) {
-            ESP_LOGE(TAG, "Share name can't be empty for shared subscribe");
-            MQTT_API_UNLOCK(client);
-            return ESP_FAIL;
-        }
     }
 
     client->mqtt5_config->unsubscribe_property_info = property;
