@@ -102,6 +102,21 @@ def esp_mqtt_config(
     return base64.b64encode(json.dumps({"mqtt_config": mqtt_config}).encode()).decode()
 
 
+def _encode_config(category: str, fields: dict[str, object]) -> str:
+    """Encode a single-category config blob (base64 JSON) for `config <b64>`."""
+    return base64.b64encode(json.dumps({category: fields}).encode()).decode()
+
+
+def connect_property_config(**fields: object) -> str:
+    """MQTT5 CONNECT properties blob (topic_alias_maximum, maximum_packet_size, …)."""
+    return _encode_config("connect_property", fields)
+
+
+def apply_config(dut: Dut, blob: str) -> None:
+    """Apply a single-category config blob to an already-initialised client."""
+    dut.write(f"config {blob}")
+
+
 def configure_paho_broker_logging() -> None:
     logger = logging.getLogger("MQTT broker")
     level = getattr(logging, PAHO_BROKER_LOG_LEVEL, logging.WARNING)
@@ -165,6 +180,25 @@ def mqtt_fixed_header_dup(packet: object) -> bool:
     return bool(getattr(getattr(packet, "fh"), "DUP"))
 
 
+def mqtt_packed_size(packet: object) -> int:
+    packed = getattr(packet, "pack")()
+    return len(packed)
+
+
+def mqtt_topic_alias_of(packet: object) -> int | None:
+    props = getattr(packet, "properties", None)
+    if props is None or not hasattr(props, "TopicAlias"):
+        return None
+    return int(getattr(props, "TopicAlias"))
+
+
+def mqtt_publish_topic_name(packet: object) -> str:
+    name = getattr(packet, "topicName")
+    if isinstance(name, bytes):
+        return name.decode()
+    return str(name)
+
+
 class BrokerInterface(Protocol):
     uri: str
 
@@ -191,6 +225,8 @@ class BrokerInterface(Protocol):
     def release_all_held_packets(self) -> None: ...
 
     def held_packet_identifiers(self, packet_type: MqttPacketType) -> list[int]: ...
+
+    def held_packets(self, packet_type: MqttPacketType) -> list[object]: ...
 
     def inject_ack(self, packet_type: MqttPacketType, packet_identifier: int) -> None: ...
 
@@ -350,6 +386,10 @@ def _start_paho_broker(
         def held_packet_identifiers(self, packet_type: MqttPacketType) -> list[int]:
             with held_packets_condition:
                 return [mqtt_packet_identifier_of(packet) for _, packet, _ in held_packets.get(packet_type, ())]
+
+        def held_packets(self, packet_type: MqttPacketType) -> list[object]:
+            with held_packets_condition:
+                return [packet for _, packet, _ in held_packets.get(packet_type, ())]
 
         def inject_ack(self, packet_type: MqttPacketType, packet_identifier: int) -> None:
             if packet_type not in (MqttPacketType.PUBACK, MqttPacketType.PUBCOMP):
@@ -1723,3 +1763,171 @@ def test_mqtt_large_payload_fragmentation(dut: Dut, protocol_ver: int) -> None:
                 re.compile(rb"MQTT_EVENT_DATA_COMPLETE msg_id=\d+ total=" + str(payload_size).encode()),
                 timeout=DUT_CMD_TIMEOUT,
             )
+
+
+SERVER_MAXIMUM_PACKET_SIZE = 256
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=1,
+        publish_operations=1,
+        event_wait_operations=2,
+    )
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "MQTT-3.2.2-15: The Client MUST NOT send packets exceeding Maximum Packet Size "
+        "to the Server"
+    ),
+)
+def test_client_must_not_send_oversized_packets__mqtt_3_2_2_15(dut: Dut) -> None:
+    """DUT must not send a packet larger than CONNACK Maximum Packet Size.
+
+    Claim ID: MQTT-3.2.2-15
+    Version: 5.0
+    Section: 3.2.2.3.6 Maximum Packet Size
+    Party: Client
+    Quote: The Client MUST NOT send packets exceeding Maximum Packet Size to the Server
+    DUT observable: CONNACK Maximum Packet Size is 256; after the DUT publishes a
+      payload that would produce a larger PUBLISH, no inbound packet packs to more
+      than 256 bytes
+    Violating DUT still passes?: no — a DUT that sends the oversized PUBLISH fails
+      the packed-size assertion
+    """
+    topic = build_topic()
+    pattern = "0123456789"
+    pattern_repetitions = 40
+
+    with (
+        broker_started(
+            hold_packet_types=(MqttPacketType.CONNACK,),
+            record_inbound_types=(MqttPacketType.PUBLISH,),
+        ) as broker,
+        initialized_mqtt_client(dut, broker.uri) as client,
+    ):
+        try:
+            client.write("start")
+            broker.wait_for_held_packets(MqttPacketType.CONNACK, 1, timeout=DUT_CONNECT_TIMEOUT)
+            connack = broker.held_packets(MqttPacketType.CONNACK)[0]
+            getattr(connack, "properties").MaximumPacketSize = SERVER_MAXIMUM_PACKET_SIZE
+            broker.release_held_packets(MqttPacketType.CONNACK)
+            client.expect(re.compile(rb"MQTT_EVENT_CONNECTED"), timeout=DUT_CONNECT_TIMEOUT)
+
+            publish_from_dut(
+                client,
+                topic,
+                1,
+                payload_prefix=pattern,
+                message_count=1,
+                pattern_repetitions=pattern_repetitions,
+            )
+            expect_n(client, {b"Publish requested, msg_id=": 1}, timeout=DUT_CMD_TIMEOUT)
+            try:
+                broker.wait_for_inbound_packets(MqttPacketType.PUBLISH, 1, timeout=DUT_EVENT_TIMEOUT)
+            except TimeoutError:
+                pass
+            oversized = [
+                mqtt_packed_size(packet)
+                for packet in broker.inbound_packets(MqttPacketType.PUBLISH)
+                if mqtt_packed_size(packet) > SERVER_MAXIMUM_PACKET_SIZE
+            ]
+            assert not oversized, (
+                f"MQTT-3.2.2-15: DUT sent PUBLISH packet(s) of size {oversized} "
+                f"exceeding CONNACK Maximum Packet Size {SERVER_MAXIMUM_PACKET_SIZE}"
+            )
+        finally:
+            broker.release_all_held_packets()
+            stop_client(client)
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=1,
+        subscribe_operations=1,
+        publish_operations=3,
+        event_wait_operations=2,
+    )
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+def test_client_accepts_server_topic_alias__mqtt_3_3_2_10(dut: Dut) -> None:
+    """DUT must accept Topic Alias values within the CONNECT Topic Alias Maximum.
+
+    Claim ID: MQTT-3.3.2-10
+    Version: 5.0
+    Section: 3.3.2.3.4 Topic Alias
+    Party: Client
+    Quote: A Client MUST accept all Topic Alias values greater than 0 and less than
+      or equal to the Topic Alias Maximum value that it sent in the CONNECT packet
+    DUT observable: CONNECT Topic Alias Maximum is 1; at least one held PUBLISH to
+      the DUT has Topic Alias 1 and a zero-length Topic Name; the DUT still logs
+      MQTT_EVENT_DATA with the original topic and each payload
+    Violating DUT still passes?: no — a DUT that drops aliased PUBLISH or cannot
+      restore the topic fails the DATA topic/payload asserts after the aliased
+      packet is released
+    """
+    topic = build_topic()
+    topic_alias_maximum = 1
+    n_messages = 3
+    topic_line = f"MQTT_EVENT_DATA topic={topic}".encode()
+
+    with (
+        broker_started(
+            receive_maximum=n_messages,
+            hold_packet_types=(MqttPacketType.PUBLISH,),
+            record_inbound_types=(MqttPacketType.CONNECT,),
+        ) as broker,
+        initialized_mqtt_client(dut, broker.uri) as client,
+    ):
+        apply_config(client, connect_property_config(topic_alias_maximum=topic_alias_maximum))
+        with started_client(client):
+            broker.wait_for_inbound_packets(MqttPacketType.CONNECT, 1, timeout=DUT_CONNECT_TIMEOUT)
+            connect_props = getattr(broker.inbound_packets(MqttPacketType.CONNECT)[0], "properties")
+            advertised = int(getattr(connect_props, "TopicAliasMaximum"))
+            assert advertised == topic_alias_maximum, (
+                f"CONNECT Topic Alias Maximum {advertised} != {topic_alias_maximum}"
+            )
+            subscribed_to(client, topic, 1)
+            host, _, port = broker.uri.removeprefix("mqtt://").partition(":")
+            with host_publisher(
+                protocol="mqtt5",
+                client_id="paho5-srv-alias-pub",
+                host=host,
+                port=int(port),
+            ) as pub:
+                for i in range(n_messages):
+                    pub.publish(topic, f"alias_msg{i}".encode(), 1)
+
+            broker.wait_for_held_packets(MqttPacketType.PUBLISH, n_messages, timeout=DUT_EVENT_TIMEOUT)
+            held_publish = broker.held_packets(MqttPacketType.PUBLISH)
+            aliased = [
+                packet
+                for packet in held_publish
+                if mqtt_topic_alias_of(packet) is not None and mqtt_publish_topic_name(packet) == ""
+            ]
+            assert aliased, (
+                "MQTT-3.3.2-10: broker did not send a PUBLISH with Topic Alias and "
+                "zero-length Topic Name (cannot witness Client accept)"
+            )
+            for packet in aliased:
+                alias = mqtt_topic_alias_of(packet)
+                assert alias is not None and 1 <= alias <= topic_alias_maximum, (
+                    f"MQTT-3.3.2-10: Topic Alias {alias} is outside CONNECT maximum "
+                    f"{topic_alias_maximum}"
+                )
+            try:
+                broker.release_held_packets(MqttPacketType.PUBLISH)
+                expect_n(
+                    client,
+                    {
+                        topic_line: n_messages,
+                        **data_payload_patterns("alias_msg", n_messages),
+                    },
+                    timeout=DUT_EVENT_TIMEOUT,
+                )
+            finally:
+                broker.release_all_held_packets()
