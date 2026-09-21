@@ -617,7 +617,11 @@ def case_timeout(
     event_wait_operations: int = 0,
     timeout_margin: int = TEST_TIMEOUT_MARGIN_SEC,
 ) -> int:
-    """Compound a timeout from the operations performed by a test or test phase."""
+    """Compound a timeout from the operations performed by a test or test phase.
+
+    Use with ``pytest.mark.timeout(..., func_only=True)`` so flash setup and
+    gcov teardown are not counted against this budget.
+    """
     timeout = (
         connect_operations * DUT_CONNECT_TIMEOUT
         + subscribe_operations * DUT_SUBSCRIBE_TIMEOUT
@@ -743,7 +747,8 @@ def host_publisher(
     case_timeout(
         connect_operations=1,
         event_wait_operations=1,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 def test_client_state_transitions(dut: Dut) -> None:
@@ -784,7 +789,8 @@ def test_client_state_transitions(dut: Dut) -> None:
         connect_operations=1,
         subscribe_operations=1,
         publish_operations=4,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 @pytest.mark.parametrize("enqueue", [0, 1], ids=["publish", "enqueue"])
@@ -871,7 +877,8 @@ def test_mqtt5_receive_maximum_defers_publish(
         connect_operations=1,
         subscribe_operations=1,
         publish_operations=4,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 def test_mqtt5_server_receive_maximum_mixed_qos(dut: Dut) -> None:
@@ -948,7 +955,8 @@ def test_mqtt5_server_receive_maximum_mixed_qos(dut: Dut) -> None:
         subscribe_operations=1,
         publish_operations=4,
         event_wait_operations=1,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 @pytest.mark.parametrize(
@@ -1029,7 +1037,8 @@ def test_mqtt5_unmatched_completion_does_not_release_receive_maximum(
         subscribe_operations=2,
         publish_operations=5,
         event_wait_operations=2,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 def test_mqtt5_reconnect_applies_receive_maximum_to_retransmits(dut: Dut) -> None:
@@ -1087,7 +1096,8 @@ def test_mqtt5_reconnect_applies_receive_maximum_to_retransmits(dut: Dut) -> Non
         subscribe_operations=1,
         publish_operations=2,
         event_wait_operations=2,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 def test_mqtt5_reconnect_resends_requeued_packets_once(dut: Dut) -> None:
@@ -1153,7 +1163,8 @@ def test_mqtt5_reconnect_resends_requeued_packets_once(dut: Dut) -> None:
         subscribe_operations=1,
         publish_operations=2,
         event_wait_operations=2,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 def test_mqtt5_reconnect_resends_only_inflight_publishes__sec_4_4(dut: Dut) -> None:
@@ -1206,7 +1217,8 @@ def test_mqtt5_reconnect_resends_only_inflight_publishes__sec_4_4(dut: Dut) -> N
         connect_operations=1,
         subscribe_operations=2,
         publish_operations=DEFAULT_BROKER_RECEIVE_MAXIMUM,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 def test_mqtt5_subscribe_not_delayed_by_receive_maximum(dut: Dut) -> None:
@@ -1253,7 +1265,8 @@ def test_mqtt5_subscribe_not_delayed_by_receive_maximum(dut: Dut) -> None:
         connect_operations=1,
         subscribe_operations=2,
         publish_operations=DEFAULT_BROKER_RECEIVE_MAXIMUM + 2,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 @pytest.mark.parametrize(
@@ -1329,7 +1342,8 @@ def test_mqtt5_qos0_not_blocked_by_quota(dut: Dut, qos0_enqueue: bool) -> None:
         connect_operations=1,
         subscribe_operations=1,
         event_wait_operations=2,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 @pytest.mark.parametrize(
@@ -1380,7 +1394,8 @@ def test_subscribe_and_qos1_publish__sec_3_8_4_and_4_3(dut: Dut, protocol_ver: i
         subscribe_operations=1,
         publish_operations=3,
         event_wait_operations=2,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 @pytest.mark.parametrize(
@@ -1465,7 +1480,8 @@ def test_client_acks_in_publish_receive_order__sec_4_6(
         connect_operations=2,
         publish_operations=3,
         event_wait_operations=3,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 @pytest.mark.parametrize(
@@ -1561,7 +1577,8 @@ def test_client_resends_publish_in_original_order__mqtt_4_6_0_1(
         connect_operations=1,
         publish_operations=3,
         event_wait_operations=2,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 @pytest.mark.parametrize(
@@ -1621,7 +1638,8 @@ def test_client_pubrel_follows_pubrec_receive_order__mqtt_4_6_0_4(dut: Dut, prot
         connect_operations=1,
         publish_operations=1,
         event_wait_operations=2,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 @pytest.mark.parametrize(
@@ -1692,7 +1710,8 @@ def test_mqtt_publish_subscribe_at_all_qos_levels(dut: Dut, protocol_ver: int, q
         connect_operations=1,
         subscribe_operations=1,
         event_wait_operations=2,
-    )
+    ),
+    func_only=True,
 )
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 @pytest.mark.parametrize(
