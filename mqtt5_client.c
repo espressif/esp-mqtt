@@ -642,11 +642,16 @@ esp_err_t esp_mqtt5_client_set_disconnect_property(esp_mqtt5_client_handle_t cli
 
         if (property->user_property) {
             esp_mqtt5_client_delete_user_property(client->mqtt5_config->disconnect_property_info.user_property);
+            /* False positive: the allocation remains owned by disconnect_property_info
+             * until it is replaced or the MQTT 5 configuration is destroyed. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
             client->mqtt5_config->disconnect_property_info.user_property = calloc(1, sizeof(struct mqtt5_user_property_list_t));
             ESP_MEM_CHECK(TAG, client->mqtt5_config->disconnect_property_info.user_property, {
                 MQTT_API_UNLOCK(client);
                 return ESP_ERR_NO_MEM;
             });
+#pragma GCC diagnostic pop
             STAILQ_INIT(client->mqtt5_config->disconnect_property_info.user_property);
 
             if (esp_mqtt5_user_property_copy(client->mqtt5_config->disconnect_property_info.user_property,
@@ -746,8 +751,14 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
 
         if (connect_property->correlation_data && connect_property->correlation_data_len) {
             free(client->mqtt5_config->will_property_info.correlation_data);
+            /* False positive: the analyzer cannot trace that on the _mqtt_set_config_failed path
+             * esp_mqtt_destroy_config() calls esp_mqtt5_client_destory(), which frees this allocation.
+             * The cleanup crosses a translation-unit boundary that analyzer does not follow. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
             client->mqtt5_config->will_property_info.correlation_data = malloc(connect_property->correlation_data_len);
             ESP_MEM_CHECK(TAG, client->mqtt5_config->will_property_info.correlation_data, goto _mqtt_set_config_failed);
+#pragma GCC diagnostic pop
             memcpy(client->mqtt5_config->will_property_info.correlation_data, connect_property->correlation_data,
                    connect_property->correlation_data_len);
             client->mqtt5_config->will_property_info.correlation_data_len = connect_property->correlation_data_len;
@@ -755,8 +766,13 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
 
         if (connect_property->will_user_property) {
             esp_mqtt5_client_delete_user_property(client->mqtt5_config->will_property_info.user_property);
+            /* False positive: esp_mqtt_destroy_config() releases this allocation on failure,
+             * but the analyzer cannot follow that cleanup across the translation-unit boundary. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
             client->mqtt5_config->will_property_info.user_property = calloc(1, sizeof(struct mqtt5_user_property_list_t));
             ESP_MEM_CHECK(TAG, client->mqtt5_config->will_property_info.user_property, goto _mqtt_set_config_failed);
+#pragma GCC diagnostic pop
             STAILQ_INIT(client->mqtt5_config->will_property_info.user_property);
 
             if (esp_mqtt5_user_property_copy(client->mqtt5_config->will_property_info.user_property,
@@ -859,6 +875,8 @@ esp_err_t esp_mqtt5_client_get_user_property(mqtt5_user_property_handle_t user_p
     }
 
 err:
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
 
     for (j = 0; j < i; j ++) {
         if (item[j].key) {
@@ -870,6 +888,7 @@ err:
         }
     }
 
+#pragma GCC diagnostic pop
     return ESP_ERR_NO_MEM;
 }
 

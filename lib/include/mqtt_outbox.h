@@ -25,12 +25,12 @@ typedef struct outbox_message *outbox_message_handle_t;
 typedef long long outbox_tick_t;
 
 typedef struct outbox_message {
-    uint8_t *data;
+    const uint8_t *data;
     int len;
     int msg_id;
     int msg_qos;
     int msg_type;
-    uint8_t *remaining_data;
+    const uint8_t *remaining_data;
     int remaining_len;
 } outbox_message_t;
 
