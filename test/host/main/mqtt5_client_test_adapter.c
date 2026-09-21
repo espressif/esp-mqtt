@@ -25,3 +25,33 @@ int test_mqtt5_increment_packet_counter_with_dup(void)
     esp_mqtt5_increment_packet_counter(&client);
     return client.send_publish_packet_count;
 }
+
+esp_err_t test_mqtt5_set_connect_null_property(void)
+{
+    struct esp_mqtt_client client = {0};
+    return esp_mqtt5_client_set_connect_property(&client, NULL);
+}
+
+esp_err_t test_mqtt5_set_publish_null_property(void)
+{
+    struct esp_mqtt_client client = {0};
+    return esp_mqtt5_client_set_publish_property(&client, NULL);
+}
+
+esp_err_t test_mqtt5_set_subscribe_null_property(void)
+{
+    struct esp_mqtt_client client = {0};
+    return esp_mqtt5_client_set_subscribe_property(&client, NULL);
+}
+
+esp_err_t test_mqtt5_set_unsubscribe_null_property(void)
+{
+    struct esp_mqtt_client client = {0};
+    return esp_mqtt5_client_set_unsubscribe_property(&client, NULL);
+}
+
+esp_err_t test_mqtt5_set_disconnect_null_property(void)
+{
+    struct esp_mqtt_client client = {0};
+    return esp_mqtt5_client_set_disconnect_property(&client, NULL);
+}
