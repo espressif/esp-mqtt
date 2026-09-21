@@ -205,13 +205,13 @@ typedef struct {
 /**
  * @brief Set MQTT5 client connect property configuration
  *
- * @param client            mqtt client handle
- * @param connect_property  connect property
+ * @param client            mqtt client handle, must not be NULL
+ * @param connect_property  connect property, must not be NULL
  *
  * @return
  *         - ESP_OK on success
  *         - ESP_ERR_NO_MEM if failed to allocate
- *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_ERR_INVALID_ARG if client or connect_property is NULL
  *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client,
@@ -223,12 +223,12 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
  * This API will not store the publish property, it is one-time configuration.
  * Before call `esp_mqtt_client_publish` to publish data, call this API to set publish property if have
  *
- * @param client            mqtt client handle
- * @param property          publish property
+ * @param client            mqtt client handle, must not be NULL
+ * @param property          publish property, must not be NULL
  *
  * @return
  *         - ESP_OK on success
- *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_ERR_INVALID_ARG if client or property is NULL
  *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client,
@@ -240,12 +240,12 @@ esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client
  * This API will not store the subscribe property, it is one-time configuration.
  * Before call `esp_mqtt_client_subscribe` to subscribe topic, call this API to set subscribe property if have
  *
- * @param client            mqtt client handle
- * @param property          subscribe property
+ * @param client            mqtt client handle, must not be NULL
+ * @param property          subscribe property, must not be NULL
  *
  * @return
  *         - ESP_OK on success
- *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_ERR_INVALID_ARG if client or property is NULL
  *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t client,
@@ -257,12 +257,12 @@ esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t clie
  * This API will not store the unsubscribe property, it is one-time configuration.
  * Before call `esp_mqtt_client_unsubscribe` to unsubscribe topic, call this API to set unsubscribe property if have
  *
- * @param client            mqtt client handle
- * @param property          unsubscribe property
+ * @param client            mqtt client handle, must not be NULL
+ * @param property          unsubscribe property, must not be NULL
  *
  * @return
  *         - ESP_OK on success
- *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_ERR_INVALID_ARG if client or property is NULL
  *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_unsubscribe_property(esp_mqtt5_client_handle_t client,
@@ -274,13 +274,13 @@ esp_err_t esp_mqtt5_client_set_unsubscribe_property(esp_mqtt5_client_handle_t cl
  * This API will not store the disconnect property, it is one-time configuration.
  * Before call `esp_mqtt_client_disconnect` to disconnect connection, call this API to set disconnect property if have
  *
- * @param client            mqtt client handle
- * @param property          disconnect property
+ * @param client            mqtt client handle, must not be NULL
+ * @param property          disconnect property, must not be NULL
  *
  * @return
  *         - ESP_OK on success
  *         - ESP_ERR_NO_MEM if failed to allocate
- *         - ESP_ERR_INVALID_ARG on wrong initialization
+ *         - ESP_ERR_INVALID_ARG if client or property is NULL
  *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_disconnect_property(esp_mqtt5_client_handle_t client,

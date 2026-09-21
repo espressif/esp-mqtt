@@ -508,6 +508,11 @@ esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client
         return ESP_ERR_INVALID_ARG;
     }
 
+    if (!property) {
+        ESP_LOGE(TAG, "Property is NULL");
+        return ESP_ERR_INVALID_ARG;
+    }
+
     MQTT_API_LOCK(client);
 
     /* Check protocol version */
@@ -535,6 +540,11 @@ esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t clie
 {
     if (!client) {
         ESP_LOGE(TAG, "Client was not initialized");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!property) {
+        ESP_LOGE(TAG, "Property is NULL");
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -586,6 +596,11 @@ esp_err_t esp_mqtt5_client_set_unsubscribe_property(esp_mqtt5_client_handle_t cl
         return ESP_ERR_INVALID_ARG;
     }
 
+    if (!property) {
+        ESP_LOGE(TAG, "Property is NULL");
+        return ESP_ERR_INVALID_ARG;
+    }
+
     MQTT_API_LOCK(client);
 
     /* Check protocol version */
@@ -619,6 +634,11 @@ esp_err_t esp_mqtt5_client_set_disconnect_property(esp_mqtt5_client_handle_t cli
 {
     if (!client) {
         ESP_LOGE(TAG, "Client was not initialized");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!property) {
+        ESP_LOGE(TAG, "Property is NULL");
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -674,6 +694,11 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
 {
     if (!client) {
         ESP_LOGE(TAG, "Client was not initialized");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!connect_property) {
+        ESP_LOGE(TAG, "Property is NULL");
         return ESP_ERR_INVALID_ARG;
     }
 
