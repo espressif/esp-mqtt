@@ -220,8 +220,11 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
 /**
  * @brief Set MQTT5 client publish property configuration
  *
- * This API will not store the publish property, it is one-time configuration.
- * Before call `esp_mqtt_client_publish` to publish data, call this API to set publish property if have
+ * This API stages a borrowed property pointer for one successful publish or enqueue serialization by the
+ * calling task. The property and all referenced data must remain valid until then. A call from the same task
+ * replaces its staged pointer. Publish or enqueue calls from another task proceed without this property and do
+ * not consume it. The owner task must not terminate before consuming the property; otherwise the slot remains
+ * reserved until client destruction. Reuse of a terminated task's handle cannot currently be detected.
  *
  * @param client            mqtt client handle, must not be NULL
  * @param property          publish property, must not be NULL
@@ -229,6 +232,7 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
  * @return
  *         - ESP_OK on success
  *         - ESP_ERR_INVALID_ARG if client or property is NULL
+ *         - ESP_ERR_INVALID_STATE if another task owns the staged publish property
  *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client,
@@ -237,8 +241,11 @@ esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client
 /**
  * @brief Set MQTT5 client subscribe property configuration
  *
- * This API will not store the subscribe property, it is one-time configuration.
- * Before call `esp_mqtt_client_subscribe` to subscribe topic, call this API to set subscribe property if have
+ * This API stages a borrowed property pointer for one successful subscribe serialization by the calling task.
+ * The property and all referenced data must remain valid until then. A call from the same task replaces its
+ * staged pointer. Subscribe calls from another task proceed without this property and do not consume it. The
+ * owner task must not terminate before consuming the property; otherwise the slot remains reserved until client
+ * destruction. Reuse of a terminated task's handle cannot currently be detected.
  *
  * @param client            mqtt client handle, must not be NULL
  * @param property          subscribe property, must not be NULL
@@ -246,6 +253,7 @@ esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client
  * @return
  *         - ESP_OK on success
  *         - ESP_ERR_INVALID_ARG if client or property is NULL
+ *         - ESP_ERR_INVALID_STATE if another task owns the staged subscribe property
  *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t client,
@@ -254,8 +262,11 @@ esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t clie
 /**
  * @brief Set MQTT5 client unsubscribe property configuration
  *
- * This API will not store the unsubscribe property, it is one-time configuration.
- * Before call `esp_mqtt_client_unsubscribe` to unsubscribe topic, call this API to set unsubscribe property if have
+ * This API stages a borrowed property pointer for one successful unsubscribe serialization by the calling task.
+ * The property and all referenced data must remain valid until then. A call from the same task replaces its
+ * staged pointer. Unsubscribe calls from another task proceed without this property and do not consume it. The
+ * owner task must not terminate before consuming the property; otherwise the slot remains reserved until client
+ * destruction. Reuse of a terminated task's handle cannot currently be detected.
  *
  * @param client            mqtt client handle, must not be NULL
  * @param property          unsubscribe property, must not be NULL
@@ -263,6 +274,7 @@ esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t clie
  * @return
  *         - ESP_OK on success
  *         - ESP_ERR_INVALID_ARG if client or property is NULL
+ *         - ESP_ERR_INVALID_STATE if another task owns the staged unsubscribe property
  *         - ESP_FAIL on fail
  */
 esp_err_t esp_mqtt5_client_set_unsubscribe_property(esp_mqtt5_client_handle_t client,

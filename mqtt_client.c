@@ -2405,12 +2405,14 @@ int esp_mqtt_client_subscribe_multiple(esp_mqtt_client_handle_t client,
             return -1;
         }
 
+        const esp_mqtt5_subscribe_property_config_t *property =
+            esp_mqtt5_staged_property_get(&client->mqtt5_config->subscribe_property);
         mqtt5_msg_subscribe(&client->mqtt_state.connection,
                             topic_list, size,
-                            &client->mqtt_state.pending_msg_id, client->mqtt5_config->subscribe_property_info);
+                            &client->mqtt_state.pending_msg_id, property);
 
-        if (client->mqtt_state.connection.outbound_message.length) {
-            client->mqtt5_config->subscribe_property_info = NULL;
+        if (property && client->mqtt_state.connection.outbound_message.length) {
+            esp_mqtt5_staged_property_clear(&client->mqtt5_config->subscribe_property);
         }
 
 #endif
@@ -2471,12 +2473,14 @@ int esp_mqtt_client_unsubscribe(esp_mqtt_client_handle_t client, const char *top
 
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
+        const esp_mqtt5_unsubscribe_property_config_t *property =
+            esp_mqtt5_staged_property_get(&client->mqtt5_config->unsubscribe_property);
         mqtt5_msg_unsubscribe(&client->mqtt_state.connection,
                               topic,
-                              &client->mqtt_state.pending_msg_id, client->mqtt5_config->unsubscribe_property_info);
+                              &client->mqtt_state.pending_msg_id, property);
 
-        if (client->mqtt_state.connection.outbound_message.length) {
-            client->mqtt5_config->unsubscribe_property_info = NULL;
+        if (property && client->mqtt_state.connection.outbound_message.length) {
+            esp_mqtt5_staged_property_clear(&client->mqtt5_config->unsubscribe_property);
         }
 
 #endif
@@ -2521,14 +2525,16 @@ static int make_publish(esp_mqtt_client_handle_t client, const char *topic, cons
 
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
+        const esp_mqtt5_publish_property_config_t *property =
+            esp_mqtt5_staged_property_get(&client->mqtt5_config->publish_property);
         mqtt5_msg_publish(&client->mqtt_state.connection,
                           topic, data, len,
                           qos, retain,
-                          &pending_msg_id, client->mqtt5_config->publish_property_info,
+                          &pending_msg_id, property,
                           client->mqtt5_config->server_resp_property_info.response_info);
 
-        if (client->mqtt_state.connection.outbound_message.length) {
-            client->mqtt5_config->publish_property_info = NULL;
+        if (property && client->mqtt_state.connection.outbound_message.length) {
+            esp_mqtt5_staged_property_clear(&client->mqtt5_config->publish_property);
         }
 
 #endif

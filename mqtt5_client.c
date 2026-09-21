@@ -22,6 +22,32 @@ static void esp_mqtt5_client_delete_topic_alias(mqtt5_topic_alias_handle_t topic
 static esp_err_t esp_mqtt5_user_property_copy(mqtt5_user_property_handle_t user_property_new,
                                               const mqtt5_user_property_handle_t user_property_old);
 
+esp_err_t esp_mqtt5_staged_property_set(mqtt5_staged_property_t *slot, const void *property)
+{
+    TaskHandle_t current_task = xTaskGetCurrentTaskHandle();
+
+    if (slot->property && slot->owner != current_task) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    slot->property = property;
+    slot->owner = current_task;
+    return ESP_OK;
+}
+
+const void *esp_mqtt5_staged_property_get(const mqtt5_staged_property_t *slot)
+{
+    return slot->owner == xTaskGetCurrentTaskHandle() ? slot->property : NULL;
+}
+
+void esp_mqtt5_staged_property_clear(mqtt5_staged_property_t *slot)
+{
+    if (slot->owner == xTaskGetCurrentTaskHandle()) {
+        slot->property = NULL;
+        slot->owner = NULL;
+    }
+}
+
 void esp_mqtt5_increment_packet_counter(esp_mqtt5_client_handle_t client)
 {
     client->send_publish_packet_count ++;
@@ -530,9 +556,9 @@ esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client
         return ESP_FAIL;
     }
 
-    client->mqtt5_config->publish_property_info = property;
+    esp_err_t ret = esp_mqtt5_staged_property_set(&client->mqtt5_config->publish_property, property);
     MQTT_API_UNLOCK(client);
-    return ESP_OK;
+    return ret;
 }
 
 esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t client,
@@ -583,9 +609,9 @@ esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t clie
         }
     }
 
-    client->mqtt5_config->subscribe_property_info = property;
+    esp_err_t ret = esp_mqtt5_staged_property_set(&client->mqtt5_config->subscribe_property, property);
     MQTT_API_UNLOCK(client);
-    return ESP_OK;
+    return ret;
 }
 
 esp_err_t esp_mqtt5_client_set_unsubscribe_property(esp_mqtt5_client_handle_t client,
@@ -624,9 +650,9 @@ esp_err_t esp_mqtt5_client_set_unsubscribe_property(esp_mqtt5_client_handle_t cl
         }
     }
 
-    client->mqtt5_config->unsubscribe_property_info = property;
+    esp_err_t ret = esp_mqtt5_staged_property_set(&client->mqtt5_config->unsubscribe_property, property);
     MQTT_API_UNLOCK(client);
-    return ESP_OK;
+    return ret;
 }
 
 esp_err_t esp_mqtt5_client_set_disconnect_property(esp_mqtt5_client_handle_t client,
