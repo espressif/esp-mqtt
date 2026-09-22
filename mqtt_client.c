@@ -37,6 +37,7 @@ static const int DISCONNECT_BIT = (1 << 2);
 
 static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_dispatch_event_with_msgid(esp_mqtt_client_handle_t client);
+static void esp_mqtt_dispatch_keepalive_event(esp_mqtt_client_handle_t client, esp_mqtt_keepalive_kind_t kind);
 static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_ms);
 static void esp_mqtt_abort_connection(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_client_ping(esp_mqtt_client_handle_t client);
@@ -818,6 +819,7 @@ static esp_err_t process_keepalive(esp_mqtt_client_handle_t client)
             }
 
             client->wait_for_ping_resp = true;
+            esp_mqtt_dispatch_keepalive_event(client, MQTT_KEEPALIVE_PINGREQ);
             return ESP_OK;
         }
     }
@@ -1273,6 +1275,15 @@ esp_err_t esp_mqtt_dispatch_custom_event(esp_mqtt_client_handle_t client, esp_mq
 
 #endif
     return ret;
+}
+
+static void esp_mqtt_dispatch_keepalive_event(esp_mqtt_client_handle_t client, esp_mqtt_keepalive_kind_t kind)
+{
+    char data = (char)kind;
+    client->event.event_id = MQTT_EVENT_KEEPALIVE;
+    client->event.data_len = 1;
+    client->event.data = &data;
+    esp_mqtt_dispatch_event(client);
 }
 
 static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
@@ -1830,6 +1841,7 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
          * [MQTT-3.1.2-23]
          */
         client->keepalive_tick = platform_tick_get_ms();
+        esp_mqtt_dispatch_keepalive_event(client, MQTT_KEEPALIVE_PINGRESP);
         break;
 
     case MQTT_MSG_TYPE_DISCONNECT:

@@ -97,7 +97,22 @@ typedef enum esp_mqtt_event_id_t {
                                  All fields from the esp_mqtt_event_t type could be used to pass
                                  an additional context data to the handler.
                                  */
+    MQTT_EVENT_KEEPALIVE,       /*!< Keepalive PINGREQ sent or PINGRESP received.
+                                 Additional context:
+                                 - data      pointer to one byte, an :cpp:type:`esp_mqtt_keepalive_kind_t`
+                                 - data_len  always 1
+                                 The pointer remains valid for the duration of the event handler.
+                                 */
 } esp_mqtt_event_id_t;
+
+/**
+ * Kind of keepalive traffic reported in :cpp:enumerator:`MQTT_EVENT_KEEPALIVE`.
+ * Encoded as a single byte in :cpp:member:`esp_mqtt_event_t::data`.
+ */
+typedef enum {
+    MQTT_KEEPALIVE_PINGREQ = 0,  /*!< Client sent a PINGREQ */
+    MQTT_KEEPALIVE_PINGRESP = 1, /*!< Client received a PINGRESP */
+} esp_mqtt_keepalive_kind_t;
 
 /**
  * *MQTT* connection error codes propagated via ERROR event
