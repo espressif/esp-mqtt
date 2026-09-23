@@ -34,6 +34,7 @@ ESP_EVENT_DEFINE_BASE(MQTT_EVENTS);
 static const int STOPPED_BIT = (1 << 0);
 static const int RECONNECT_BIT = (1 << 1);
 static const int DISCONNECT_BIT = (1 << 2);
+static const int STOP_REQ_BIT = (1 << 3);
 
 static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client);
 static esp_err_t esp_mqtt_dispatch_event_with_msgid(esp_mqtt_client_handle_t client);
@@ -2013,7 +2014,7 @@ static void esp_mqtt_task(void *pv)
             break;
 
         case MQTT_STATE_INIT:
-            xEventGroupClearBits(client->status_bits, RECONNECT_BIT | DISCONNECT_BIT);
+            xEventGroupClearBits(client->status_bits, RECONNECT_BIT | DISCONNECT_BIT | STOP_REQ_BIT);
             client->transport = client->config->transport;
 
             if (!client->transport) {
@@ -2185,7 +2186,7 @@ static void esp_mqtt_task(void *pv)
             }
 
             MQTT_API_UNLOCK(client);
-            xEventGroupWaitBits(client->status_bits, RECONNECT_BIT, false, true,
+            xEventGroupWaitBits(client->status_bits, RECONNECT_BIT | STOP_REQ_BIT, false, false,
                                 max_poll_timeout(client, client->wait_timeout_ms / 2 / portTICK_PERIOD_MS));
             // continue the while loop instead of break, as the mutex is unlocked
             continue;
@@ -2352,6 +2353,7 @@ esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client)
 
         client->run = false;
         client->state = MQTT_STATE_DISCONNECTED;
+        xEventGroupSetBits(client->status_bits, STOP_REQ_BIT);
         MQTT_API_UNLOCK(client);
         xEventGroupWaitBits(client->status_bits, STOPPED_BIT, false, true, portMAX_DELAY);
         return ESP_OK;
