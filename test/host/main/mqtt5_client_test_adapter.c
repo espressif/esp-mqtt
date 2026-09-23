@@ -4,8 +4,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "mqtt_client_priv.h"
+#include "mqtt5_msg.h"
+
+static bool fail_next_calloc;
+
+void *mqtt_test_calloc(size_t count, size_t size)
+{
+    if (fail_next_calloc) {
+        fail_next_calloc = false;
+        return NULL;
+    }
+
+    return calloc(count, size);
+}
+
+size_t test_mqtt5_shared_subscription_alloc_failure(bool unsubscribe)
+{
+    uint8_t buffer[256] = {0};
+    mqtt_connection_t connection = {.buffer = buffer, .buffer_length = sizeof(buffer)};
+    uint16_t message_id = 0;
+    esp_mqtt5_subscribe_property_config_t subscribe_property = {
+        .is_share_subscribe = true, .share_name = "group"
+    };
+    esp_mqtt5_unsubscribe_property_config_t unsubscribe_property = {
+        .is_share_subscribe = true, .share_name = "group"
+    };
+    esp_mqtt_topic_t topic = {.filter = "sensors/+", .qos = 1};
+    fail_next_calloc = true;
+    mqtt_message_t *message = unsubscribe ?
+                              mqtt5_msg_unsubscribe(&connection, topic.filter, &message_id, &unsubscribe_property) :
+                              mqtt5_msg_subscribe(&connection, &topic, 1, &message_id, &subscribe_property);
+    return message->length;
+}
 
 esp_err_t test_mqtt5_check_inflight_maximum(uint16_t send_count, uint16_t receive_maximum)
 {

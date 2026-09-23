@@ -18,6 +18,13 @@ extern "C" {
     esp_err_t test_mqtt5_set_subscribe_null_property(void);
     esp_err_t test_mqtt5_set_unsubscribe_null_property(void);
     esp_err_t test_mqtt5_set_disconnect_null_property(void);
+    size_t test_mqtt5_shared_subscription_alloc_failure(bool unsubscribe);
+}
+
+TEST_CASE("MQTT5 shared subscription handles allocation failure")
+{
+    REQUIRE(test_mqtt5_shared_subscription_alloc_failure(true) == 0);
+    REQUIRE(test_mqtt5_shared_subscription_alloc_failure(false) == 0);
 }
 
 TEST_CASE("MQTT5 inflight quota uses an exact upper bound")
