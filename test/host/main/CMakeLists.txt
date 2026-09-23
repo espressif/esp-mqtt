@@ -10,6 +10,7 @@ target_link_libraries(${COMPONENT_LIB} PUBLIC Catch2::Catch2WithMain rapidcheck 
 
 idf_component_get_property(mqtt mqtt COMPONENT_LIB)
 target_compile_definitions(${mqtt} PRIVATE SOC_WIFI_SUPPORTED=1)
+target_compile_definitions(${mqtt} PRIVATE calloc=mqtt_test_calloc)
 target_compile_options(${mqtt} PUBLIC ${SANITIZER_FLAGS})
 target_link_options(${mqtt} PUBLIC ${SANITIZER_FLAGS})
 
