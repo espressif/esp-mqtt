@@ -4,8 +4,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <stdint.h>
+#include <string.h>
 
 #include "mqtt_client_priv.h"
+
+static struct esp_mqtt_client s_client;
+static mqtt5_config_storage_t s_mqtt5_config;
+
+esp_mqtt_client_handle_t test_mqtt5_property_client_reset(void)
+{
+    memset(&s_client, 0, sizeof(s_client));
+    memset(&s_mqtt5_config, 0, sizeof(s_mqtt5_config));
+    s_client.mqtt5_config = &s_mqtt5_config;
+    s_client.mqtt_state.connection.information.protocol_ver = MQTT_PROTOCOL_V_5;
+    return &s_client;
+}
+
+mqtt5_staged_property_t *test_mqtt5_publish_property_slot(void)
+{
+    return &s_mqtt5_config.publish_property;
+}
+
+mqtt5_staged_property_t *test_mqtt5_subscribe_property_slot(void)
+{
+    return &s_mqtt5_config.subscribe_property;
+}
+
+mqtt5_staged_property_t *test_mqtt5_unsubscribe_property_slot(void)
+{
+    return &s_mqtt5_config.unsubscribe_property;
+}
 
 esp_err_t test_mqtt5_check_inflight_maximum(uint16_t send_count, uint16_t receive_maximum)
 {
