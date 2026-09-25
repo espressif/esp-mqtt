@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2023-2025 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2023-2026 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Unlicense OR CC0-1.0
 import contextlib
 import difflib
@@ -371,7 +371,7 @@ test_cases = make_cases(transport_cases, get_scenarios())
 stress_test_cases = make_cases(transport_cases, stress_scenarios)
 
 
-@pytest.mark.eth_ip101
+@pytest.mark.eth_cfg_default
 @pytest.mark.parametrize(
     "test_case", test_cases, ids=[generate_test_id(case) for case in test_cases]
 )
@@ -385,7 +385,7 @@ def test_mqtt_publish(dut: Dut, test_case: Any) -> None:
     run_publish_test_case(dut, publish_cfg)
 
 
-@pytest.mark.eth_ip101_stress
+@pytest.mark.eth_cfg_default_stress
 @pytest.mark.nightly_run
 @pytest.mark.parametrize(
     "test_case",
@@ -405,7 +405,7 @@ def test_mqtt_publish_stress(dut: Dut, test_case: Any) -> None:
 local_test_cases = make_cases(local_broker_supported_transports, local_broker_scenarios)
 
 
-@pytest.mark.eth_ip101
+@pytest.mark.eth_cfg_default
 @pytest.mark.parametrize(
     "test_case",
     local_test_cases,

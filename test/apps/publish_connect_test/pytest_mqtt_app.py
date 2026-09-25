@@ -257,7 +257,7 @@ def run_cases(dut: Dut, uri: str, cases: Dict[str, int]) -> None:
         dut.write("destroy")
 
 
-@pytest.mark.eth_ip101
+@pytest.mark.eth_cfg_default
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 def test_mqtt_connect(
     dut: Dut,

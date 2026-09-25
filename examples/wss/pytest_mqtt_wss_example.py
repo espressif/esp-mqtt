@@ -47,7 +47,7 @@ def on_message(client, userdata, msg):  # type: (mqtt.Client, tuple, mqtt.client
     message_log += "Received data:" + msg.topic + " " + payload + "\n"
 
 
-@pytest.mark.eth_ip101
+@pytest.mark.eth_cfg_default
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 def test_examples_protocol_mqtt_wss(dut):  # type: (Dut) -> None  # type: ignore
     broker_url = ""
