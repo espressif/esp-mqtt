@@ -1279,12 +1279,19 @@ esp_err_t esp_mqtt_dispatch_custom_event(esp_mqtt_client_handle_t client, esp_mq
 
 static void esp_mqtt_dispatch_keepalive_event(esp_mqtt_client_handle_t client, esp_mqtt_keepalive_kind_t kind)
 {
-    char data = (char)kind;
+    client->keepalive_event_data[kind] = (char)kind;
     client->event.event_id = MQTT_EVENT_KEEPALIVE;
     client->event.data_len = 1;
-    client->event.data = &data;
+    client->event.data = &client->keepalive_event_data[kind];
     esp_mqtt_dispatch_event(client);
 }
+
+#ifdef MQTT_TEST
+void mqtt_test_dispatch_keepalive_event(esp_mqtt_client_handle_t client, esp_mqtt_keepalive_kind_t kind)
+{
+    esp_mqtt_dispatch_keepalive_event(client, kind);
+}
+#endif
 
 static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
 {

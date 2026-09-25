@@ -17,6 +17,7 @@
 #include <type_traits>
 
 #include "mqtt_client.h"
+#include "mqtt_client_priv.h"
 #include "test_log_intercept.hpp"
 #include "test_log_matchers.hpp"
 extern "C" {
@@ -44,6 +45,40 @@ extern "C" {
     {
         return ESP_OK;
     }
+}
+
+extern "C" void mqtt_test_dispatch_keepalive_event(esp_mqtt_client_handle_t client, esp_mqtt_keepalive_kind_t kind);
+
+static esp_mqtt_event_t captured_keepalive_events[2];
+static int captured_keepalive_count;
+
+static esp_err_t capture_keepalive_event(esp_event_loop_handle_t, esp_event_base_t, int32_t,
+                                         const void *data, size_t, TickType_t, int)
+{
+    if (captured_keepalive_count < 2) {
+        captured_keepalive_events[captured_keepalive_count] = *static_cast<const esp_mqtt_event_t *>(data);
+    }
+
+    ++captured_keepalive_count;
+    return ESP_OK;
+}
+
+TEST_CASE("Queued keepalive events retain their distinct payloads")
+{
+    captured_keepalive_count = 0;
+    esp_event_post_to_StubWithCallback(capture_keepalive_event);
+    esp_event_loop_run_IgnoreAndReturn(ESP_OK);
+    mqtt_config_storage_t config = {};
+    struct esp_mqtt_client client = {};
+    client.config = &config;
+    client.mqtt_state.connection.information.protocol_ver = MQTT_PROTOCOL_V_3_1_1;
+    mqtt_test_dispatch_keepalive_event(&client, MQTT_KEEPALIVE_PINGREQ);
+    mqtt_test_dispatch_keepalive_event(&client, MQTT_KEEPALIVE_PINGRESP);
+    REQUIRE(captured_keepalive_count == 2);
+    REQUIRE(captured_keepalive_events[0].event_id == MQTT_EVENT_KEEPALIVE);
+    REQUIRE(captured_keepalive_events[1].event_id == MQTT_EVENT_KEEPALIVE);
+    REQUIRE(*captured_keepalive_events[0].data == MQTT_KEEPALIVE_PINGREQ);
+    REQUIRE(*captured_keepalive_events[1].data == MQTT_KEEPALIVE_PINGRESP);
 }
 
 static std::string build_uri(std::string_view scheme, std::string_view host,
