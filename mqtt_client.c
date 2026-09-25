@@ -17,19 +17,15 @@
 #include "mqtt_utils.h"
 
 _Static_assert(sizeof(uint64_t) == sizeof(outbox_tick_t), "mqtt-client tick type size different from outbox tick type");
-#ifdef ESP_EVENT_ANY_ID
 _Static_assert(MQTT_EVENT_ANY == ESP_EVENT_ANY_ID, "mqtt-client event enum does not match the global EVENT_ANY_ID");
-#endif
 
 static const char *TAG = "mqtt_client";
 
-#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
 /**
  * @brief Define of MQTT Event base
  *
  */
 ESP_EVENT_DEFINE_BASE(MQTT_EVENTS);
-#endif
 
 static const int STOPPED_BIT = (1 << 0);
 static const int RECONNECT_BIT = (1 << 1);
@@ -114,14 +110,6 @@ static esp_err_t esp_mqtt_set_cert_key_data(esp_transport_handle_t ssl, enum esp
         len = strlen(data);
     }
 
-#ifndef MQTT_SUPPORTED_FEATURE_DER_CERTIFICATES
-    else {
-        ESP_LOGE(TAG, "Explicit cert-/key-len is not available in IDF version %s", IDF_VER);
-        return ESP_ERR_NOT_SUPPORTED;
-    }
-
-#endif
-
     // option to force the cert/key config to null (i.e. skip validation) when existing config updates
     if (0 == strcmp(data, "NULL")) {
         data = NULL;
@@ -129,8 +117,6 @@ static esp_err_t esp_mqtt_set_cert_key_data(esp_transport_handle_t ssl, enum esp
     }
 
     switch (ssl_transport_api_id) {
-#ifdef MQTT_SUPPORTED_FEATURE_DER_CERTIFICATES
-
     case MQTT_SSL_DATA_API_CA_CERT:
         esp_transport_ssl_set_cert_data_der(ssl, data, len);
         break;
@@ -142,7 +128,6 @@ static esp_err_t esp_mqtt_set_cert_key_data(esp_transport_handle_t ssl, enum esp
     case MQTT_SSL_DATA_API_CLIENT_KEY:
         esp_transport_ssl_set_client_key_data_der(ssl, data, len);
         break;
-#endif
 
     case MQTT_SSL_DATA_API_CA_CERT + MQTT_SSL_DATA_API_MAX:
         esp_transport_ssl_set_cert_data(ssl, data, len);
@@ -171,17 +156,12 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
     if (cfg->use_global_ca_store == true) {
         esp_transport_ssl_enable_global_ca_store(ssl);
     } else if (cfg->crt_bundle_attach != NULL) {
-#ifdef MQTT_SUPPORTED_FEATURE_CERTIFICATE_BUNDLE
 #ifdef CONFIG_MBEDTLS_CERTIFICATE_BUNDLE
         esp_transport_ssl_crt_bundle_attach(ssl, cfg->crt_bundle_attach);
 #else
         ESP_LOGE(TAG, "Certificate bundle is not enabled for mbedTLS in menuconfig");
         goto esp_mqtt_set_transport_failed;
 #endif /* CONFIG_MBEDTLS_CERTIFICATE_BUNDLE */
-#else
-        ESP_LOGE(TAG, "Certificate bundle feature is not available in IDF version %s", IDF_VER);
-        goto esp_mqtt_set_transport_failed;
-#endif /* MQTT_SUPPORTED_FEATURE_CERTIFICATE_BUNDLE */
     } else {
         ESP_OK_CHECK(TAG, esp_mqtt_set_cert_key_data(ssl, MQTT_SSL_DATA_API_CA_CERT, cfg->cacert_buf, cfg->cacert_bytes),
                      goto esp_mqtt_set_transport_failed);
@@ -197,7 +177,6 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
     }
 
     if (cfg->psk_hint_key) {
-#if defined(MQTT_SUPPORTED_FEATURE_PSK_AUTHENTICATION) && MQTT_ENABLE_SSL
 #ifdef CONFIG_ESP_TLS_PSK_VERIFICATION
         esp_transport_ssl_set_psk_key_hint(ssl, cfg->psk_hint_key);
 #else
@@ -205,14 +184,9 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
                  "PSK authentication configured but not enabled in menuconfig: Please enable ESP_TLS_PSK_VERIFICATION option");
         goto esp_mqtt_set_transport_failed;
 #endif
-#else
-        ESP_LOGE(TAG, "PSK authentication is not available in IDF version %s", IDF_VER);
-        goto esp_mqtt_set_transport_failed;
-#endif
     }
 
     if (cfg->alpn_protos) {
-#if defined(MQTT_SUPPORTED_FEATURE_ALPN) && MQTT_ENABLE_SSL
 #if defined(CONFIG_MBEDTLS_SSL_ALPN) || defined(CONFIG_WOLFSSL_HAVE_ALPN)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-qual"
@@ -223,70 +197,41 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
                  "APLN configured but not enabled in menuconfig: Please enable MBEDTLS_SSL_ALPN or WOLFSSL_HAVE_ALPN option");
         goto esp_mqtt_set_transport_failed;
 #endif
-#else
-        ESP_LOGE(TAG, "APLN is not available in IDF version %s", IDF_VER);
-        goto esp_mqtt_set_transport_failed;
-#endif
     }
 
     if (cfg->skip_cert_common_name_check) {
-#if defined(MQTT_SUPPORTED_FEATURE_SKIP_CRT_CMN_NAME_CHECK) && MQTT_ENABLE_SSL
         esp_transport_ssl_skip_common_name_check(ssl);
-#else
-        ESP_LOGE(TAG, "Skip certificate common name check is not available in IDF version %s", IDF_VER);
-        goto esp_mqtt_set_transport_failed;
-#endif
     }
 
     if (cfg->common_name) {
-#if defined(MQTT_SUPPORTED_FEATURE_CRT_CMN_NAME) && MQTT_ENABLE_SSL
         esp_transport_ssl_set_common_name(ssl, cfg->common_name);
-#else
-        ESP_LOGE(TAG, "Setting expected certificate common name is not available in IDF version %s", IDF_VER);
-        goto esp_mqtt_set_transport_failed;
-#endif
     }
 
     if (cfg->use_secure_element) {
-#ifdef MQTT_SUPPORTED_FEATURE_SECURE_ELEMENT
 #ifdef CONFIG_ESP_TLS_USE_SECURE_ELEMENT
         esp_transport_ssl_use_secure_element(ssl);
 #else
         ESP_LOGE(TAG, "Secure element not enabled for esp-tls in menuconfig");
         goto esp_mqtt_set_transport_failed;
 #endif /* CONFIG_ESP_TLS_USE_SECURE_ELEMENT */
-#else
-        ESP_LOGE(TAG, "Secure element feature is not available in IDF version %s", IDF_VER);
-        goto esp_mqtt_set_transport_failed;
-#endif /* MQTT_SUPPORTED_FEATURE_SECURE_ELEMENT */
     }
 
     if (cfg->ds_data != NULL) {
-#ifdef MQTT_SUPPORTED_FEATURE_DIGITAL_SIGNATURE
 #ifdef CONFIG_ESP_TLS_USE_DS_PERIPHERAL
         esp_transport_ssl_set_ds_data(ssl, cfg->ds_data);
 #else
         ESP_LOGE(TAG, "Digital Signature not enabled for esp-tls in menuconfig");
         goto esp_mqtt_set_transport_failed;
 #endif /* CONFIG_ESP_TLS_USE_DS_PERIPHERAL */
-#else
-        ESP_LOGE(TAG, "Digital Signature feature is not available in IDF version %s", IDF_VER);
-        goto esp_mqtt_set_transport_failed;
-#endif
     }
 
     if (cfg->use_ecdsa_peripheral) {
-#ifdef MQTT_SUPPORTED_FEATURE_ECDSA_PERIPHERAL
 #ifdef CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN
         esp_transport_ssl_set_client_key_ecdsa_peripheral(ssl, cfg->ecdsa_key_efuse_blk);
 #else
         ESP_LOGE(TAG, "ECDSA peripheral not enabled for esp-tls in menuconfig");
         goto esp_mqtt_set_transport_failed;
 #endif /* CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN */
-#else
-        ESP_LOGE(TAG, "ECDSA peripheral feature is not available in IDF version %s", IDF_VER);
-        goto esp_mqtt_set_transport_failed;
-#endif /* MQTT_SUPPORTED_FEATURE_ECDSA_PERIPHERAL */
     }
 
     ESP_OK_CHECK(TAG, esp_mqtt_set_cert_key_data(ssl, MQTT_SSL_DATA_API_CLIENT_CERT, cfg->clientcert_buf,
@@ -297,14 +242,9 @@ static esp_err_t esp_mqtt_set_ssl_transport_properties(esp_transport_list_handle
                  goto esp_mqtt_set_transport_failed);
 
     if (cfg->clientkey_password && cfg->clientkey_password_len) {
-#if defined(MQTT_SUPPORTED_FEATURE_CLIENT_KEY_PASSWORD) && MQTT_ENABLE_SSL
         esp_transport_ssl_set_client_key_password(ssl,
                                                   cfg->clientkey_password,
                                                   cfg->clientkey_password_len);
-#else
-        ESP_LOGE(TAG, "Password protected keys are not available in IDF version %s", IDF_VER);
-        goto esp_mqtt_set_transport_failed;
-#endif
     }
 
     return ESP_OK;
@@ -407,9 +347,7 @@ static esp_err_t esp_mqtt_client_create_transport(esp_mqtt_client_handle_t clien
                     esp_transport_ws_set_path(ws, client->config->path);
                 }
 
-#ifdef MQTT_SUPPORTED_FEATURE_WS_SUBPROTOCOL
                 esp_transport_ws_set_subprotocol(ws, MQTT_OVER_TCP_SCHEME);
-#endif
                 esp_transport_list_add(client->transport_list, ws, MQTT_OVER_WS_SCHEME);
 #else
                 ESP_LOGE(TAG, "Please enable MQTT_ENABLE_WS to use %s", client->config->scheme);
@@ -439,9 +377,7 @@ static esp_err_t esp_mqtt_client_create_transport(esp_mqtt_client_handle_t clien
                     esp_transport_ws_set_path(wss, client->config->path);
                 }
 
-#ifdef MQTT_SUPPORTED_FEATURE_WS_SUBPROTOCOL
                 esp_transport_ws_set_subprotocol(wss, MQTT_OVER_TCP_SCHEME);
-#endif
                 esp_transport_list_add(client->transport_list, wss, MQTT_OVER_WSS_SCHEME);
 #else
                 ESP_LOGE(TAG, "Please enable MQTT_ENABLE_WS to use %s", client->config->scheme);
@@ -776,13 +712,11 @@ void esp_mqtt_destroy_config(esp_mqtt_client_handle_t client)
     esp_mqtt5_client_destory(client);
 #endif
     memset(&client->mqtt_state.connection.information, 0, sizeof(mqtt_connect_info_t));
-#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
 
     if (client->config->event_loop_handle) {
         esp_event_loop_delete(client->config->event_loop_handle);
     }
 
-#endif
     esp_transport_destroy(client->config->transport);
     memset(client->config, 0, sizeof(mqtt_config_storage_t));
     free(client->config);
@@ -1054,7 +988,6 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     }
 
     atomic_init(&client->task_running, false);
-#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
     esp_event_loop_args_t no_task_loop = {
         .queue_size = MQTT_EVENT_QUEUE_SIZE,
         .task_name = NULL,
@@ -1062,7 +995,6 @@ esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_config_t *co
     esp_event_loop_create(&no_task_loop, &client->config->event_loop_handle);
 #if MQTT_EVENT_QUEUE_SIZE > 1
     atomic_init(&client->queued_events, 0);
-#endif
 #endif
     client->keepalive_tick = platform_tick_get_ms();
     client->reconnect_tick = platform_tick_get_ms();
@@ -1290,14 +1222,9 @@ static esp_err_t esp_mqtt_dispatch_event(esp_mqtt_client_handle_t client)
 {
     client->event.client = client;
     client->event.protocol_ver = client->mqtt_state.connection.information.protocol_ver;
-    esp_err_t ret = ESP_FAIL;
-#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
     esp_event_post_to(client->config->event_loop_handle, MQTT_EVENTS, client->event.event_id, &client->event,
                       sizeof(client->event), portMAX_DELAY);
-    ret = esp_event_loop_run(client->config->event_loop_handle, 0);
-#else
-    return ESP_FAIL;
-#endif
+    esp_err_t ret = esp_event_loop_run(client->config->event_loop_handle, 0);
 
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
@@ -2792,13 +2719,8 @@ esp_err_t esp_mqtt_client_register_event(esp_mqtt_client_handle_t client, esp_mq
         return ESP_ERR_INVALID_ARG;
     }
 
-#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
     return esp_event_handler_register_with(client->config->event_loop_handle, MQTT_EVENTS, event, event_handler,
                                            event_handler_arg);
-#else
-    ESP_LOGE(TAG, "Registering event handler while event loop not available in IDF version %s", IDF_VER);
-    return ESP_FAIL;
-#endif
 }
 
 esp_err_t esp_mqtt_client_unregister_event(esp_mqtt_client_handle_t client, esp_mqtt_event_id_t event,
@@ -2809,12 +2731,7 @@ esp_err_t esp_mqtt_client_unregister_event(esp_mqtt_client_handle_t client, esp_
         return ESP_ERR_INVALID_ARG;
     }
 
-#ifdef MQTT_SUPPORTED_FEATURE_EVENT_LOOP
     return esp_event_handler_unregister_with(client->config->event_loop_handle, MQTT_EVENTS, event, event_handler);
-#else
-    ESP_LOGE(TAG, "Unregistering event handler while event loop not available in IDF version %s", IDF_VER);
-    return ESP_FAIL;
-#endif
 }
 
 static void esp_mqtt_client_dispatch_transport_error(esp_mqtt_client_handle_t client)
@@ -2829,15 +2746,11 @@ static void esp_mqtt_client_dispatch_transport_error(esp_mqtt_client_handle_t cl
 #pragma GCC diagnostic pop
     client->event.reason_code = 0;
 #endif
-#ifdef MQTT_SUPPORTED_FEATURE_TRANSPORT_ERR_REPORTING
     client->event.error_handle->esp_tls_last_esp_err = esp_tls_get_and_clear_last_error(esp_transport_get_error_handle(
                                                                                             client->transport),
                                                                                         &client->event.error_handle->esp_tls_stack_err,
                                                                                         &client->event.error_handle->esp_tls_cert_verify_flags);
-#ifdef MQTT_SUPPORTED_FEATURE_TRANSPORT_SOCK_ERRNO_REPORTING
     client->event.error_handle->esp_transport_sock_errno = esp_transport_get_errno(client->transport);
-#endif
-#endif
     esp_mqtt_dispatch_event_with_msgid(client);
 }
 
