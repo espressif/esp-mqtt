@@ -6,9 +6,6 @@
         - if: IDF_TARGET in ["esp32h21", "esp32h4"]
           temporary: true
           reason: not supported yet
-        - if: IDF_TARGET in ["esp32p4", "esp32h2"] and IDF_VERSION_MAJOR == 5 and IDF_VERSION_MINOR == 3
-          temporary: true
-          reason: esp32p4/esp32h2 example dependencies require IDF versions other than 5.3
     disable_test:
         - if: IDF_TARGET not in ["esp32"]
           reason: Tests run only on ESP32 with ethernet runners
