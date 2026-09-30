@@ -53,7 +53,7 @@ def mqqt_server_sketch(my_ip, port):  # type: (str, str) -> None
     logging.info("server closed")
 
 
-@pytest.mark.eth_ip101
+@pytest.mark.eth_cfg_default
 @idf_parametrize("target", ["esp32"], indirect=["target"])
 def test_examples_protocol_mqtt_qos1(dut: Dut) -> None:
     global msgid

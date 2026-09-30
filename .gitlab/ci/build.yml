@@ -21,7 +21,3 @@ include:
       inputs:
           build-job-tags: ["brew", "build"]
           job-suffix: ":idf-v5.4"
-    - component: $CI_SERVER_FQDN/ci/actions/idf-dynamic-pipeline/ci-component@main
-      inputs:
-          build-job-tags: ["brew", "build"]
-          job-suffix: ":idf-v5.3"
