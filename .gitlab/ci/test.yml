@@ -39,5 +39,7 @@ host_tests:
         ./build_linux_default/mqtt_utils_host_test.elf
         cd ../mqtt_outbox_host_test
         ./build_linux_coverage/mqtt_outbox_host_test.elf
+        cd ../mqtt_msg_host_test
+        ./build_linux_coverage/mqtt_msg_host_test.elf
         cd ../..
         gcovr --gcov-ignore-parse-errors -k -r . --exclude '.*/managed_components/.*' --print-summary --html coverage.html -x coverage.xml
