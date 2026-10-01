@@ -10,17 +10,14 @@
 #include "mqtt_config.h"
 #include "sys/queue.h"
 #include "esp_heap_caps.h"
+#include "mqtt_msg.h"
 #include "esp_log.h"
 
 #ifndef CONFIG_MQTT_CUSTOM_OUTBOX
 static const char *TAG = "outbox";
 
 typedef struct outbox_item {
-    char *buffer;
-    int len;
-    int msg_id;
-    int msg_type;
-    int msg_qos;
+    mqtt_message_t *message;
     outbox_tick_t tick;
     pending_state_t pending;
     STAILQ_ENTRY(outbox_item) next;
@@ -44,31 +41,23 @@ outbox_handle_t outbox_init(void)
     return outbox;
 }
 
-outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, outbox_message_handle_t message, outbox_tick_t tick)
+static void outbox_item_free(outbox_item_handle_t item)
+{
+    mqtt_msg_destroy(item->message);
+    free(item);
+}
+
+outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, mqtt_message_t *message, outbox_tick_t tick)
 {
     outbox_item_handle_t item = calloc(1, sizeof(outbox_item_t));
     ESP_MEM_CHECK(TAG, item, return NULL);
-    item->msg_id = message->msg_id;
-    item->msg_type = message->msg_type;
-    item->msg_qos = message->msg_qos;
+    item->message = message;
     item->tick = tick;
-    item->len =  message->len + message->remaining_len;
     item->pending = QUEUED;
-    item->buffer = heap_caps_malloc(message->len + message->remaining_len, MQTT_OUTBOX_MEMORY);
-    ESP_MEM_CHECK(TAG, item->buffer, {
-        free(item);
-        return NULL;
-    });
-    memcpy(item->buffer, message->data, message->len);
-
-    if (message->remaining_data) {
-        memcpy(item->buffer + message->len, message->remaining_data, message->remaining_len);
-    }
-
     STAILQ_INSERT_TAIL(outbox->list, item, next);
-    outbox->size += item->len;
-    ESP_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%d, size=%"PRIu64, message->msg_id, message->msg_type,
-             message->len + message->remaining_len, outbox_get_size(outbox));
+    outbox->size += item->message->length;
+    ESP_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%zu, size=%"PRIu64, message->id, message->type,
+             message->length, outbox_get_size(outbox));
     return item;
 }
 
@@ -76,7 +65,7 @@ outbox_item_handle_t outbox_get(outbox_handle_t outbox, int msg_id)
 {
     outbox_item_handle_t item;
     STAILQ_FOREACH(item, outbox->list, next) {
-        if (item->msg_id == msg_id) {
+        if (item->message->id == msg_id) {
             return item;
         }
     }
@@ -104,11 +93,10 @@ esp_err_t outbox_delete_item(outbox_handle_t outbox, outbox_item_handle_t item_t
     STAILQ_FOREACH(item, outbox->list, next) {
         if (item == item_to_delete) {
             STAILQ_REMOVE(outbox->list, item, outbox_item, next);
-            outbox->size -= item->len;
-            ESP_LOGD(TAG, "DELETE_ITEM msgid=%d, msg_type=%d, remain size=%"PRIu64, item_to_delete->msg_id,
-                     item_to_delete->msg_type, outbox_get_size(outbox));
-            free(item->buffer);
-            free(item);
+            outbox->size -= item->message->length;
+            ESP_LOGD(TAG, "DELETE_ITEM msgid=%d, msg_type=%d, remain size=%"PRIu64, item->message->id,
+                     item->message->type, outbox_get_size(outbox));
+            outbox_item_free(item);
             return ESP_OK;
         }
     }
@@ -118,11 +106,11 @@ esp_err_t outbox_delete_item(outbox_handle_t outbox, outbox_item_handle_t item_t
 uint8_t *outbox_item_get_data(outbox_item_handle_t item,  size_t *len, uint16_t *msg_id, int *msg_type, int *qos)
 {
     if (item) {
-        *len = item->len;
-        *msg_id = item->msg_id;
-        *msg_type = item->msg_type;
-        *qos = item->msg_qos;
-        return (uint8_t *)item->buffer;
+        *len = item->message->length;
+        *msg_id = item->message->id;
+        *msg_type = item->message->type;
+        *qos = item->message->qos;
+        return (uint8_t *)item->message->data;
     }
 
     return NULL;
@@ -132,12 +120,11 @@ esp_err_t outbox_delete(outbox_handle_t outbox, int msg_id, int msg_type)
 {
     outbox_item_handle_t item, tmp;
     STAILQ_FOREACH_SAFE(item, outbox->list, next, tmp) {
-        if (item->msg_id == msg_id && (0xFF & (item->msg_type)) == msg_type) {
+        if (item->message->id == msg_id && (0xFF & (item->message->type)) == msg_type) {
             STAILQ_REMOVE(outbox->list, item, outbox_item, next);
-            outbox->size -= item->len;
+            outbox->size -= item->message->length;
+            outbox_item_free(item);
             ESP_LOGD(TAG, "DELETE msgid=%d, msg_type=%d, remain size=%"PRIu64, msg_id, msg_type, outbox_get_size(outbox));
-            free(item->buffer);
-            free(item);
             return ESP_OK;
         }
     }
@@ -184,10 +171,9 @@ int outbox_delete_single_expired(outbox_handle_t outbox, outbox_tick_t current_t
     STAILQ_FOREACH(item, outbox->list, next) {
         if (current_tick - item->tick > timeout) {
             STAILQ_REMOVE(outbox->list, item, outbox_item, next);
-            free(item->buffer);
-            outbox->size -= item->len;
-            msg_id = item->msg_id;
-            free(item);
+            outbox->size -= item->message->length;
+            msg_id = item->message->id;
+            outbox_item_free(item);
             ESP_LOGD(TAG, "DELETE_SINGLE_EXPIRED msgid=%d, remain size=%"PRIu64, msg_id, outbox_get_size(outbox));
             return msg_id;
         }
@@ -202,10 +188,9 @@ int outbox_delete_expired(outbox_handle_t outbox, outbox_tick_t current_tick, ou
     STAILQ_FOREACH_SAFE(item, outbox->list, next, tmp) {
         if (current_tick - item->tick > timeout) {
             STAILQ_REMOVE(outbox->list, item, outbox_item, next);
-            free(item->buffer);
-            outbox->size -= item->len;
-            ESP_LOGD(TAG, "DELETE_EXPIRED msgid=%d, remain size=%"PRIu64, item->msg_id, outbox_get_size(outbox));
-            free(item);
+            outbox->size -= item->message->length;
+            ESP_LOGD(TAG, "DELETE_EXPIRED msgid=%d, remain size=%"PRIu64, item->message->id, outbox_get_size(outbox));
+            outbox_item_free(item);
             deleted_items ++;
         }
     }
@@ -219,18 +204,26 @@ uint64_t outbox_get_size(outbox_handle_t outbox)
 
 void outbox_delete_all_items(outbox_handle_t outbox)
 {
+    if (!outbox) {
+        return;
+    }
+
     outbox_item_handle_t item, tmp;
     STAILQ_FOREACH_SAFE(item, outbox->list, next, tmp) {
         STAILQ_REMOVE(outbox->list, item, outbox_item, next);
-        outbox->size -= item->len;
-        ESP_LOGD(TAG, "DELETE_ALL_ITEMS msgid=%d, msg_type=%d, remain size=%"PRIu64, item->msg_id, item->msg_type,
-                 outbox_get_size(outbox));
-        free(item->buffer);
-        free(item);
+        outbox->size -= item->message->length;
+        ESP_LOGD(TAG, "DELETE_ALL_ITEMS msgid=%d, msg_type=%d, remain size=%"PRIu64, item->message->id,
+                 item->message->type, outbox_get_size(outbox));
+        outbox_item_free(item);
     }
 }
+
 void outbox_destroy(outbox_handle_t outbox)
 {
+    if (!outbox) {
+        return;
+    }
+
     outbox_delete_all_items(outbox);
     free(outbox->list);
     free(outbox);

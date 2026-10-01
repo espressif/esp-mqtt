@@ -16,13 +16,6 @@
 extern "C" {
 #endif
 
-typedef struct mqtt5_topic_alias {
-    char *topic;
-    uint16_t topic_len;
-    uint16_t topic_alias;
-    STAILQ_ENTRY(mqtt5_topic_alias) next;
-} mqtt5_topic_alias_t;
-STAILQ_HEAD(mqtt5_topic_alias_list_t, mqtt5_topic_alias);
 typedef struct mqtt5_topic_alias_list_t *mqtt5_topic_alias_handle_t;
 typedef struct mqtt5_topic_alias *mqtt5_topic_alias_item_t;
 

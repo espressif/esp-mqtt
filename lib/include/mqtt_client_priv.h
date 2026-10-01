@@ -15,6 +15,7 @@
 #include "platform.h"
 
 #include "esp_event.h"
+#include "mqtt_config.h"
 #include "mqtt_client.h"
 #include "mqtt_msg.h"
 #ifdef MQTT_PROTOCOL_5
@@ -55,15 +56,14 @@ extern "C" {
 # define MQTT_API_UNLOCK(c)        xSemaphoreGiveRecursive(c->api_lock)
 #endif /* MQTT_USE_API_LOCKS */
 
+typedef struct mqtt_connection {
+    mqtt_message_t outbound_message;
+    mqtt_connect_info_t information;
+} mqtt_connection_t;
+
 typedef struct mqtt_state {
-    uint8_t *in_buffer;
-    int in_buffer_length;
-    size_t message_length;
-    size_t in_buffer_read_len;
     mqtt_connection_t connection;
-    uint16_t pending_msg_id;
-    int pending_msg_type;
-    int pending_publish_qos;
+    mqtt_message_t inbound_message;
 } mqtt_state_t;
 
 typedef struct {
@@ -114,14 +114,18 @@ typedef enum {
 } mqtt_client_state_t;
 
 struct esp_mqtt_client {
-    esp_transport_list_handle_t transport_list;
-    esp_transport_handle_t transport;
+    struct {
+        esp_transport_list_handle_t list;
+        esp_transport_handle_t handle;
+    } transport;
     mqtt_config_storage_t *config;
     mqtt_state_t  mqtt_state;
     _Atomic mqtt_client_state_t state;
-    uint64_t refresh_connection_tick;
-    int64_t keepalive_tick;
-    uint64_t reconnect_tick;
+    struct {
+        uint64_t refresh_connection;
+        uint64_t keepalive;
+        uint64_t reconnect;
+    } tick;
 #ifdef MQTT_PROTOCOL_5
     mqtt5_config_storage_t *mqtt5_config;
     uint16_t send_publish_packet_count; // This is for MQTT v5.0 flow control

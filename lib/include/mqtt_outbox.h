@@ -10,6 +10,7 @@
  */
 #ifndef _MQTT_OUTOBX_H_
 #define _MQTT_OUTOBX_H_
+#include "mqtt_msg.h"
 #include "platform.h"
 #include "esp_err.h"
 
@@ -21,18 +22,7 @@ struct outbox_item;
 
 typedef struct outbox_t *outbox_handle_t;
 typedef struct outbox_item *outbox_item_handle_t;
-typedef struct outbox_message *outbox_message_handle_t;
-typedef long long outbox_tick_t;
-
-typedef struct outbox_message {
-    const uint8_t *data;
-    int len;
-    int msg_id;
-    int msg_qos;
-    int msg_type;
-    const uint8_t *remaining_data;
-    int remaining_len;
-} outbox_message_t;
+typedef uint64_t outbox_tick_t;
 
 typedef enum pending_state {
     QUEUED,
@@ -42,7 +32,15 @@ typedef enum pending_state {
 } pending_state_t;
 
 outbox_handle_t outbox_init(void);
-outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, outbox_message_handle_t message, outbox_tick_t tick);
+/**
+ * @brief Stores a message in the outbox
+ *
+ * On success the outbox takes ownership of @c message and releases it when the item is deleted.
+ * On failure the ownership stays with the caller.
+ *
+ * @return handle of the enqueued item, NULL on failure
+ */
+outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, mqtt_message_t *message, outbox_tick_t tick);
 outbox_item_handle_t outbox_dequeue(outbox_handle_t outbox, pending_state_t pending, outbox_tick_t *tick);
 outbox_item_handle_t outbox_get(outbox_handle_t outbox, int msg_id);
 uint8_t *outbox_item_get_data(outbox_item_handle_t item,  size_t *len, uint16_t *msg_id, int *msg_type, int *qos);

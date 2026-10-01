@@ -222,20 +222,25 @@ struct outbox_t {
         queue.clear();
     }
 
-    outbox_item_handle_t enqueue(outbox_message_handle_t message, outbox_tick_t tick) noexcept
+    outbox_item_handle_t enqueue(mqtt_message_t *message, outbox_tick_t tick) noexcept
     {
+        if (message == nullptr || message->data == nullptr) {
+            return nullptr;
+        }
+
         try {
             auto &item =
-                queue.emplace_back(std::pmr::vector<uint8_t> {message->data, message->data + message->len},
-                                   outbox_item::id_t{message->msg_id},
-                                   outbox_item::type_t{message->msg_type},
-                                   outbox_item::qos_t{message->msg_qos},
+                queue.emplace_back(std::pmr::vector<uint8_t> {message->data, message->data + message->length},
+                                   outbox_item::id_t{message->id},
+                                   outbox_item::type_t{message->type},
+                                   outbox_item::qos_t{message->qos},
                                    tick,
                                    QUEUED
                                   );
             total_size += item.get_size();
-            ESP_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%d, size=%" PRIu64, message->msg_id, message->msg_type,
-                     message->len + message->remaining_len, outbox_get_size(this));
+            ESP_LOGD(TAG, "ENQUEUE msgid=%d, msg_type=%d, len=%zu, size=%" PRIu64, message->id, message->type,
+                     message->length, outbox_get_size(this));
+            mqtt_msg_destroy(message);
             return &item;
         } catch (const std::exception &e) {
             return nullptr;
@@ -305,7 +310,7 @@ extern "C" {
         }
     }
 
-    outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, outbox_message_handle_t message, outbox_tick_t tick)
+    outbox_item_handle_t outbox_enqueue(outbox_handle_t outbox, mqtt_message_t *message, outbox_tick_t tick)
     {
         return outbox->enqueue(message, tick);
     }
