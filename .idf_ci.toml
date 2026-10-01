@@ -128,8 +128,8 @@ mqtt_conformance_coverage_report{{ settings.gitlab.test_pipeline.job_name_suffix
     gcovr_filters=(
       --filter="${CI_PROJECT_DIR}/mqtt_client.c"
       --filter="${CI_PROJECT_DIR}/mqtt5_client.c"
-      --filter="${CI_PROJECT_DIR}/lib/mqtt_msg.c"
-      --filter="${CI_PROJECT_DIR}/lib/mqtt5_msg.c"
+      --filter="${CI_PROJECT_DIR}/lib/mqtt_msg/mqtt_msg.c"
+      --filter="${CI_PROJECT_DIR}/lib/mqtt_msg/mqtt5_msg.c"
       --filter="${CI_PROJECT_DIR}/lib/platform.c"
     )
     shopt -s nullglob

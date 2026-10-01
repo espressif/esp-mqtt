@@ -30,8 +30,8 @@ if(CONFIG_ESP_GCOV_ENABLE AND COMMAND idf_create_coverage_report)
         GCOV_OPTIONS
             "--filter=${mqtt_root}/mqtt_client.c"
             "--filter=${mqtt_root}/mqtt5_client.c"
-            "--filter=${mqtt_root}/lib/mqtt_msg.c"
-            "--filter=${mqtt_root}/lib/mqtt5_msg.c"
+            "--filter=${mqtt_root}/lib/mqtt_msg/mqtt_msg.c"
+            "--filter=${mqtt_root}/lib/mqtt_msg/mqtt5_msg.c"
             "--filter=${mqtt_root}/lib/platform.c"
             "--xml=${CMAKE_CURRENT_BINARY_DIR}/coverage_report/coverage.xml")
     idf_clean_coverage_report(${CMAKE_CURRENT_BINARY_DIR}/coverage_report)

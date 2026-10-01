@@ -796,6 +796,9 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
              * esp_mqtt_destroy_config() calls esp_mqtt5_client_destory(), which frees this allocation.
              * The cleanup crosses a translation-unit boundary that analyzer does not follow. */
 #pragma GCC diagnostic push
+#ifdef __clang__
+#pragma GCC diagnostic ignored "-Wunknown-warning-option"
+#endif
 #pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
             client->mqtt5_config->will_property_info.correlation_data = malloc(connect_property->correlation_data_len);
             ESP_MEM_CHECK(TAG, client->mqtt5_config->will_property_info.correlation_data, goto _mqtt_set_config_failed);

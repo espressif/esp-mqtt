@@ -38,8 +38,8 @@ examples_and_unit_tests:
 
 third_party_libs:
     include:
-        - "lib/mqtt_msg.c"
-        - "lib/include/mqtt_msg.h"
+        - "lib/mqtt_msg/mqtt_msg.c"
+        - "lib/mqtt_msg/include/mqtt_msg.h"
         - "test/host/mocks/include/sys/queue.h"
     allowed_licenses:
         - BSD-3-Clause
