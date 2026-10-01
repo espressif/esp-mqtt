@@ -228,14 +228,14 @@ char *mqtt_get_publish_data(uint8_t *buffer, size_t *length)
     topiclen = buffer[i++] << 8;
     topiclen |= buffer[i++];
 
-    if (i + topiclen >= blength) {
+    if (i + topiclen > blength) {
         return NULL;
     }
 
     i += topiclen;
 
     if (mqtt_get_qos(buffer) > 0) {
-        if (i + 2 >= blength) {
+        if (i + 2 > blength) {
             return NULL;
         }
 
