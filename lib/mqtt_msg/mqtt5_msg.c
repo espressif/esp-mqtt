@@ -331,6 +331,9 @@ static mqtt5_user_property_handle_t mqtt5_msg_parse_user_property(uint8_t *buffe
             /* False positive: user_porperty is released at err or returned to the caller.
              * The analyzer cannot track its cleanup across the translation-unit boundary. */
 #pragma GCC diagnostic push
+#ifdef __clang__
+#pragma GCC diagnostic ignored "-Wunknown-warning-option"
+#endif
 #pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
 
             if (mqtt5_msg_set_user_property(&user_property, (char *)key, key_len, (char *)value, value_len) != ESP_OK) {

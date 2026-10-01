@@ -301,6 +301,9 @@ bool esp_mqtt_set_if_config(char const *const new_config, char **old_config)
          * (e.g. client->config->uri). On the failure path esp_mqtt_destroy_config frees it,
          * but the analyzer cannot follow that cross-TU cleanup chain. */
 #pragma GCC diagnostic push
+#ifdef __clang__
+#pragma GCC diagnostic ignored "-Wunknown-warning-option"
+#endif
 #pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
         *old_config = strdup(new_config);
 
