@@ -11,6 +11,7 @@ set(CONFIG_MQTT_PROTOCOL_5 ON)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../../lib/mqtt_msg
                  ${CMAKE_CURRENT_BINARY_DIR}/mqtt_msg)
 
+target_compile_definitions(mqtt_msg_lib PRIVATE calloc=mqtt_test_calloc)
 target_compile_options(mqtt_msg_lib PRIVATE ${SANITIZER_FLAGS})
 
 target_link_libraries(${COMPONENT_LIB} PUBLIC
