@@ -11,8 +11,10 @@
 #include <memory>
 #include <random>
 #include <string>
+#include <vector>
 
 extern "C" {
+#include "mqtt5_msg.h"
 #include "mqtt_msg.h"
 
     int platform_random(int max)
@@ -80,6 +82,39 @@ TEST_CASE("mqtt_msg_publish rejects an empty topic")
     mqtt_message_t *encoded = mqtt_msg_publish(message.get(), "", "payload", 7, 0, 0, &message_id);
     REQUIRE(encoded == message.get());
     REQUIRE(encoded->length == 0);
+}
+
+TEST_CASE("mqtt5 CONNACK parser rejects truncated fixed-width properties")
+{
+    struct PropertyCase {
+        uint8_t id;
+        size_t width;
+    };
+    const PropertyCase property_cases[] = {
+        {MQTT5_PROPERTY_RECEIVE_MAXIMUM, 2},
+        {MQTT5_PROPERTY_TOPIC_ALIAS_MAXIMIM, 2},
+        {MQTT5_PROPERTY_MAXIMUM_PACKET_SIZE, 4},
+    };
+
+    for (const PropertyCase &property_case : property_cases) {
+        for (size_t available = 0; available < property_case.width; ++available) {
+            CAPTURE(property_case.id, available);
+            std::vector<uint8_t> packet(6 + available, 0);
+            packet[0] = 0x20;
+            packet[1] = static_cast<uint8_t>(4 + available);
+            packet[4] = static_cast<uint8_t>(1 + available);
+            packet[5] = property_case.id;
+            mqtt_connect_info_t connection_info = {};
+            esp_mqtt5_connection_property_storage_t connection_property = {};
+            esp_mqtt5_connection_server_resp_property_t response_property = {};
+            int reason_code = 0;
+            uint8_t ack_flag = 0;
+            mqtt5_user_property_handle_t user_property = nullptr;
+            REQUIRE(mqtt5_msg_parse_connack_property(packet.data(), packet.size(), &connection_info,
+                                                     &connection_property, &response_property, &reason_code,
+                                                     &ack_flag, &user_property) == ESP_FAIL);
+        }
+    }
 }
 
 TEST_CASE("mqtt_msg_publish round-trips an empty payload")
