@@ -890,6 +890,10 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
             continue;
 
         case MQTT5_PROPERTY_RECEIVE_MAXIMUM:
+            if (!mqtt5_property_has_bytes(property_offset, 2, property_len)) {
+                return ESP_FAIL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(resp_property->receive_maximum, property[property_offset ++],
                                           property[property_offset ++])
             ESP_LOGD(TAG, "MQTT5_PROPERTY_RECEIVE_MAXIMUM %d", resp_property->receive_maximum);
@@ -914,6 +918,10 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
             continue;
 
         case MQTT5_PROPERTY_MAXIMUM_PACKET_SIZE:
+            if (!mqtt5_property_has_bytes(property_offset, 4, property_len)) {
+                return ESP_FAIL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_FOUR(resp_property->maximum_packet_size, property[property_offset ++],
                                            property[property_offset ++], property[property_offset ++], property[property_offset ++])
             ESP_LOGD(TAG, "MQTT5_PROPERTY_MAXIMUM_PACKET_SIZE %"PRIu32, resp_property->maximum_packet_size);
@@ -949,6 +957,10 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
             continue;
 
         case MQTT5_PROPERTY_TOPIC_ALIAS_MAXIMIM:
+            if (!mqtt5_property_has_bytes(property_offset, 2, property_len)) {
+                return ESP_FAIL;
+            }
+
             MQTT5_CONVERT_ONE_BYTE_TO_TWO(resp_property->topic_alias_maximum, property[property_offset ++],
                                           property[property_offset ++])
             ESP_LOGD(TAG, "MQTT5_PROPERTY_TOPIC_ALIAS_MAXIMIM %d", resp_property->topic_alias_maximum);
