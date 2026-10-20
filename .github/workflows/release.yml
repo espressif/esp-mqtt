@@ -16,6 +16,7 @@ jobs:
     outputs:
       releases_created: ${{ steps.release.outputs.releases_created }}
       paths_released: ${{ steps.release.outputs.paths_released }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     permissions:
       contents: write
       pull-requests: write
@@ -80,3 +81,107 @@ jobs:
           git push --atomic gitlab HEAD:master --tags
 
           echo "Release commit and tags successfully synced to GitLab"
+
+  deploy_docs:
+    runs-on: ubuntu-latest
+    needs: [release-please]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_name == 'master' &&
+      github.repository_owner == 'espressif'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install documentation build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen
+          pip install "setuptools<81" esp-docs linuxdoc
+
+      - name: Publish documentation
+        env:
+          RELEASES_CREATED: ${{ needs.release-please.outputs.releases_created }}
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+          DOCS_BUILD_DIR: ${{ github.workspace }}/docs/_build
+          DOCS_DEPLOY_PRIVATEKEY: ${{ secrets.DOCS_PROD_PRIVATEKEY }}
+          DOCS_DEPLOY_SERVER: ${{ secrets.DOCS_PROD_SERVER }}
+          DOCS_DEPLOY_SERVER_USER: ${{ secrets.DOCS_PROD_SERVER_USER }}
+          DOCS_DEPLOY_PATH: ${{ secrets.DOCS_PROD_PATH }}
+          DOCS_DEPLOY_URL_BASE: ${{ secrets.DOCS_PROD_URL_BASE }}
+          TYPE: production
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          source "${GITHUB_WORKSPACE}/.gitlab/ci/utils.sh"
+          add_doc_server_ssh_keys "$DOCS_DEPLOY_PRIVATEKEY" "$DOCS_DEPLOY_SERVER" "$DOCS_DEPLOY_SERVER_USER"
+
+          build_docs() {
+            local ref_name="$1"
+            export GITHUB_REF_NAME="$ref_name"
+            export GIT_VER="$ref_name"
+            unset CI_COMMIT_REF_NAME
+            rm -rf "${DOCS_BUILD_DIR}"
+            (
+              cd "${GITHUB_WORKSPACE}/docs"
+              export LC_ALL=C.UTF-8
+              build-docs -t esp32 -l en
+              build-docs -t esp32 -l zh_CN
+            )
+          }
+
+          publish() {
+            local ref_name="$1"
+            local stable="$2"
+            build_docs "$ref_name"
+            if [ "$stable" = "1" ]; then
+              export DEPLOY_STABLE=1
+            else
+              unset DEPLOY_STABLE
+            fi
+            deploy-docs
+          }
+
+          refresh_published_tags() {
+            local versions_js="${GITHUB_WORKSPACE}/docs/_static/mqtt_docs_versions.js"
+            local remote_js
+            remote_js="$(ssh -o BatchMode=yes "$DOCS_DEPLOY_SERVER" -x mktemp)"
+            scp -B "$versions_js" "${DOCS_DEPLOY_SERVER}:${remote_js}"
+            ssh -o BatchMode=yes "$DOCS_DEPLOY_SERVER" -x bash -s -- "$DOCS_DEPLOY_PATH" "$remote_js" <<'EOF'
+          set -euo pipefail
+          docs_path="$1"
+          versions_js="$2"
+          chmod 664 "$versions_js"
+          shopt -s nullglob
+          for lang in en zh_CN; do
+            for dir in "${docs_path}/${lang}/stable" "${docs_path}/${lang}"/v*; do
+              if [ -d "${dir}/esp32/_static" ]; then
+                cp "$versions_js" "${dir}/esp32/_static/mqtt_docs_versions.js"
+              fi
+            done
+          done
+          rm -f "$versions_js"
+          EOF
+          }
+
+          if [ "${RELEASES_CREATED}" = "true" ]; then
+            tag="${RELEASE_TAG}"
+            if [ -z "$tag" ]; then
+              tag="$(git describe --tags --exact-match HEAD)"
+            fi
+            if [ -z "$tag" ]; then
+              echo "release-please did not provide a tag" >&2
+              exit 1
+            fi
+            publish "$tag" 1
+          fi
+          publish master 0
+          refresh_published_tags
