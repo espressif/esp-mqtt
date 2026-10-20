@@ -112,6 +112,16 @@ def connect_property_config(**fields: object) -> str:
     return _encode_config("connect_property", fields)
 
 
+def publish_property_config(**fields: object) -> str:
+    """MQTT5 PUBLISH properties blob (topic_alias, content_type, response_topic, …)."""
+    return _encode_config("publish_property", fields)
+
+
+def subscribe_property_config(**fields: object) -> str:
+    """MQTT5 SUBSCRIBE properties blob (subscribe_id, no_local_flag, share_name, …)."""
+    return _encode_config("subscribe_property", fields)
+
+
 def apply_config(dut: Dut, blob: str) -> None:
     """Apply a single-category config blob to an already-initialised client."""
     dut.write(f"config {blob}")
@@ -197,6 +207,21 @@ def mqtt_publish_topic_name(packet: object) -> str:
     if isinstance(name, bytes):
         return name.decode()
     return str(name)
+
+
+def mqtt_has_property(packet: object, name: str) -> bool:
+    props = getattr(packet, "properties", None)
+    return props is not None and hasattr(props, name)
+
+
+def mqtt_property_value(packet: object, name: str) -> object | None:
+    if not mqtt_has_property(packet, name):
+        return None
+    return getattr(getattr(packet, "properties"), name)
+
+
+def mqtt_topic_contains_wildcard(topic: str) -> bool:
+    return "#" in topic or "+" in topic
 
 
 class BrokerInterface(Protocol):
@@ -1950,3 +1975,232 @@ def test_client_accepts_server_topic_alias__mqtt_3_3_2_10(dut: Dut) -> None:
                 )
             finally:
                 broker.release_all_held_packets()
+
+
+def _wait_inbound(broker: BrokerInterface, packet_type: MqttPacketType, count: int, timeout: float) -> list[object]:
+    try:
+        broker.wait_for_inbound_packets(packet_type, count, timeout=timeout)
+    except TimeoutError:
+        pass
+    return broker.inbound_packets(packet_type)
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=1,
+        publish_operations=1,
+        event_wait_operations=1,
+    )
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "MQTT-3.3.2-2: The Topic Name in the PUBLISH packet MUST NOT contain "
+        "wildcard characters"
+    ),
+)
+def test_client_publish_topic_has_no_wildcards__mqtt_3_3_2_2(dut: Dut) -> None:
+    """DUT PUBLISH Topic Name must not contain wildcard characters.
+
+    Claim ID: MQTT-3.3.2-2
+    Version: 5.0
+    Section: 3.3.2 Topic Name
+    Party: Client (sender)
+    Quote: The Topic Name in the PUBLISH packet MUST NOT contain wildcard characters
+    DUT observable: after publish to a topic containing #, no inbound PUBLISH
+      carries a Topic Name with # or +
+    Violating DUT still passes?: no — a DUT that puts # or + in the Topic Name
+      fails the wildcard assertion
+    """
+    topic = "test/conformance/wild/#"
+
+    with (
+        broker_started(record_inbound_types=(MqttPacketType.PUBLISH,)) as broker,
+        initialized_mqtt_client(dut, broker.uri) as client,
+        started_client(client),
+    ):
+        publish_from_dut(client, topic, 1, payload_prefix="nowild", message_count=1)
+        expect_n(client, {b"Publish requested, msg_id=": 1}, timeout=DUT_CMD_TIMEOUT)
+        inbound = _wait_inbound(broker, MqttPacketType.PUBLISH, 1, DUT_EVENT_TIMEOUT)
+        wild = [
+            mqtt_publish_topic_name(packet)
+            for packet in inbound
+            if mqtt_topic_contains_wildcard(mqtt_publish_topic_name(packet))
+        ]
+        assert not wild, f"MQTT-3.3.2-2: DUT sent PUBLISH Topic Name with wildcard: {wild}"
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=1,
+        publish_operations=1,
+        event_wait_operations=1,
+    )
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+def test_client_response_topic_has_no_wildcards__mqtt_3_3_2_14(dut: Dut) -> None:
+    """DUT Response Topic property must not contain wildcard characters.
+
+    Claim ID: MQTT-3.3.2-14
+    Version: 5.0
+    Section: 3.3.2.3.5 Response Topic
+    Party: Client (sender)
+    Quote: The Response Topic MUST NOT contain wildcard characters
+    DUT observable: after publish with response_topic containing #, no inbound
+      PUBLISH has a Response Topic with # or +
+    Violating DUT still passes?: no — a DUT that encodes Response Topic a/# fails
+    """
+    topic = build_topic()
+    response_topic = "test/conformance/reply/#"
+
+    with (
+        broker_started(record_inbound_types=(MqttPacketType.PUBLISH,)) as broker,
+        initialized_mqtt_client(dut, broker.uri) as client,
+        started_client(client),
+    ):
+        apply_config(client, publish_property_config(response_topic=response_topic))
+        publish_from_dut(client, topic, 1, payload_prefix="req", message_count=1)
+        expect_n(client, {b"Publish requested, msg_id=": 1}, timeout=DUT_CMD_TIMEOUT)
+        inbound = _wait_inbound(broker, MqttPacketType.PUBLISH, 1, DUT_EVENT_TIMEOUT)
+        wild = []
+        for packet in inbound:
+            value = mqtt_property_value(packet, "ResponseTopic")
+            if value is None:
+                continue
+            text = value.decode() if isinstance(value, bytes) else str(value)
+            if mqtt_topic_contains_wildcard(text):
+                wild.append(text)
+        assert not wild, f"MQTT-3.3.2-14: DUT sent Response Topic with wildcard: {wild}"
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=1,
+        publish_operations=1,
+        event_wait_operations=1,
+    )
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+def test_client_topic_alias_not_above_server_maximum__mqtt_3_3_2_9(dut: Dut) -> None:
+    """DUT must not send Topic Alias greater than CONNACK Topic Alias Maximum.
+
+    Claim ID: MQTT-3.3.2-9
+    Version: 5.0
+    Section: 3.3.2.3.4 Topic Alias
+    Party: Client
+    Quote: A Client MUST NOT send a PUBLISH packet with a Topic Alias greater than
+      the Topic Alias Maximum value returned by the Server in the CONNACK packet
+    DUT observable: broker CONNACK Topic Alias Maximum is 2; after config
+      topic_alias=3, no inbound PUBLISH has Topic Alias > 2
+    Violating DUT still passes?: no — a DUT that sends Topic Alias 3 fails
+    """
+    topic = build_topic()
+    server_topic_alias_maximum = 2
+
+    with (
+        broker_started(record_inbound_types=(MqttPacketType.PUBLISH,)) as broker,
+        initialized_mqtt_client(dut, broker.uri) as client,
+        started_client(client),
+    ):
+        apply_config(client, publish_property_config(topic_alias=server_topic_alias_maximum + 1))
+        publish_from_dut(client, topic, 1, payload_prefix="aliasover", message_count=1)
+        expect_n(client, {b"Publish requested, msg_id=": 1}, timeout=DUT_CMD_TIMEOUT)
+        inbound = _wait_inbound(broker, MqttPacketType.PUBLISH, 1, DUT_EVENT_TIMEOUT)
+        over = []
+        for packet in inbound:
+            alias = mqtt_topic_alias_of(packet)
+            if alias is not None and alias > server_topic_alias_maximum:
+                over.append(alias)
+        assert not over, (
+            f"MQTT-3.3.2-9: DUT sent Topic Alias {over} greater than CONNACK "
+            f"Topic Alias Maximum {server_topic_alias_maximum}"
+        )
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=1,
+        subscribe_operations=1,
+        publish_operations=1,
+        event_wait_operations=1,
+    )
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+def test_client_publish_omits_subscription_identifier__mqtt_3_3_4_6(dut: Dut) -> None:
+    """DUT PUBLISH to the Server must not carry a Subscription Identifier.
+
+    Claim ID: MQTT-3.3.4-6
+    Version: 5.0
+    Section: 3.3.4 PUBLISH Actions
+    Party: Client
+    Quote: A PUBLISH packet sent from a Client to a Server MUST NOT contain a
+      Subscription Identifier
+    DUT observable: after subscribe_id is configured and the DUT publishes, inbound
+      PUBLISH packets have no SubscriptionIdentifier property
+    Violating DUT still passes?: no — a DUT that copies subscribe_id onto PUBLISH
+      fails the property assertion
+    """
+    topic = build_topic()
+
+    with (
+        broker_started(record_inbound_types=(MqttPacketType.PUBLISH,)) as broker,
+        initialized_mqtt_client(dut, broker.uri) as client,
+        started_client(client),
+    ):
+        apply_config(client, subscribe_property_config(subscribe_id=42))
+        subscribed_to(client, topic, 1)
+        publish_from_dut(client, topic, 1, payload_prefix="nosubid", message_count=1)
+        expect_n(client, {b"Publish requested, msg_id=": 1}, timeout=DUT_CMD_TIMEOUT)
+        inbound = _wait_inbound(broker, MqttPacketType.PUBLISH, 1, DUT_EVENT_TIMEOUT)
+        assert inbound, "MQTT-3.3.4-6: expected a DUT PUBLISH to inspect"
+        leaked = [packet for packet in inbound if mqtt_has_property(packet, "SubscriptionIdentifier")]
+        assert not leaked, "MQTT-3.3.4-6: DUT PUBLISH contained a Subscription Identifier"
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=1,
+        subscribe_operations=1,
+        event_wait_operations=1,
+    )
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+def test_client_shared_subscribe_not_no_local__mqtt_3_8_3_4(dut: Dut) -> None:
+    """DUT must not set No Local on a Shared Subscription.
+
+    Claim ID: MQTT-3.8.3-4
+    Version: 5.0
+    Section: 3.8.3.1 Subscription Options
+    Party: Client
+    Quote: It is a Protocol Error to set the No Local bit to 1 on a Shared Subscription
+    DUT observable: after config no_local_flag + is_share_subscribe, no inbound
+      SUBSCRIBE has No Local on a $share/ Topic Filter
+    Violating DUT still passes?: no — a DUT that encodes both on the wire fails
+    """
+    topic = build_topic()
+
+    with (
+        broker_started(record_inbound_types=(MqttPacketType.SUBSCRIBE,)) as broker,
+        initialized_mqtt_client(dut, broker.uri) as client,
+        started_client(client),
+    ):
+        apply_config(
+            client,
+            subscribe_property_config(no_local_flag=True, is_share_subscribe=True, share_name="grp"),
+        )
+        dut.write(f"subscribe {topic} 1")
+        inbound = _wait_inbound(broker, MqttPacketType.SUBSCRIBE, 1, DUT_EVENT_TIMEOUT)
+        illegal = []
+        for packet in inbound:
+            for filter_name, options in getattr(packet, "data"):
+                name = filter_name.decode() if isinstance(filter_name, bytes) else str(filter_name)
+                no_local = bool(getattr(options, "noLocal"))
+                if no_local and name.startswith("$share/"):
+                    illegal.append((name, no_local))
+        assert not illegal, f"MQTT-3.8.3-4: DUT SUBSCRIBE set No Local on shared filter: {illegal}"
