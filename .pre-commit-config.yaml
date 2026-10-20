@@ -50,7 +50,7 @@ repos:
       - id: conventional-precommit-linter                # Lints commit messages for conventional format
         stages: [commit-msg]
         args:
-          - --types=ci,docs,feat,fix,perf,refactor,chore
+          - --types=ci,docs,feat,fix,perf,refactor,test,chore
           - --scopes=mqtt,mqtt5,examples
           - --subject-min-length=10
 

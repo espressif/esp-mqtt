@@ -7,6 +7,7 @@ set(SANITIZER_FLAGS -fsanitize=address,undefined -fno-sanitize-recover=undefined
 target_compile_options(${COMPONENT_LIB} PRIVATE ${SANITIZER_FLAGS} -Wno-missing-field-initializers)
 target_link_options(${COMPONENT_LIB} INTERFACE ${SANITIZER_FLAGS})
 
+set(CONFIG_MQTT_PROTOCOL_5 ON)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../../lib/mqtt_msg
                  ${CMAKE_CURRENT_BINARY_DIR}/mqtt_msg)
 
