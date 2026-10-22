@@ -26,8 +26,11 @@ docs_build:
         - build-docs -t esp32 -l en
         - build-docs -t esp32 -l zh_CN
     rules:
-        - if: $CI_COMMIT_REF_NAME == "master"
-        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        - if: $CI_PIPELINE_SOURCE == "schedule"
+        - changes:
+              - docs/**/*
+              - include/**/*
+              - .gitlab/ci/docs.yml
 
 .deploy_docs_template:
     image: $ESP_DOCS_ENV_IMAGE
@@ -52,9 +55,14 @@ docs_build:
 deploy_docs_preview:
     extends:
         - .deploy_docs_template
-    except:
-        refs:
-            - master
+    rules:
+        - if: $CI_COMMIT_REF_NAME == "master"
+          when: never
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+          changes:
+              - docs/**/*
+              - include/**/*
+              - .gitlab/ci/docs.yml
     needs:
         - docs_build
     variables:

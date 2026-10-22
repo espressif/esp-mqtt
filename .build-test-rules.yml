@@ -1,7 +1,25 @@
 # ESP-MQTT Build Test Rules
 # Consolidated manifest covering all examples and test apps
 
+.mqtt_core: &mqtt_core
+    depends_filepatterns:
+        - "mqtt_client.c"
+        - "mqtt5_client.c"
+        - "include/**"
+        - "lib/**"
+        - "CMakeLists.txt"
+        - "cmake/**"
+        - "Kconfig*"
+        - "idf_component.yml"
+
+# idf-build-apps appends keys ending in "+"; a second depends_filepatterns would replace the list.
+.mqtt_test_apps: &mqtt_test_apps
+    <<: *mqtt_core
+    depends_filepatterns+:
+        - "test/apps/common/**"
+
 .default_rules: &default_rules
+    <<: *mqtt_core
     disable:
         - if: IDF_TARGET in ["esp32h21", "esp32h4"]
           temporary: true
@@ -73,6 +91,7 @@ examples/custom_outbox:
           reason: Advanced feature demonstration, only build
 
 test/apps:
+    <<: *mqtt_test_apps
     disable:
         - if: IDF_TARGET not in ["esp32"]
           reason: Test apps build only for esp32
@@ -83,6 +102,7 @@ test/apps:
 
 # C++ compatibility build test
 test/apps/build_test:
+    <<: *mqtt_test_apps
     enable:
         - if: IDF_TARGET in ["esp32", "esp32c3"]
           reason: C++ compatibility build test
@@ -93,6 +113,7 @@ test/apps/build_test:
 
 # Publish/Connect integration test
 test/apps/publish_connect_test:
+    <<: *mqtt_test_apps
     enable:
         - if: IDF_TARGET in ["esp32"]
           reason: Integration test for publish/connect functionality
@@ -103,6 +124,7 @@ test/apps/publish_connect_test:
 
 # MQTT conformance integration test
 test/apps/mqtt_conformance:
+    <<: *mqtt_test_apps
     enable:
         - if: IDF_TARGET in ["esp32"]
           reason: Integration test for conformance scenarios
@@ -120,6 +142,7 @@ test/apps/mqtt_conformance:
 
 # Host tests (unit tests with mocks)
 test/host:
+    <<: *mqtt_core
     enable:
         - if: IDF_TARGET in ["linux"]
           reason: Host-based unit tests with mocked ESP-IDF components

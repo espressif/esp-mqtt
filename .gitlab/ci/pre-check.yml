@@ -20,6 +20,7 @@ check_pre_commit:
   extends:
     - .check_pre_commit_template
   rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: '$CI_COMMIT_REF_NAME == "master" && $CI_PIPELINE_SOURCE == "push"'
       when: never
     - when: on_success
