@@ -18,6 +18,8 @@ static const char *TAG = "mqtt5_client";
 
 // Receive Maximum is optional in CONNACK; when absent the limit is 65535
 #define MQTT5_DEFAULT_RECEIVE_MAXIMUM 65535
+// Largest Variable Byte Integer, the encoding of the Subscription Identifier
+#define MQTT5_MAX_SUBSCRIBE_ID 268435455
 
 typedef struct mqtt5_topic_alias {
     char *topic;
@@ -573,6 +575,11 @@ esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t clie
 
     if (property->retain_handle > 2) {
         ESP_LOGE(TAG, "retain_handle only support 0, 1, 2");
+        return -1;
+    }
+
+    if (property->subscribe_id > MQTT5_MAX_SUBSCRIBE_ID) {
+        ESP_LOGE(TAG, "subscribe_id only support up to %d", MQTT5_MAX_SUBSCRIBE_ID);
         return -1;
     }
 

@@ -137,3 +137,36 @@ TEST_CASE("MQTT5 property setters use task-owned slots")
     REQUIRE(test_mqtt5_subscribe_property_slot()->property == &subscribe_a);
     REQUIRE(test_mqtt5_unsubscribe_property_slot()->property == &unsubscribe_a);
 }
+
+TEST_CASE("MQTT5 subscribe property accepts every subscription identifier the encoding carries")
+{
+    int task_storage;
+    use_task(reinterpret_cast<TaskHandle_t>(&task_storage));
+    esp_mqtt5_subscribe_property_config_t largest = {};
+    largest.subscribe_id = 268435455;
+    esp_mqtt_client_handle_t client = prepare_property_client();
+    REQUIRE(esp_mqtt5_client_set_subscribe_property(client, &largest) == ESP_OK);
+    REQUIRE(test_mqtt5_subscribe_property_slot()->property == &largest);
+    esp_mqtt5_subscribe_property_config_t too_large = {};
+    too_large.subscribe_id = 268435456;
+    client = prepare_property_client();
+    REQUIRE(esp_mqtt5_client_set_subscribe_property(client, &too_large) == ESP_FAIL);
+    REQUIRE(test_mqtt5_subscribe_property_slot()->property == nullptr);
+}
+
+TEST_CASE("MQTT5 PUBLISH keeps a subscription identifier above 65535")
+{
+    // QoS 0 PUBLISH to "a" carrying Subscription Identifier 268435455 and payload "x"
+    uint8_t packet[] = {0x30, 10, 0x00, 0x01, 'a', 5, 0x0B, 0xFF, 0xFF, 0xFF, 0x7F, 'x'};
+    char *topic = nullptr;
+    size_t topic_len = 0;
+    esp_mqtt5_publish_resp_property_t property = {};
+    uint16_t property_len = 0;
+    size_t payload_len = 0;
+    mqtt5_user_property_handle_t user_property = nullptr;
+    char *payload = mqtt5_get_publish_property_payload(packet, sizeof(packet), &topic, &topic_len, &property,
+                                                       &property_len, &payload_len, &user_property);
+    REQUIRE(payload != nullptr);
+    REQUIRE(*payload == 'x');
+    REQUIRE(property.subscribe_id == 268435455);
+}

@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: Unlicense OR CC0-1.0
  */
+#include <cinttypes>
 #include <concepts>
 #include <cstdint>
 #include <deque>
@@ -159,7 +160,7 @@ void conformance_mqtt_event_handler(void *, esp_event_base_t, int32_t event_id,
             }
 
             if (event->property->subscribe_id > 0) {
-                ESP_LOGI(TAG, "DATA_PROP subscribe_id=%d",
+                ESP_LOGI(TAG, "DATA_PROP subscribe_id=%" PRIu32,
                          event->property->subscribe_id);
             }
 

@@ -514,7 +514,7 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
             }
 
             property_offset += len_bytes;
-            ESP_LOGD(TAG, "MQTT5_PROPERTY_SUBSCRIBE_IDENTIFIER %d", resp_property->subscribe_id);
+            ESP_LOGD(TAG, "MQTT5_PROPERTY_SUBSCRIBE_IDENTIFIER %"PRIu32, resp_property->subscribe_id);
             continue;
 
         case MQTT5_PROPERTY_CONTENT_TYPE:
