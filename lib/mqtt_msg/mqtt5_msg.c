@@ -21,7 +21,7 @@ static const char *TAG = "mqtt5_msg";
         ESP_LOGE(TAG,"%s(%d) fail",__FUNCTION__, __LINE__);      \
         return (ret);                                           \
         }
-#define MQTT5_SHARED_SUB "$share/%s/%s"
+#define MQTT5_SHARED_SUB_PREFIX "$share/"
 #define MQTT5_CONVERT_ONE_BYTE_TO_FOUR(i, a, b, c, d) i = (a << 24); \
                                                       i |= (b << 16); \
                                                       i |= (c << 8); \
@@ -170,6 +170,36 @@ static int append_property(mqtt_message_t *message, uint8_t property_type, uint8
     }
 
     return message->length - origin_message_len;
+}
+
+static int append_joined_string(mqtt_message_t *message, uint8_t property_type, const char *const parts[],
+                                size_t part_count)
+{
+    size_t len = 0;
+
+    for (size_t i = 0; i < part_count; i++) {
+        len += strlen(parts[i]);
+
+        if (len > UINT16_MAX) {
+            return -1;
+        }
+    }
+
+    if (append_property(message, property_type, 2, NULL, len) == -1) {
+        return -1;
+    }
+
+    if (message->length + len > message->buffer_length) {
+        return -1;
+    }
+
+    for (size_t i = 0; i < part_count; i++) {
+        size_t part_len = strlen(parts[i]);
+        memcpy(message->buffer + message->length, parts[i], part_len);
+        message->length += part_len;
+    }
+
+    return 0;
 }
 
 static uint16_t append_message_id(mqtt_message_t *message, uint16_t message_id)
@@ -1304,23 +1334,9 @@ mqtt_message_t *mqtt5_msg_publish(mqtt_message_t *message, const char *topic, co
 
         if (property->response_topic) {
             if (resp_info && strlen(resp_info)) {
-                uint16_t response_topic_size = strlen(property->response_topic) + strlen(resp_info) + 1;
-                char *response_topic = calloc(1, response_topic_size);
-
-                if (!response_topic) {
-                    ESP_LOGE(TAG, "Failed to calloc %d memory", response_topic_size);
-                    return fail_message(message);
-                }
-
-                snprintf(response_topic, response_topic_size, "%s/%s", property->response_topic, resp_info);
-
-                if (append_property(message, MQTT5_PROPERTY_RESPONSE_TOPIC, 2, response_topic, response_topic_size) == -1) {
-                    ESP_LOGE(TAG, "%s(%d) fail", __FUNCTION__, __LINE__);
-                    free(response_topic);
-                    return fail_message(message);
-                }
-
-                free(response_topic);
+                const char *const parts[] = {property->response_topic, "/", resp_info};
+                APPEND_CHECK(append_joined_string(message, MQTT5_PROPERTY_RESPONSE_TOPIC, parts, 3),
+                             fail_message(message));
             } else {
                 APPEND_CHECK(append_property(message, MQTT5_PROPERTY_RESPONSE_TOPIC, 2, property->response_topic,
                                              strlen(property->response_topic)), fail_message(message));
@@ -1485,24 +1501,14 @@ mqtt_message_t *mqtt5_msg_subscribe(mqtt_message_t *message, const esp_mqtt_topi
         }
 
         if (property && property->is_share_subscribe) {
-            uint16_t shared_topic_size = strlen(topic_list[topic_number].filter) + strlen(MQTT5_SHARED_SUB) + strlen(
-                                             property->share_name);
-            char *shared_topic = calloc(1, shared_topic_size);
-
-            if (!shared_topic) {
-                ESP_LOGE(TAG, "Failed to calloc %d memory", shared_topic_size);
-                fail_message(message);
-            }
-
-            snprintf(shared_topic, shared_topic_size, MQTT5_SHARED_SUB, property->share_name, topic_list[topic_number].filter);
-
-            if (append_property(message, 0, 2, shared_topic, strlen(shared_topic)) == -1) {
-                ESP_LOGE(TAG, "%s(%d) fail", __FUNCTION__, __LINE__);
-                free(shared_topic);
+            if (!property->share_name) {
                 return fail_message(message);
             }
 
-            free(shared_topic);
+            const char *const parts[] = {MQTT5_SHARED_SUB_PREFIX, property->share_name, "/",
+                                         topic_list[topic_number].filter
+                                        };
+            APPEND_CHECK(append_joined_string(message, 0, parts, 4), fail_message(message));
         } else {
             APPEND_CHECK(append_property(message, 0, 2, topic_list[topic_number].filter,
                                          strlen(topic_list[topic_number].filter)), fail_message(message));
@@ -1600,23 +1606,12 @@ mqtt_message_t *mqtt5_msg_unsubscribe(mqtt_message_t *message, const char *topic
                                            properties_offset), fail_message(message));
 
     if (property && property->is_share_subscribe) {
-        uint16_t shared_topic_size = strlen(topic) + strlen(MQTT5_SHARED_SUB) + strlen(property->share_name);
-        char *shared_topic = calloc(1, shared_topic_size);
-
-        if (!shared_topic) {
-            ESP_LOGE(TAG, "Failed to calloc %d memory", shared_topic_size);
-            fail_message(message);
-        }
-
-        snprintf(shared_topic, shared_topic_size, MQTT5_SHARED_SUB, property->share_name, topic);
-
-        if (append_property(message, 0, 2, shared_topic, strlen(shared_topic)) == -1) {
-            ESP_LOGE(TAG, "%s(%d) fail", __FUNCTION__, __LINE__);
-            free(shared_topic);
+        if (!property->share_name) {
             return fail_message(message);
         }
 
-        free(shared_topic);
+        const char *const parts[] = {MQTT5_SHARED_SUB_PREFIX, property->share_name, "/", topic};
+        APPEND_CHECK(append_joined_string(message, 0, parts, 4), fail_message(message));
     } else {
         APPEND_CHECK(append_property(message, 0, 2, topic, strlen(topic)), fail_message(message));
     }
