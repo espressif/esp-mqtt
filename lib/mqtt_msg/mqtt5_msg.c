@@ -1357,7 +1357,7 @@ mqtt_message_t *mqtt5_msg_subscribe(mqtt_message_t *message, const esp_mqtt_topi
 
             if (!shared_topic) {
                 ESP_LOGE(TAG, "Failed to calloc %d memory", shared_topic_size);
-                fail_message(message);
+                return fail_message(message);
             }
 
             snprintf(shared_topic, shared_topic_size, MQTT5_SHARED_SUB, property->share_name, topic_list[topic_number].filter);
@@ -1471,7 +1471,7 @@ mqtt_message_t *mqtt5_msg_unsubscribe(mqtt_message_t *message, const char *topic
 
         if (!shared_topic) {
             ESP_LOGE(TAG, "Failed to calloc %d memory", shared_topic_size);
-            fail_message(message);
+            return fail_message(message);
         }
 
         snprintf(shared_topic, shared_topic_size, MQTT5_SHARED_SUB, property->share_name, topic);
