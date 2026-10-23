@@ -21,3 +21,57 @@ include:
       inputs:
           build-job-tags: ["brew", "build"]
           job-suffix: ":idf-v5.4"
+
+.rules_skip_on_master_push: &rules_skip_on_master_push
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "schedule"
+        - if: $CI_COMMIT_REF_NAME == "master" && $CI_PIPELINE_SOURCE == "push"
+          when: never
+        - when: on_success
+
+generate_build_child_pipeline:idf-latest:
+    needs:
+        - job: pipeline_variables:idf-latest
+        - job: baseline_manifest_sha:idf-latest
+          optional: true
+        - job: changed-files
+
+generate_build_child_pipeline:idf-v6.1:
+    needs:
+        - job: pipeline_variables:idf-v6.1
+        - job: baseline_manifest_sha:idf-v6.1
+          optional: true
+        - job: changed-files
+
+generate_build_child_pipeline:idf-v6.0:
+    needs:
+        - job: pipeline_variables:idf-v6.0
+        - job: baseline_manifest_sha:idf-v6.0
+          optional: true
+        - job: changed-files
+
+generate_build_child_pipeline:idf-v5.5:
+    needs:
+        - job: pipeline_variables:idf-v5.5
+        - job: baseline_manifest_sha:idf-v5.5
+          optional: true
+        - job: changed-files
+
+generate_build_child_pipeline:idf-v5.4:
+    needs:
+        - job: pipeline_variables:idf-v5.4
+        - job: baseline_manifest_sha:idf-v5.4
+          optional: true
+        - job: changed-files
+
+build_child_pipeline:idf-v6.1:
+    <<: *rules_skip_on_master_push
+
+build_child_pipeline:idf-v6.0:
+    <<: *rules_skip_on_master_push
+
+build_child_pipeline:idf-v5.5:
+    <<: *rules_skip_on_master_push
+
+build_child_pipeline:idf-v5.4:
+    <<: *rules_skip_on_master_push

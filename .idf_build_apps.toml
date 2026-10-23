@@ -16,3 +16,13 @@ collect_app_info_filename = "app_info_@p.txt"
 check_manifest_rules = true
 manifest_filepatterns = ['**/.build-test-rules.yml']
 ignore_warning_files = ['.gitlab/ci/ignore_build_warnings.txt']
+
+# Rebuild everything when CI/config that controls selection changes.
+deactivate_dependency_driven_build_by_filepatterns = [
+    '.gitlab-ci.yml',
+    '.gitlab/ci/**',
+    '.idf_ci.toml',
+    '.idf_build_apps.toml',
+    '.build-test-rules.yml',
+    'conftest.py',
+]

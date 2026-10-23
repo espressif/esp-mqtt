@@ -6,6 +6,27 @@ host_tests:
     variables:
         GIT_DEPTH: 1
     needs: []
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "schedule"
+        - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)BUILD_AND_TEST_ALL_APPS(?:,|$)/'
+        - changes:
+              - mqtt_client.c
+              - mqtt5_client.c
+              - include/**/*
+              - lib/**/*
+              - CMakeLists.txt
+              - cmake/**/*
+              - Kconfig*
+              - idf_component.yml
+              - test/host/**/*
+              - test/mqtt_utils_host_test/**/*
+              - test/mqtt_outbox_host_test/**/*
+              - test/mqtt_msg_host_test/**/*
+              - .gitlab-ci.yml
+              - .gitlab/ci/test.yml
+              - .idf_ci.toml
+              - .idf_build_apps.toml
+              - .build-test-rules.yml
     coverage: '/^lines:\s+(\d+\.\d+)\%/'
     artifacts:
         paths:
