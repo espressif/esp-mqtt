@@ -4,12 +4,19 @@ if(CONFIG_MQTT_PROTOCOL_5)
     list(APPEND srcs mqtt5_client.c)
 endif()
 
+set(priv_requires esp_timer http_parser esp_hw_support heap)
+idf_build_get_property(target IDF_TARGET)
+if(NOT target STREQUAL "linux")
+    # eventfd, to wake the client task when a message is enqueued
+    list(APPEND priv_requires vfs)
+endif()
+
 list(TRANSFORM srcs PREPEND ${CMAKE_CURRENT_LIST_DIR}/)
 idf_component_register(SRCS "${srcs}"
                     INCLUDE_DIRS ${CMAKE_CURRENT_LIST_DIR}/include ${CMAKE_CURRENT_LIST_DIR}/lib/mqtt_msg/include
                     PRIV_INCLUDE_DIRS ${CMAKE_CURRENT_LIST_DIR}/lib/include
                     REQUIRES esp_event tcp_transport
-                    PRIV_REQUIRES esp_timer http_parser esp_hw_support heap
+                    PRIV_REQUIRES ${priv_requires}
                     KCONFIG ${CMAKE_CURRENT_LIST_DIR}/Kconfig
                     )
 
