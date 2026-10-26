@@ -67,7 +67,7 @@ typedef struct {
  *  MQTT5 protocol subscribe properties configuration, more details refer to MQTT5 protocol document section 3.8.2.1
  */
 typedef struct {
-    uint16_t subscribe_id;                       /*!< A variable byte represents the identifier of the subscription */
+    uint32_t subscribe_id;                       /*!< A variable byte represents the identifier of the subscription, 1 to 268435455 (0 for none) */
     bool no_local_flag;                          /*!< Subscription Option to allow that server publish message that client sent */
     bool retain_as_published_flag;               /*!< Subscription Option to keep the retain flag as published option */
     uint8_t retain_handle;                       /*!< Subscription Option to handle retain option */
