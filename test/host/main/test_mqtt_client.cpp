@@ -421,6 +421,44 @@ SCENARIO("MQTT Client Operation")
                             MQTT_CLIENT_STATE_NOT_STARTED);
                 }
             }
+            SECTION("get_uri builds the URI without user info") {
+                char uri[64];
+                REQUIRE(esp_mqtt_client_get_uri(client.get(), uri, sizeof(uri)) == ESP_OK);
+                REQUIRE(std::string{uri} == "mqtt://1.1.1.1");
+                REQUIRE(esp_mqtt_client_set_uri(client.get(),
+                                                "wss://user:pass@broker.local:8443/mqtt") == ESP_OK);
+                REQUIRE(esp_mqtt_client_get_uri(client.get(), uri, sizeof(uri)) == ESP_OK);
+                REQUIRE(std::string{uri} == "wss://broker.local:8443/mqtt");
+                REQUIRE(esp_mqtt_client_set_uri(client.get(), "mqtt://[::1]:1883") == ESP_OK);
+                REQUIRE(esp_mqtt_client_get_uri(client.get(), uri, sizeof(uri)) == ESP_OK);
+                REQUIRE(std::string{uri} == "mqtt://[::1]:1883");
+                SECTION("and truncates to the buffer") {
+                    char small[8];
+                    REQUIRE(esp_mqtt_client_get_uri(client.get(), small, sizeof(small)) ==
+                            ESP_ERR_INVALID_SIZE);
+                    REQUIRE(std::string{small} == "mqtt://");
+                }
+                SECTION("and rejects bad arguments") {
+                    REQUIRE(esp_mqtt_client_get_uri(nullptr, uri, sizeof(uri)) == ESP_ERR_INVALID_ARG);
+                    REQUIRE(esp_mqtt_client_get_uri(client.get(), nullptr, sizeof(uri)) ==
+                            ESP_ERR_INVALID_ARG);
+                    REQUIRE(esp_mqtt_client_get_uri(client.get(), uri, 0) == ESP_ERR_INVALID_ARG);
+                }
+            }
+            SECTION("get_client_id returns the configured or generated ID") {
+                char id[64];
+                REQUIRE(esp_mqtt_client_get_client_id(client.get(), id, sizeof(id)) == ESP_OK);
+                REQUIRE_FALSE(std::string{id}.empty());
+                config.credentials.client_id = "configured-id";
+                REQUIRE(esp_mqtt_set_config(client.get(), &config) == ESP_OK);
+                REQUIRE(esp_mqtt_client_get_client_id(client.get(), id, sizeof(id)) == ESP_OK);
+                REQUIRE(std::string{id} == "configured-id");
+                char small[4];
+                REQUIRE(esp_mqtt_client_get_client_id(client.get(), small, sizeof(small)) ==
+                        ESP_ERR_INVALID_SIZE);
+                REQUIRE(std::string{small} == "con");
+                REQUIRE(esp_mqtt_client_get_client_id(nullptr, id, sizeof(id)) == ESP_ERR_INVALID_ARG);
+            }
         }
         SECTION("Client with all allocating configuration set") {
             xQueueCreateMutex_IgnoreAndReturn(
