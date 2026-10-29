@@ -9,15 +9,15 @@ import socket
 import subprocess
 import time
 import typing as t
-import warnings
 from pathlib import Path
-
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", DeprecationWarning)
-    from telnetlib import Telnet
 
 import pytest
 from pytest_embedded_idf import IdfDut
+
+try:
+    from pytest_embedded_jtag._telnetlib.telnetlib import Telnet
+except ImportError:
+    from telnetlib import Telnet
 
 
 _MQTT_CONFORMANCE_DIR = Path(__file__).parent / "test" / "apps" / "mqtt_conformance"

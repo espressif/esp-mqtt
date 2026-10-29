@@ -1,0 +1,7 @@
+menu "Host-test config"
+
+    config GCOV_ENABLED
+        bool "Coverage analyzer"
+        default n
+
+endmenu
