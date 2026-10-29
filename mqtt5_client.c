@@ -11,6 +11,7 @@
 #include "mqtt5_client.h"
 #include "mqtt5_msg.h"
 #include "esp_log.h"
+#include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
 
@@ -144,6 +145,8 @@ esp_err_t esp_mqtt5_parse_connack(esp_mqtt5_client_handle_t client, int *connect
     client->mqtt_state.inbound_message.read_len = 0;
     uint8_t ack_flag = 0;
     client->mqtt5_config->server_resp_property_info.receive_maximum = MQTT5_DEFAULT_RECEIVE_MAXIMUM;
+    free(client->mqtt5_config->server_resp_property_info.response_info);
+    client->mqtt5_config->server_resp_property_info.response_info = NULL;
 
     if (mqtt5_msg_parse_connack_property(client->mqtt_state.inbound_message.data, len, &client->mqtt_state.
                                          connection.information, &client->mqtt5_config->connect_property_info, &client->mqtt5_config->server_resp_property_info,

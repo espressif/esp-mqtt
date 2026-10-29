@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <stdlib.h>
 #include <string.h>
 #include "mqtt5_msg.h"
 #include "esp_err.h"
@@ -983,6 +984,7 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
     }
 
     uint8_t *property = (buffer + offset);
+    bool resp_info_seen = false;
 
     while (property_offset < property_len) {
         uint8_t property_id = property[property_offset ++];
@@ -1170,10 +1172,12 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
             ESP_LOGD(TAG, "MQTT5_PROPERTY_SERVER_KEEP_ALIVE %lld", connection_info->keepalive);
             continue;
 
-        case MQTT5_PROPERTY_RESP_INFO:
-            if (resp_property->response_info) {
-                free(resp_property->response_info);
+        case MQTT5_PROPERTY_RESP_INFO: {
+            if (resp_info_seen) {
+                return ESP_FAIL;
             }
+
+            resp_info_seen = true;
 
             if (!mqtt5_property_has_bytes(property_offset, 2, property_len)) {
                 return ESP_FAIL;
@@ -1185,18 +1189,20 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
                 return ESP_FAIL;
             }
 
-            resp_property->response_info = calloc(1, len + 1);
+            char *response_info = calloc(1, len + 1);
 
-            if (!resp_property->response_info) {
+            if (!response_info) {
                 ESP_LOGE(TAG, "Failed to calloc %d data", len);
                 return ESP_FAIL;
             }
 
-            memcpy(resp_property->response_info, &property[property_offset], len);
-            resp_property->response_info[len] = '\0';
+            memcpy(response_info, &property[property_offset], len);
+            free(resp_property->response_info);
+            resp_property->response_info = response_info;
             property_offset += len;
             ESP_LOGD(TAG, "MQTT5_PROPERTY_RESP_INFO %s", resp_property->response_info);
             continue;
+        }
 
         case MQTT5_PROPERTY_SERVER_REFERENCE: //only print now
             if (!mqtt5_property_has_bytes(property_offset, 2, property_len)) {
