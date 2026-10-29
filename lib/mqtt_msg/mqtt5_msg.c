@@ -662,19 +662,35 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
 
 char *mqtt5_get_suback_data(uint8_t *buffer, size_t *length, mqtt5_user_property_handle_t *user_property)
 {
-    uint8_t len_bytes = 0;
-    size_t offset = 1;
-    size_t totlen = get_variable_len(buffer, offset, *length, &len_bytes);
-    offset += len_bytes;
-    totlen += offset;
-
     if (*user_property) {
         ESP_LOGE(TAG, "user_property not freed before mqtt5_get_suback_data");
         mqtt5_msg_delete_user_property(*user_property);
         *user_property = NULL;
     }
 
+    if (*length < 2) {
+        *length = 0;
+        return NULL;
+    }
+
+    uint8_t len_bytes = 0;
+    size_t offset = 1;
+    size_t totlen = get_variable_len(buffer, offset, *length, &len_bytes);
+
+    if (len_bytes == 0 || totlen > SIZE_MAX - offset) {
+        *length = 0;
+        return NULL;
+    }
+
+    offset += len_bytes;
+    totlen += offset;
+
     if (totlen > *length) {
+        *length = 0;
+        return NULL;
+    }
+
+    if (offset + 2 > totlen) {
         *length = 0;
         return NULL;
     }
@@ -687,6 +703,12 @@ char *mqtt5_get_suback_data(uint8_t *buffer, size_t *length, mqtt5_user_property
     }
 
     size_t property_len = get_variable_len(buffer, offset, totlen, &len_bytes);
+
+    if (len_bytes == 0) {
+        *length = 0;
+        return NULL;
+    }
+
     offset += len_bytes;
 
     if (property_len > (totlen - offset)) {
