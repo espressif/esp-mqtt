@@ -361,7 +361,17 @@ uint16_t mqtt5_get_id(uint8_t *buffer, size_t length)
     int topiclen = 0;
     uint8_t len_bytes = 0;
     size_t offset = 1;
+
+    if (length < 2) {
+        return 0;
+    }
+
     get_variable_len(buffer, offset, length, &len_bytes);
+
+    if (len_bytes == 0) {
+        return 0;
+    }
+
     offset += len_bytes;
 
     if (offset + 2 > length) {
@@ -371,13 +381,18 @@ uint16_t mqtt5_get_id(uint8_t *buffer, size_t length)
     switch (mqtt5_get_type(buffer)) {
     case MQTT_MSG_TYPE_PUBLISH: {
         MQTT5_CONVERT_ONE_BYTE_TO_TWO(topiclen, buffer[offset++], buffer[offset++])
-        offset += topiclen;
 
-        if (offset + 2 > length) {
+        if ((size_t)topiclen > length - offset) {
             return 0;
         }
 
+        offset += topiclen;
+
         if (mqtt_get_qos(buffer) == 0) {
+            return 0;
+        }
+
+        if (offset + 2 > length) {
             return 0;
         }
 
