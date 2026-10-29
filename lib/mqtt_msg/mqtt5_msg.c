@@ -945,25 +945,40 @@ esp_err_t mqtt5_msg_parse_connack_property(uint8_t *buffer, size_t buffer_len, m
 {
     *reason_code = 0;
     *user_property = NULL;
+
+    if (buffer_len < 2) {
+        return ESP_FAIL;
+    }
+
     uint8_t len_bytes = 0;
     size_t offset = 1;
     size_t totlen = get_variable_len(buffer, offset, buffer_len, &len_bytes);
+
+    if (len_bytes == 0 || totlen > SIZE_MAX - offset) {
+        return ESP_FAIL;
+    }
+
     offset += len_bytes;
     totlen += offset;
 
-    if (totlen > buffer_len) {
+    if (totlen > buffer_len || offset + 2 > totlen) {
         ESP_LOGE(TAG, "Total length %d is over read len %d", totlen, buffer_len);
         return ESP_FAIL;
     }
 
     *ack_flag = buffer[offset ++]; //acknowledge flags
     *reason_code = buffer[offset ++]; //reason code
-    size_t property_len = get_variable_len(buffer, offset, buffer_len, &len_bytes);
+    size_t property_len = get_variable_len(buffer, offset, totlen, &len_bytes);
+
+    if (len_bytes == 0) {
+        return ESP_FAIL;
+    }
+
     offset += len_bytes;
     uint16_t property_offset = 0, len = 0;
 
-    if (property_len > (buffer_len - offset)) {
-        ESP_LOGE(TAG, "Property length %d exceeds buffer bounds %d", property_len, buffer_len - offset);
+    if (property_len > (totlen - offset)) {
+        ESP_LOGE(TAG, "Property length %d exceeds packet bounds %d", property_len, totlen - offset);
         return ESP_FAIL;
     }
 
