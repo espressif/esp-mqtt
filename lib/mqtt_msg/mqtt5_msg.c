@@ -1366,10 +1366,20 @@ mqtt_message_t *mqtt5_msg_publish(mqtt_message_t *message, const char *topic, co
 
 int mqtt5_msg_get_reason_code(uint8_t *buffer, size_t length)
 {
+    if (length < 2) {
+        return -1;
+    }
+
     uint8_t len_bytes = 0;
     size_t offset = 1; // Message type
     size_t variable_len = get_variable_len(buffer, offset, length, &len_bytes);
+
+    if (len_bytes == 0 || variable_len > length - 1 - len_bytes) {
+        return -1;
+    }
+
     offset += len_bytes;
+    size_t packet_end = offset + variable_len;
     uint8_t type = mqtt5_get_type(buffer);
 
     switch (type) {
@@ -1383,7 +1393,7 @@ int mqtt5_msg_get_reason_code(uint8_t *buffer, size_t length)
 
         offset += 2; //skip the message id
 
-        if (offset >= length) {
+        if (offset >= packet_end) {
             ESP_LOGE(TAG, "Invalid control packet type %d, reason code is absent", type);
             return -1;
         }
@@ -1392,16 +1402,25 @@ int mqtt5_msg_get_reason_code(uint8_t *buffer, size_t length)
 
     case MQTT_MSG_TYPE_SUBACK:
     case MQTT_MSG_TYPE_UNSUBACK: {
-        offset += 2; //skip the message id
-
-        if (offset >= length) {
+        if (offset + 2 >= packet_end) {
             return -1;
         }
 
-        size_t property_len = get_variable_len(buffer, offset, length, &len_bytes);
+        offset += 2; //skip the message id
+
+        if (offset >= packet_end) {
+            return -1;
+        }
+
+        size_t property_len = get_variable_len(buffer, offset, packet_end, &len_bytes);
+
+        if (len_bytes == 0 || property_len > packet_end - offset - len_bytes) {
+            return -1;
+        }
+
         offset = offset + len_bytes + property_len;
 
-        if (offset >= length) {
+        if (offset >= packet_end) {
             ESP_LOGE(TAG, "Invalid control packet type %d, reason code is absent", type);
             return -1;
         }
@@ -1410,7 +1429,7 @@ int mqtt5_msg_get_reason_code(uint8_t *buffer, size_t length)
     }
 
     case MQTT_MSG_TYPE_DISCONNECT:
-        if (offset >= length) {
+        if (offset >= packet_end) {
             return -1;
         } else {
             return buffer[offset];
