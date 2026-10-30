@@ -76,9 +76,10 @@ pre_release_validate_push:
     - build
     - internet
   needs: []
-  except:
-    - master
-  when: on_success
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master")'
+      when: on_success
+    - when: never
   allow_failure: false
   script:
     - *deploy_check_github_fast_forward
