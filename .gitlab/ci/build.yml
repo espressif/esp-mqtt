@@ -25,7 +25,9 @@ include:
 .rules_skip_on_master_push: &rules_skip_on_master_push
     rules:
         - if: $CI_PIPELINE_SOURCE == "schedule"
-        - if: $CI_COMMIT_REF_NAME == "master" && $CI_PIPELINE_SOURCE == "push"
+        - if: '$CI_COMMIT_REF_NAME == "master" && $CI_PIPELINE_SOURCE == "push"'
+          when: never
+        - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "master"'
           when: never
         - when: on_success
 
