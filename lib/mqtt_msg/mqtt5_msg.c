@@ -420,33 +420,68 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
                                          mqtt5_user_property_handle_t *user_property)
 {
     *user_property = NULL;
+    *msg_topic = NULL;
+    *msg_topic_len = 0;
+    *property_len = 0;
+    *payload_len = 0;
+
+    if (buffer_length < 2) {
+        return NULL;
+    }
+
     uint8_t len_bytes = 0;
     size_t offset = 1;
     size_t totlen = get_variable_len(buffer, offset, buffer_length, &len_bytes);
+
+    if (len_bytes == 0) {
+        return NULL;
+    }
+
     offset += len_bytes;
+
+    if (totlen > SIZE_MAX - offset || offset + 2 > buffer_length) {
+        return NULL;
+    }
+
     totlen += offset;
+    size_t available_end = totlen <= buffer_length ? totlen : buffer_length;
+
+    if (offset + 2 > available_end) {
+        return NULL;
+    }
+
     size_t topic_len = buffer[offset ++] << 8;
     topic_len |= buffer[offset ++] & 0xff;
+
+    if (topic_len > available_end - offset) {
+        return NULL;
+    }
+
     *msg_topic = (char *)(buffer + offset);
     *msg_topic_len = topic_len;
     offset += topic_len;
 
-    if (offset >= buffer_length) {
+    if (offset >= available_end) {
         return NULL;
     }
 
     if (mqtt5_get_qos(buffer) > 0) {
-        if (offset + 2 >= buffer_length) {
+        if (offset + 2 >= available_end) {
             return NULL;
         }
 
         offset += 2; // skip the message id
     }
 
-    *property_len = get_variable_len(buffer, offset, buffer_length, &len_bytes);
+    *property_len = get_variable_len(buffer, offset, available_end, &len_bytes);
+
+    if (len_bytes == 0) {
+        return NULL;
+    }
+
     offset += len_bytes;
 
-    if (offset > buffer_length || *property_len > (buffer_length - offset)) {
+    if (offset > available_end || *property_len > (available_end - offset)) {
         return NULL;
     }
 
@@ -617,12 +652,11 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
 
     offset += property_offset;
 
-    if (totlen <= buffer_length) {
-        *payload_len = totlen - offset;
-    } else {
-        *payload_len = buffer_length - offset;
+    if (offset > available_end) {
+        return NULL;
     }
 
+    *payload_len = available_end - offset;
     return (char *)(buffer + offset);
 }
 
