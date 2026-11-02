@@ -15,9 +15,24 @@ target_compile_options(mqtt_msg_lib PRIVATE ${SANITIZER_FLAGS})
 
 target_link_libraries(${COMPONENT_LIB} PUBLIC
     idf::mqtt::msg
-    Catch2::Catch2WithMain
+    Catch2::Catch2
     rapidcheck
     rapidcheck_catch)
+
+target_precompile_headers(${COMPONENT_LIB} PRIVATE
+    <catch2/catch_test_macros.hpp>
+    <catch2/generators/catch_generators.hpp>
+    <catch2/generators/catch_generators_range.hpp>
+    <rapidcheck.h>
+    <rapidcheck/catch.h>
+    <algorithm>
+    <array>
+    <cstdint>
+    <memory>
+    <string>
+    <string_view>
+    <vector>
+)
 
 if(CONFIG_GCOV_ENABLED)
     target_compile_options(mqtt_msg_lib PUBLIC --coverage -fprofile-arcs -ftest-coverage)
