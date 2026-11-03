@@ -67,7 +67,7 @@ typedef struct {
     uint16_t correlation_data_len;
     char *content_type;
     int content_type_len;
-    uint16_t subscribe_id;
+    uint32_t subscribe_id;
 } esp_mqtt5_publish_resp_property_t;
 
 typedef struct {
