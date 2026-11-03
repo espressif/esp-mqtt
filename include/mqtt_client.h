@@ -421,6 +421,33 @@ esp_err_t esp_mqtt_client_set_uri(esp_mqtt_client_handle_t client,
                                   const char *uri);
 
 /**
+ * @brief Gets the URI of the broker the client connects to, built from the configured scheme,
+ * host, port and path. User info is left out. The port is left out while it is unset,
+ * until the first connection fills in the scheme's default.
+ *
+ * @param client     *MQTT* client handle
+ * @param uri        Buffer to write the null-terminated URI to
+ * @param max_len    Size of the buffer, including the null terminator
+ * @return ESP_OK on success
+ *         ESP_ERR_INVALID_ARG on null arguments or a zero max_len
+ *         ESP_ERR_INVALID_SIZE if the URI did not fit and was truncated
+ */
+esp_err_t esp_mqtt_client_get_uri(esp_mqtt_client_handle_t client, char *uri, size_t max_len);
+
+/**
+ * @brief Gets the client identifier the client connects with, including one generated
+ * when none was configured. Empty when the client is configured with a null client id.
+ *
+ * @param client     *MQTT* client handle
+ * @param client_id  Buffer to write the null-terminated client identifier to
+ * @param max_len    Size of the buffer, including the null terminator
+ * @return ESP_OK on success
+ *         ESP_ERR_INVALID_ARG on null arguments or a zero max_len
+ *         ESP_ERR_INVALID_SIZE if the client identifier did not fit and was truncated
+ */
+esp_err_t esp_mqtt_client_get_client_id(esp_mqtt_client_handle_t client, char *client_id, size_t max_len);
+
+/**
  * @brief Starts *MQTT* client with already created client handle
  *
  * @param client    *MQTT* client handle
