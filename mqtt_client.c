@@ -17,6 +17,14 @@
 #include "mqtt_outbox.h"
 #include "mqtt_utils.h"
 
+#include <sys/select.h>
+#include <unistd.h>
+// The linux target keeps the timed wait: its eventfd and select() depend on the host and on vfs
+#if !CONFIG_IDF_TARGET_LINUX
+#include "esp_vfs_eventfd.h"
+#define MQTT_WAKE_FD 1
+#endif
+
 _Static_assert(sizeof(uint64_t) == sizeof(outbox_tick_t), "mqtt-client tick type size different from outbox tick type");
 _Static_assert(MQTT_EVENT_ANY == ESP_EVENT_ANY_ID, "mqtt-client event enum does not match the global EVENT_ANY_ID");
 
@@ -973,6 +981,21 @@ static bool create_client_data(esp_mqtt_client_handle_t client)
     ESP_MEM_CHECK(TAG, client->outbox, return false);
     client->status_bits = xEventGroupCreate();
     ESP_MEM_CHECK(TAG, client->status_bits, return false);
+    client->wake_fd = -1;
+#ifdef MQTT_WAKE_FD
+    // Registered once for the whole firmware; another component may have done it already.
+    esp_vfs_eventfd_config_t eventfd_config = ESP_VFS_EVENTD_CONFIG_DEFAULT();
+    esp_err_t registered = esp_vfs_eventfd_register(&eventfd_config);
+
+    if (registered == ESP_OK || registered == ESP_ERR_INVALID_STATE) {
+        client->wake_fd = eventfd(0, 0);
+    }
+
+    if (client->wake_fd < 0) {
+        ESP_LOGW(TAG, "No eventfd: queued messages wait for the next poll");
+    }
+
+#endif
     return true;
 }
 
@@ -1049,6 +1072,10 @@ esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client)
 
     if (client->api_lock) {
         vSemaphoreDelete(client->api_lock);
+    }
+
+    if (client->wake_fd >= 0) {
+        close(client->wake_fd);
     }
 
     free(client->event.error_handle);
@@ -1914,6 +1941,79 @@ static void mqtt_delete_expired_messages(esp_mqtt_client_handle_t client)
 #endif
 }
 
+/* Waits up to timeout_ms for input, or for esp_mqtt_client_enqueue() to queue something.
+   Returns as esp_transport_poll_read() does: > 0 readable, 0 nothing, < 0 error. */
+static int mqtt_wait_for_input_or_queued(esp_mqtt_client_handle_t client, int timeout_ms)
+{
+    int socket = client->wake_fd >= 0 ? esp_transport_get_socket(client->transport.handle) : -1;
+
+    if (socket < 0) {
+        return esp_transport_poll_read(client->transport.handle, timeout_ms);
+    }
+
+    // Bytes the TLS layer has already decrypted are invisible to select(), so ask the transport
+    // first.
+    int ready = esp_transport_poll_read(client->transport.handle, 0);
+
+    if (ready != 0) {
+        return ready;
+    }
+
+    fd_set readset;
+    fd_set errset;
+    FD_ZERO(&readset);
+    FD_ZERO(&errset);
+    FD_SET(socket, &readset);
+    FD_SET(socket, &errset);
+    FD_SET(client->wake_fd, &readset);
+    struct timeval timeout = { .tv_sec = timeout_ms / 1000, .tv_usec = (timeout_ms % 1000) * 1000 };
+    int selected = select((socket > client->wake_fd ? socket : client->wake_fd) + 1, &readset, NULL, &errset, &timeout);
+
+    if (selected < 0) {
+        return -1;
+    }
+
+    if (FD_ISSET(client->wake_fd, &readset)) {
+        uint64_t count;
+
+        if (read(client->wake_fd, &count, sizeof(count)) < 0) {
+            ESP_LOGD(TAG, "Failed to clear the wake event: %d", errno);
+        }
+    }
+
+    if (FD_ISSET(socket, &readset) || FD_ISSET(socket, &errset)) {
+        // Let the transport classify it, capturing the socket's error as it would.
+        return esp_transport_poll_read(client->transport.handle, 0);
+    }
+
+    return 0;
+}
+
+/* The next queued message that may go out now: MQTT 5's Receive Maximum holds back QoS 1 and 2
+   publishes while too many are unacknowledged. */
+static outbox_item_handle_t mqtt_next_queued(esp_mqtt_client_handle_t client)
+{
+    outbox_item_handle_t item = outbox_dequeue(client->outbox, QUEUED, NULL);
+#ifdef MQTT_PROTOCOL_5
+
+    if (item && client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5 &&
+            esp_mqtt5_client_check_inflight_maximum(client) != ESP_OK) {
+        size_t len;
+        uint16_t msg_id;
+        int msg_type = 0;
+        int msg_qos = 0;
+
+        if (outbox_item_get_data(item, &len, &msg_id, &msg_type, &msg_qos) != NULL &&
+                msg_type == MQTT_MSG_TYPE_PUBLISH && msg_qos > 0) {
+            // Receive Maximum applies only to QoS 1 and QoS 2.
+            item = mqtt_get_queued_qos0(client->outbox);
+        }
+    }
+
+#endif
+    return item;
+}
+
 /**
  * @brief When using multiple queued item, we'd like to reduce the poll timeout to proceed with event loop execution
  */
@@ -1954,6 +2054,7 @@ static void esp_mqtt_task(void *pv)
     xEventGroupClearBits(client->status_bits, STOPPED_BIT);
 
     while (client->run) {
+        bool more_queued = false;
         MQTT_API_LOCK(client);
         run_event_loop(client);
         // delete long pending messages
@@ -2052,24 +2153,7 @@ static void esp_mqtt_task(void *pv)
             }
 
             // resend all non-transmitted messages first
-            outbox_item_handle_t item = outbox_dequeue(client->outbox, QUEUED, NULL);
-#ifdef MQTT_PROTOCOL_5
-
-            if (item && client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5 &&
-                    esp_mqtt5_client_check_inflight_maximum(client) != ESP_OK) {
-                size_t len;
-                uint16_t msg_id;
-                int msg_type = 0;
-                int msg_qos = 0;
-
-                if (outbox_item_get_data(item, &len, &msg_id, &msg_type, &msg_qos) != NULL &&
-                        msg_type == MQTT_MSG_TYPE_PUBLISH && msg_qos > 0) {
-                    // Receive Maximum applies only to QoS 1 and QoS 2.
-                    item = mqtt_get_queued_qos0(client->outbox);
-                }
-            }
-
-#endif
+            outbox_item_handle_t item = mqtt_next_queued(client);
 
             if (item) {
                 if (mqtt_resend_queued(client, item) == ESP_OK) {
@@ -2092,6 +2176,7 @@ static void esp_mqtt_task(void *pv)
                     }
                 }
 
+                more_queued = mqtt_next_queued(client) != NULL;
                 // resend other "transmitted" messages after 1s
             } else if (has_timed_out(last_retransmit, client->config->message_retransmit_timeout)) {
                 last_retransmit = platform_tick_get_ms();
@@ -2150,7 +2235,10 @@ static void esp_mqtt_task(void *pv)
         MQTT_API_UNLOCK(client);
 
         if (MQTT_STATE_CONNECTED == client->state) {
-            if (esp_transport_poll_read(client->transport.handle, max_poll_timeout(client, MQTT_POLL_READ_TIMEOUT_MS)) < 0) {
+            // one queued message goes out per pass, so with more waiting only check for input
+            int timeout_ms = more_queued ? 0 : max_poll_timeout(client, MQTT_POLL_READ_TIMEOUT_MS);
+
+            if (mqtt_wait_for_input_or_queued(client, timeout_ms) < 0) {
                 ESP_LOGE(TAG, "Poll read error: %d, aborting connection", errno);
                 esp_mqtt_abort_connection(client);
             }
@@ -2733,6 +2821,14 @@ int esp_mqtt_client_enqueue(esp_mqtt_client_handle_t client, const char *topic, 
     if (ret == 0 && store == false) {
         // messages with qos=0 are not enqueued if not overridden by store_in_outobx -> indicate as error
         return -1;
+    }
+
+    if (ret >= 0 && client->wake_fd >= 0) {
+        uint64_t one = 1;
+
+        if (write(client->wake_fd, &one, sizeof(one)) < 0) {
+            ESP_LOGD(TAG, "Failed to wake the client task: %d", errno);
+        }
     }
 
     return ret;

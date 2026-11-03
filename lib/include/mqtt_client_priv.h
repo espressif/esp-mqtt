@@ -118,6 +118,9 @@ struct esp_mqtt_client {
         esp_transport_list_handle_t list;
         esp_transport_handle_t handle;
     } transport;
+    /* Written by esp_mqtt_client_enqueue() to wake the task's wait for input, so a message
+       queued from another task goes out at once; -1 without eventfd support. */
+    int wake_fd;
     mqtt_config_storage_t *config;
     mqtt_state_t  mqtt_state;
     _Atomic mqtt_client_state_t state;
