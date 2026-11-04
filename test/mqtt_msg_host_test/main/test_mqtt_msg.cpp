@@ -188,3 +188,45 @@ TEST_CASE("mqtt_msg_publish round-trips a complete packet")
         }
     });
 }
+
+TEST_CASE("mqtt5_msg encodes joined topics without truncation")
+{
+    auto contains = [](const mqtt_message_t *message, const std::string & expected) {
+        const std::string encoded(reinterpret_cast<const char *>(message->data), message->length);
+        return encoded.find(expected) != std::string::npos;
+    };
+    SECTION("response topic with response info") {
+        esp_mqtt5_publish_property_config_t property = {};
+        property.response_topic = "response";
+        MessagePtr message = make_message(64);
+        REQUIRE(message != nullptr);
+        uint16_t message_id = 1;
+        mqtt5_msg_publish(message.get(), "t", "x", 1, 1, 0, &message_id, &property, "info");
+        REQUIRE(message->length > 0);
+        REQUIRE(contains(message.get(), std::string("\x08\x00\x0d", 3) + "response/info"));
+    }
+    SECTION("shared subscribe and unsubscribe topics") {
+        const std::string expected = std::string("\x00\x10", 2) + "$share/group/a/b";
+        const esp_mqtt_topic_t topic = {.filter = "a/b", .qos = 1};
+        esp_mqtt5_subscribe_property_config_t subscribe_property = {};
+        subscribe_property.is_share_subscribe = true;
+        subscribe_property.share_name = "group";
+        MessagePtr subscribe = make_message(64);
+        REQUIRE(subscribe != nullptr);
+        uint16_t message_id = 1;
+        mqtt5_msg_subscribe(subscribe.get(), &topic, 1, &message_id, &subscribe_property);
+        REQUIRE(subscribe->length > 0);
+        REQUIRE(contains(subscribe.get(), expected));
+        esp_mqtt5_unsubscribe_property_config_t unsubscribe_property = {};
+        unsubscribe_property.is_share_subscribe = true;
+        unsubscribe_property.share_name = "group";
+        MessagePtr unsubscribe = make_message(64);
+        REQUIRE(unsubscribe != nullptr);
+        mqtt5_msg_unsubscribe(unsubscribe.get(), "a/b", &message_id, &unsubscribe_property);
+        REQUIRE(unsubscribe->length > 0);
+        REQUIRE(contains(unsubscribe.get(), expected));
+        unsubscribe_property.share_name = nullptr;
+        mqtt5_msg_unsubscribe(unsubscribe.get(), "a/b", &message_id, &unsubscribe_property);
+        REQUIRE(unsubscribe->length == 0);
+    }
+}
