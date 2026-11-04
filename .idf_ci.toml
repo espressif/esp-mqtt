@@ -1,6 +1,5 @@
 # ESP-MQTT idf-ci Configuration
 #
-# Requires idf-ci >= 1.2.2, and >= 1.3.0 for the idf-latest coverage job.
 # Keep the default generated jobs; mqtt-only behavior is injected through
 # the build template and test pipeline hooks.
 # idf-dynamic-pipeline@main sets build and test job_name_suffix from job-suffix.
@@ -47,11 +46,7 @@ job_template_jinja = """
   before_script:
     - CONSTRAINT_FILE="$(ls -1 ${IDF_TOOLS_PATH}/espidf.constraints.v*.txt 2>/dev/null | tail -1)"
     - test -f "${CONSTRAINT_FILE}"
-{% if settings.gitlab.build_pipeline.job_name_suffix == ":idf-latest" %}
-    - pip install -U 'idf-ci>=1.3.0,<2' -c "${CONSTRAINT_FILE}"
-{% else %}
-    - pip install -U 'idf-ci>=1.2.2,<2' -c "${CONSTRAINT_FILE}"
-{% endif %}
+    - pip install -U idf-ci -c "${CONSTRAINT_FILE}"
   script: |
     set -euo pipefail
     ORIG_DIR="${CI_PROJECT_DIR:-$(pwd)}"
