@@ -33,7 +33,7 @@ ESP-MQTT is available through the [ESP-IDF Component Manager](https://components
 
 ## Documentation
 
-- Documentation of ESP-MQTT API: <https://docs.espressif.com/projects/esp-mqtt/en/latest/esp32/>
+- Documentation of ESP-MQTT API: <https://docs.espressif.com/projects/esp-mqtt/en/stable/esp32/>
 
 ## License
 

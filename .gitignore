@@ -101,6 +101,7 @@ __pycache__/
 # Documentation builds
 docs/_build/
 docs/build/
+docs/_static/mqtt_docs_versions.js
 
 # Distribution/packaging
 dist/
