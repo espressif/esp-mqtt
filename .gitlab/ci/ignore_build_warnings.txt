@@ -12,3 +12,4 @@ Missing kconfig option
 Pydantic serializer warnings
 PydanticSerializationUnexpectedValue
 Defaulting to left to right union serialization
+managed_components/
