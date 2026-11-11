@@ -1949,9 +1949,9 @@ static void esp_mqtt_task(void *pv)
     esp_mqtt_client_handle_t client = (esp_mqtt_client_handle_t) pv;
     uint64_t last_retransmit = 0;
     outbox_tick_t msg_tick = 0;
-    client->run = true;
+    /* client->run and STOPPED_BIT are set by esp_mqtt_client_start() before this task exists,
+     * so that a stop or destroy that comes before this task runs is not lost. */
     client->state = MQTT_STATE_INIT;
-    xEventGroupClearBits(client->status_bits, STOPPED_BIT);
 
     while (client->run) {
         MQTT_API_LOCK(client);
@@ -2189,6 +2189,10 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
 
     esp_err_t err = ESP_OK;
     client->state = MQTT_STATE_INIT;
+    /* esp_mqtt_client_stop() and esp_mqtt_client_destroy() test client->run, and the new task may
+     * not have run yet when they are called. Set the state here, under the API lock. */
+    client->run = true;
+    xEventGroupClearBits(client->status_bits, STOPPED_BIT);
 #if MQTT_CORE_SELECTION_ENABLED
     ESP_LOGD(TAG, "Core selection enabled on %u", MQTT_TASK_CORE);
 #else
@@ -2212,6 +2216,11 @@ esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client)
     }
 
 #endif
+
+    if (err != ESP_OK) {
+        client->run = false;
+    }
+
     atomic_store(&client->task_running, err == ESP_OK);
     MQTT_API_UNLOCK(client);
     return err;

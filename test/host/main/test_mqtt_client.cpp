@@ -103,6 +103,12 @@ static BaseType_t fail_to_create_fake_task(TaskFunction_t, const char *const, co
     return pdFALSE;
 }
 
+static TaskHandle_t get_other_task_handle(int)
+{
+    static int other_task_storage;
+    return reinterpret_cast<TaskHandle_t>(&other_task_storage);
+}
+
 struct stop_wake_trace_t {
     EventGroupHandle_t event_group;
     int phase;
@@ -142,6 +148,14 @@ static EventBits_t track_event_group_wait_bits(EventGroupHandle_t event_group,
     return stopped_bit;
 }
 
+static EventBits_t cleared_bits;
+
+static EventBits_t track_event_group_clear_bits(EventGroupHandle_t, EventBits_t bits, int)
+{
+    cleared_bits |= bits;
+    return 0;
+}
+
 SCENARIO("MQTT Client Operation")
 {
     // Set expectations for the mocked calls.
@@ -172,6 +186,7 @@ SCENARIO("MQTT Client Operation")
     esp_transport_destroy_IgnoreAndReturn(ESP_OK);
     vEventGroupDelete_Ignore();
     vQueueDelete_Ignore();
+    xEventGroupClearBits_IgnoreAndReturn(0);
     GIVEN("An a minimal config") {
         static constexpr std::array<char, 36> char_set = {
             'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
@@ -373,7 +388,10 @@ SCENARIO("MQTT Client Operation")
                 using namespace test::esp_log::matchers;
                 REQUIRE_THAT(log, HasMessageIn("mqtt_client", "Core selection"));
                 // Only need to start the client, destroy is called automatically at the
-                // end of scope
+                // end of scope. The task has been created, so destroy stops it first.
+                xTaskGetCurrentTaskHandle_IgnoreAndReturn(nullptr);
+                xEventGroupSetBits_IgnoreAndReturn(0);
+                xEventGroupWaitBits_IgnoreAndReturn(1);
             }
             SECTION("Stop wakes a client waiting to reconnect") {
                 /* The host build does not run esp_mqtt_task. This checks the signal
@@ -387,6 +405,57 @@ SCENARIO("MQTT Client Operation")
                 xEventGroupSetBits_Stub(track_event_group_set_bits);
                 xEventGroupWaitBits_Stub(track_event_group_wait_bits);
                 REQUIRE(esp_mqtt_client_stop(client.get()) == ESP_OK);
+                REQUIRE(stop_wake_trace.phase == 2);
+                REQUIRE_FALSE(stop_wake_trace.invalid_call);
+            }
+            SECTION("Stop right after start stops the client") {
+                /* The host build does not run esp_mqtt_task, so the task has not
+                 * set any state when stop is called. stop() must still publish the
+                 * stop request and wait for the task to end. start() must clear
+                 * the stopped bit, or the wait of a restarted client returns at once. */
+                static constexpr EventBits_t stopped_bit = 1U << 0;
+                cleared_bits = 0;
+                xEventGroupClearBits_Stub(track_event_group_clear_bits);
+                xTaskCreatePinnedToCore_Stub(create_fake_task);
+                REQUIRE(esp_mqtt_client_start(client.get()) == ESP_OK);
+                REQUIRE((cleared_bits & stopped_bit) != 0);
+                stop_wake_trace = {
+                    reinterpret_cast<EventGroupHandle_t>(&event_group), 0, false
+                };
+                xTaskGetCurrentTaskHandle_IgnoreAndReturn(nullptr);
+                xEventGroupSetBits_Stub(track_event_group_set_bits);
+                xEventGroupWaitBits_Stub(track_event_group_wait_bits);
+                REQUIRE(esp_mqtt_client_stop(client.get()) == ESP_OK);
+                REQUIRE(stop_wake_trace.phase == 2);
+                REQUIRE_FALSE(stop_wake_trace.invalid_call);
+            }
+            SECTION("A failed start leaves the client not running") {
+                /* If the task can not be created, nothing runs. A later stop from
+                 * another task must report this. It must not publish a stop request
+                 * and wait for a task that does not exist. */
+                xTaskCreatePinnedToCore_Stub(fail_to_create_fake_task);
+                REQUIRE(esp_mqtt_client_start(client.get()) == ESP_FAIL);
+                stop_wake_trace = {
+                    reinterpret_cast<EventGroupHandle_t>(&event_group), 0, false
+                };
+                xTaskGetCurrentTaskHandle_Stub(get_other_task_handle);
+                xEventGroupSetBits_Stub(track_event_group_set_bits);
+                xEventGroupWaitBits_Stub(track_event_group_wait_bits);
+                REQUIRE(esp_mqtt_client_stop(client.get()) == ESP_FAIL);
+                REQUIRE(stop_wake_trace.phase == 0);
+            }
+            SECTION("Destroy right after start stops the client first") {
+                /* destroy() frees the client. If the task has not run yet, it must
+                 * still stop the task first, or the task runs on freed memory. */
+                xTaskCreatePinnedToCore_Stub(create_fake_task);
+                REQUIRE(esp_mqtt_client_start(client.get()) == ESP_OK);
+                stop_wake_trace = {
+                    reinterpret_cast<EventGroupHandle_t>(&event_group), 0, false
+                };
+                xTaskGetCurrentTaskHandle_IgnoreAndReturn(nullptr);
+                xEventGroupSetBits_Stub(track_event_group_set_bits);
+                xEventGroupWaitBits_Stub(track_event_group_wait_bits);
+                REQUIRE(esp_mqtt_client_destroy(client.release()) == ESP_OK);
                 REQUIRE(stop_wake_trace.phase == 2);
                 REQUIRE_FALSE(stop_wake_trace.invalid_call);
             }
