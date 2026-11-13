@@ -88,8 +88,7 @@ static size_t get_variable_len(uint8_t *buffer, size_t offset, size_t buffer_len
         }
     }
 
-    // If the varint didn't terminate within 4 bytes, treat as invalid (0 bytes consumed).
-    if ((i - offset) == 4 && i <= buffer_length && (buffer[i - 1] & 0x80)) {
+    if (i == offset || (buffer[i - 1] & 0x80)) {
         *len_bytes = 0;
         return 0;
     }
@@ -590,7 +589,7 @@ char *mqtt5_get_publish_property_payload(uint8_t *buffer, size_t buffer_length, 
         case MQTT5_PROPERTY_SUBSCRIBE_IDENTIFIER:
             resp_property->subscribe_id = get_variable_len(property, property_offset, *property_len, &len_bytes);
 
-            if (!mqtt5_property_has_bytes(property_offset, len_bytes, *property_len)) {
+            if (len_bytes == 0 || !mqtt5_property_has_bytes(property_offset, len_bytes, *property_len)) {
                 return NULL;
             }
 
