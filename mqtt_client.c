@@ -1218,12 +1218,25 @@ esp_err_t esp_mqtt_dispatch_custom_event(esp_mqtt_client_handle_t client, esp_mq
     return ret;
 }
 
+static const char s_keepalive_pingreq = (char)MQTT_KEEPALIVE_PINGREQ;
+static const char s_keepalive_pingresp = (char)MQTT_KEEPALIVE_PINGRESP;
+
 static void esp_mqtt_dispatch_keepalive_event(esp_mqtt_client_handle_t client, esp_mqtt_keepalive_kind_t kind)
 {
-    char data = (char)kind;
-    client->event.event_id = MQTT_EVENT_KEEPALIVE;
-    client->event.data_len = 1;
-    client->event.data = &data;
+    client->event = (esp_mqtt_event_t) {
+        .event_id = MQTT_EVENT_KEEPALIVE,
+        .data_len = 1,
+        .error_handle = client->event.error_handle,
+#ifdef CONFIG_MQTT_PROTOCOL_5
+        .property = client->event.property,
+#endif
+    };
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+    client->event.data = (kind == MQTT_KEEPALIVE_PINGRESP)
+                         ? (char *)&s_keepalive_pingresp
+                         : (char *)&s_keepalive_pingreq;
+#pragma GCC diagnostic pop
     esp_mqtt_dispatch_event(client);
 }
 
