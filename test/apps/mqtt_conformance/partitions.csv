@@ -1,0 +1,5 @@
+# Name,   Type, SubType, Offset,  Size, Flags
+# ESP32-Ethernet-Kit has 4 MB flash. Factory is 3 MB for the gcov image.
+nvs,      data, nvs,     0x9000,  0x6000,
+phy_init, data, phy,     0xf000,  0x1000,
+factory,  app,  factory, 0x10000, 0x300000,
