@@ -32,7 +32,10 @@ job_template_jinja = """
   tags: {{ settings.gitlab.build_pipeline.job_tags }}
   image: "{{ settings.gitlab.build_pipeline.job_image }}"
   timeout: "1h"
-{% if settings.gitlab.build_pipeline.job_name_suffix != ":idf-latest" %}
+{% if settings.gitlab.build_pipeline.job_name_suffix == ":idf-latest" %}
+  variables:
+    MQTT_CONFORMANCE_ENABLED: "1"
+{% else %}
   variables:
     MQTT_CONFORMANCE_ENABLED: "0"
 {% endif %}
@@ -73,10 +76,9 @@ job_template_jinja = """
 [gitlab.test_pipeline]
 job_before_script_extra = [
   """'OPENOCD_BIN="$(find "${IDF_TOOLS_PATH:-${HOME}/.espressif}/tools/openocd-esp32" -type f -path "*/bin/openocd" -print -quit 2>/dev/null || true)"; if [ -n "${OPENOCD_BIN}" ] && [ -x "${OPENOCD_BIN}" ]; then export PATH="$(dirname "${OPENOCD_BIN}"):${PATH}"; export OPENOCD_SCRIPTS="$(dirname "$(dirname "${OPENOCD_BIN}")")/share/openocd/scripts"; test -d "${OPENOCD_SCRIPTS}"; openocd --version; fi'""",
+  """'if printf %s "$nodes" | grep -q mqtt_conformance; then git submodule update --init --recursive test/tools/paho.mqtt.testing; fi'""",
 ]
 pre_yaml_jinja = """
-variables:
-  GIT_SUBMODULE_STRATEGY: recursive
 default:
   after_script:
     - |
