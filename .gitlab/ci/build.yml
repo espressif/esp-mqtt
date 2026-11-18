@@ -64,7 +64,7 @@ generate_build_child_pipeline:idf-v5.4:
           optional: true
         - job: changed-files
 
-build_child_pipeline:idf-v6.1:
+build_child_pipeline:idf-latest:
     <<: *rules_skip_on_master_push
 
 build_child_pipeline:idf-v6.0:
