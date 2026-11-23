@@ -16,7 +16,7 @@ idf.py build monitor
 - [main/idf_component.yml](main/idf_component.yml) adds a dependency on `espressif/catch2` component.
 - [main/CMakeLists.txt](main/CMakeLists.txt) specifies the source files and registers the `main` component with `WHOLE_ARCHIVE` option enabled.
 - [CMakeLists.txt](CMakeLists.txt) includes CPM package manager and adds rapidcheck package
-- [main/test_main.cpp](main/test_main.cpp) implements the application entry point which calls the test runner.
+- [main/test_main.cpp](main/test_main.cpp) forwards the process command line to the Catch2 runner.
 - [main/test_cases.cpp](main/test_cases.cpp) implements test cases.
 - [sdkconfig.defaults](sdkconfig.defaults) sets the options required to run the example: enables C++ exceptions, increases the size of the `main` task stack, and enables C++ runtime type info.
 
@@ -33,6 +33,4 @@ OK, passed 100 tests
 OK, passed 100 tests
 ===============================================================================
 All tests passed (403 assertions in 1 test case)
-
-Test passed.
 ```

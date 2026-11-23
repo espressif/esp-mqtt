@@ -8,6 +8,22 @@ target_compile_options(${COMPONENT_LIB} PUBLIC ${SANITIZER_FLAGS} -Wno-missing-f
 target_link_options(${COMPONENT_LIB} PUBLIC ${SANITIZER_FLAGS})
 target_link_libraries(${COMPONENT_LIB} PUBLIC Catch2::Catch2WithMain rapidcheck rapidcheck_catch)
 
+set_source_files_properties(
+    "mqtt_client_test_adapter.c"
+    "mqtt5_client_test_adapter.c"
+    PROPERTIES SKIP_PRECOMPILE_HEADERS ON
+)
+
+target_precompile_headers(${COMPONENT_LIB} PRIVATE
+    <catch2/catch_test_macros.hpp>
+    <rapidcheck.h>
+    <rapidcheck/catch.h>
+    <algorithm>
+    <cstdint>
+    <string>
+    <vector>
+)
+
 idf_component_get_property(mqtt mqtt COMPONENT_LIB)
 target_compile_definitions(${mqtt} PRIVATE SOC_WIFI_SUPPORTED=1)
 target_compile_options(${mqtt} PUBLIC ${SANITIZER_FLAGS})

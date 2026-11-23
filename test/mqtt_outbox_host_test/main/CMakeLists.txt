@@ -1,6 +1,5 @@
 idf_component_register(SRCS "test_main.cpp" "test_outbox.cpp"
                        INCLUDE_DIRS "."
-                       REQUIRES freertos
                        WHOLE_ARCHIVE)
 
 set(SANITIZER_FLAGS -fsanitize=address,undefined -fno-sanitize-recover=undefined)
@@ -17,9 +16,19 @@ target_compile_options(mqtt_msg_lib PRIVATE ${SANITIZER_FLAGS})
 target_link_libraries(${COMPONENT_LIB} PUBLIC
     idf::mqtt::outbox
     idf::mqtt::msg
-    Catch2::Catch2WithMain
+    Catch2::Catch2
     rapidcheck
     rapidcheck_catch)
+
+target_precompile_headers(${COMPONENT_LIB} PRIVATE
+    <catch2/catch_test_macros.hpp>
+    <rapidcheck.h>
+    <rapidcheck/catch.h>
+    <algorithm>
+    <cstdint>
+    <string>
+    <vector>
+)
 
 if(CONFIG_GCOV_ENABLED)
     target_compile_options(mqtt_outbox_lib PUBLIC --coverage -fprofile-arcs -ftest-coverage)

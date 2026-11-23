@@ -1,45 +1,21 @@
-host_tests:
-    image: espressif/idf:release-v6.0
+.host_test_template:
+    image: espressif/idf:release-v6.1
     stage: test
     tags: [build]
     timeout: 1h
     variables:
         GIT_DEPTH: 1
+        IDF_PY_BUILD_JOBS: "4"
     needs: []
-    rules:
-        - if: $CI_PIPELINE_SOURCE == "schedule"
-        - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)BUILD_AND_TEST_ALL_APPS(?:,|$)/'
-        - changes:
-              - mqtt_client.c
-              - mqtt5_client.c
-              - include/**/*
-              - lib/**/*
-              - CMakeLists.txt
-              - cmake/**/*
-              - Kconfig*
-              - idf_component.yml
-              - test/host/**/*
-              - test/mqtt_utils_host_test/**/*
-              - test/mqtt_outbox_host_test/**/*
-              - test/mqtt_msg_host_test/**/*
-              - .gitlab-ci.yml
-              - .gitlab/ci/test.yml
-              - .idf_ci.toml
-              - .idf_build_apps.toml
-              - .build-test-rules.yml
-    coverage: '/^lines:\s+(\d+\.\d+)\%/'
     artifacts:
         paths:
             - "**/build*/build.log"
-            - "**/coverage.xml"
-            - "**/coverage.html"
+            - "gcov_host/*.json"
+            - "**/junit.xml"
         expire_in: 1 week
         when: always
         reports:
             junit: "**/junit.xml"
-            coverage_report:
-                coverage_format: cobertura
-                path: "**/coverage.xml"
     before_script:
         - CONSTRAINT_FILE="$(ls -1 ${IDF_TOOLS_PATH}/espidf.constraints.v*.txt 2>/dev/null | tail -1)"
         - test -f "${CONSTRAINT_FILE}"
@@ -53,14 +29,155 @@ host_tests:
         git worktree add --force mqtt HEAD || (echo "Worktree failed; using local clone" && git clone --local --no-hardlinks . mqtt)
         git worktree list || true
         cd mqtt
-        idf-ci build run -t linux -p test
-        cd test/host
-        ./build_linux_coverage/host_mqtt_client_test.elf -r junit -o junit.xml
-        cd ../mqtt_utils_host_test
-        ./build_linux_default/mqtt_utils_host_test.elf
-        cd ../mqtt_outbox_host_test
-        ./build_linux_coverage/mqtt_outbox_host_test.elf
-        cd ../mqtt_msg_host_test
-        ./build_linux_coverage/mqtt_msg_host_test.elf
-        cd ../..
-        gcovr --gcov-ignore-parse-errors -k -r . --exclude '.*/managed_components/.*' --print-summary --html coverage.html -x coverage.xml
+        idf-ci build run -t linux -p "${SUITE_DIR}"
+        "${ORIG_DIR}/mqtt/${SUITE_DIR}/${BUILD_DIR}/${SUITE_ELF}" -r junit -o "${ORIG_DIR}/${SUITE_DIR}/junit.xml"
+        if [ "${COLLECT_COVERAGE:-1}" = "1" ]; then
+            mkdir -p "${ORIG_DIR}/gcov_host"
+            gcovr --gcov-ignore-parse-errors -k -r . --exclude '.*/managed_components/.*' --json "${ORIG_DIR}/gcov_host/${SUITE_NAME}.json"
+        fi
+        find "${SUITE_DIR}" -type f -name 'build.log' | while IFS= read -r log_file; do
+            mkdir -p "${ORIG_DIR}/$(dirname "${log_file}")"
+            cp "${log_file}" "${ORIG_DIR}/${log_file}"
+        done
+
+.host_test_common_changes: &host_test_common_changes
+    - CMakeLists.txt
+    - cmake/**/*
+    - Kconfig*
+    - idf_component.yml
+    - .gitlab-ci.yml
+    - .gitlab/ci/test.yml
+    - .idf_ci.toml
+    - .idf_build_apps.toml
+    - .build-test-rules.yml
+
+host_tests:client:
+    extends: .host_test_template
+    variables:
+        SUITE_NAME: client
+        SUITE_DIR: test/host
+        BUILD_DIR: build_linux_coverage
+        SUITE_ELF: host_mqtt_client_test.elf
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "schedule"
+        - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)BUILD_AND_TEST_ALL_APPS(?:,|$)/'
+        - changes: *host_test_common_changes
+        - changes:
+              - mqtt_client.c
+              - mqtt5_client.c
+              - include/**/*
+              - lib/**/*
+              - test/host/**/*
+
+host_tests:mqtt_msg:
+    extends: .host_test_template
+    variables:
+        SUITE_NAME: mqtt_msg
+        SUITE_DIR: test/mqtt_msg_host_test
+        BUILD_DIR: build_linux_coverage
+        SUITE_ELF: mqtt_msg_host_test.elf
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "schedule"
+        - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)BUILD_AND_TEST_ALL_APPS(?:,|$)/'
+        - changes: *host_test_common_changes
+        - changes:
+              - include/**/*
+              - lib/include/**/*
+              - lib/mqtt_msg/**/*
+              - test/mqtt_msg_host_test/**/*
+
+host_tests:mqtt_outbox:
+    extends: .host_test_template
+    variables:
+        SUITE_NAME: mqtt_outbox
+        SUITE_DIR: test/mqtt_outbox_host_test
+        BUILD_DIR: build_linux_coverage
+        SUITE_ELF: mqtt_outbox_host_test.elf
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "schedule"
+        - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)BUILD_AND_TEST_ALL_APPS(?:,|$)/'
+        - changes: *host_test_common_changes
+        - changes:
+              - include/**/*
+              - lib/include/**/*
+              - lib/mqtt_msg/**/*
+              - lib/mqtt_outbox.c
+              - lib/mqtt_outbox/**/*
+              - test/mqtt_outbox_host_test/**/*
+
+host_tests:mqtt_utils:
+    extends: .host_test_template
+    variables:
+        SUITE_NAME: mqtt_utils
+        SUITE_DIR: test/mqtt_utils_host_test
+        BUILD_DIR: build_linux_default
+        SUITE_ELF: mqtt_utils_host_test.elf
+        COLLECT_COVERAGE: "0"
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "schedule"
+        - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)BUILD_AND_TEST_ALL_APPS(?:,|$)/'
+        - changes: *host_test_common_changes
+        - changes:
+              - include/**/*
+              - lib/include/**/*
+              - lib/mqtt_utils/**/*
+              - test/mqtt_utils_host_test/**/*
+
+host_coverage_report:
+    image: espressif/idf:release-v6.1
+    stage: test
+    tags: [build]
+    timeout: 30m
+    needs:
+        - job: host_tests:client
+          optional: true
+          artifacts: true
+        - job: host_tests:mqtt_msg
+          optional: true
+          artifacts: true
+        - job: host_tests:mqtt_outbox
+          optional: true
+          artifacts: true
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "schedule"
+        - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)BUILD_AND_TEST_ALL_APPS(?:,|$)/'
+        - changes: *host_test_common_changes
+        - changes:
+              - mqtt_client.c
+              - mqtt5_client.c
+              - include/**/*
+              - lib/include/**/*
+              - lib/mqtt_msg/**/*
+              - lib/mqtt_outbox.c
+              - lib/mqtt_outbox/**/*
+              - test/host/**/*
+              - test/mqtt_msg_host_test/**/*
+              - test/mqtt_outbox_host_test/**/*
+    coverage: '/^lines:\s+(\d+\.\d+)\%/'
+    artifacts:
+        paths:
+            - "coverage.xml"
+            - "coverage.html"
+        expire_in: 1 week
+        when: always
+        reports:
+            coverage_report:
+                coverage_format: cobertura
+                path: "coverage.xml"
+    before_script:
+        - CONSTRAINT_FILE="$(ls -1 ${IDF_TOOLS_PATH}/espidf.constraints.v*.txt 2>/dev/null | tail -1)"
+        - test -f "${CONSTRAINT_FILE}"
+        - pip install -U gcovr -c "${CONSTRAINT_FILE}"
+    script: |
+        set -euo pipefail
+        shopt -s nullglob
+        traces=(gcov_host/*.json)
+        if [ "${#traces[@]}" -eq 0 ]; then
+            echo "No host coverage tracefiles found in gcov_host/" >&2
+            exit 1
+        fi
+        trace_args=()
+        for t in "${traces[@]}"; do
+            trace_args+=(--add-tracefile "${t}")
+        done
+        gcovr "${trace_args[@]}" --print-summary --html coverage.html -x coverage.xml
