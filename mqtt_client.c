@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include "esp_err.h"
@@ -1189,6 +1190,45 @@ cleanup:
     free(new_password);
     free(user_info);
     return ret;
+}
+
+esp_err_t esp_mqtt_client_get_uri(esp_mqtt_client_handle_t client, char *uri, size_t max_len)
+{
+    if (client == NULL || uri == NULL || max_len == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    MQTT_API_LOCK(client);
+    const char *host = client->config->host ? client->config->host : "";
+    // an IPv6 address literal is bracketed in a URI
+    bool bracket = strchr(host, ':') != NULL;
+    // the port stays 0 until the first connection fills in the scheme's default
+    char port[12] = "";
+
+    if (client->config->port > 0) {
+        snprintf(port, sizeof(port), ":%d", client->config->port);
+    }
+
+    int len = snprintf(uri, max_len, "%s://%s%s%s%s%s",
+                       client->config->scheme ? client->config->scheme : MQTT_OVER_TCP_SCHEME,
+                       bracket ? "[" : "", host, bracket ? "]" : "",
+                       port,
+                       client->config->path ? client->config->path : "");
+    MQTT_API_UNLOCK(client);
+    return len >= 0 && (size_t)len < max_len ? ESP_OK : ESP_ERR_INVALID_SIZE;
+}
+
+esp_err_t esp_mqtt_client_get_client_id(esp_mqtt_client_handle_t client, char *client_id, size_t max_len)
+{
+    if (client == NULL || client_id == NULL || max_len == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    MQTT_API_LOCK(client);
+    const char *id = client->mqtt_state.connection.information.client_id;
+    size_t len = strlcpy(client_id, id ? id : "", max_len);
+    MQTT_API_UNLOCK(client);
+    return len < max_len ? ESP_OK : ESP_ERR_INVALID_SIZE;
 }
 
 static esp_err_t esp_mqtt_dispatch_event_with_msgid(esp_mqtt_client_handle_t client)
