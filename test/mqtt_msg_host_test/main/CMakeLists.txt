@@ -1,4 +1,14 @@
-idf_component_register(SRCS "test_main.cpp" "test_mqtt_msg.cpp"
+idf_component_register(SRCS "test_main.cpp"
+                            "test_mqtt_msg_platform.cpp"
+                            "test_mqtt_msg_header.cpp"
+                            "test_mqtt_msg_ping.cpp"
+                            "test_mqtt_msg_connack.cpp"
+                            "test_mqtt_msg_publish.cpp"
+                            "test_mqtt_msg_puback.cpp"
+                            "test_mqtt_msg_suback.cpp"
+                            "test_mqtt_msg_subscribe.cpp"
+                            "test_mqtt_msg_unsubscribe.cpp"
+                            "test_mqtt_msg_ack.cpp"
                        INCLUDE_DIRS "."
                        REQUIRES heap log
                        WHOLE_ARCHIVE)
