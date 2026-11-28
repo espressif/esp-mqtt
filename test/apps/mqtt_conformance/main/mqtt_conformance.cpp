@@ -115,6 +115,11 @@ void conformance_mqtt_event_handler(void *, esp_event_base_t, int32_t event_id,
 
     case MQTT_EVENT_PUBLISHED:
         ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+
+        if (event->protocol_ver == MQTT_PROTOCOL_V_5) {
+            ESP_LOGI(TAG, "PUBLISHED_REASON=%d", event->reason_code);
+        }
+
         break;
 
     case MQTT_EVENT_DATA:

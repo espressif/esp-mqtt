@@ -1738,8 +1738,22 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
 
         if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
 #ifdef MQTT_PROTOCOL_5
-            ESP_LOGI(TAG, "MQTT_MSG_TYPE_PUBREC return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.inbound_message.data,
-                                                                                              client->mqtt_state.inbound_message.read_len));
+            int pubrec_reason = mqtt5_msg_get_reason_code(client->mqtt_state.inbound_message.data,
+                                                          client->mqtt_state.inbound_message.read_len);
+            ESP_LOGI(TAG, "MQTT_MSG_TYPE_PUBREC return code is %d", pubrec_reason);
+
+            if (pubrec_reason >= 0x80) {
+                // The server refused the message: no PUBREL follows and the flow ends here [MQTT-4.3.3-4].
+                if (remove_initiator_message(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
+                    esp_mqtt5_decrement_packet_counter(client);
+                    esp_mqtt5_parse_puback(client); // a PUBREC has the layout of a PUBACK
+                    client->event.event_id = MQTT_EVENT_PUBLISHED;
+                    esp_mqtt_dispatch_event_with_msgid(client);
+                }
+
+                break;
+            }
+
             mqtt5_msg_pubrel(&client->mqtt_state.connection.outbound_message, msg_id);
 #endif
         } else {

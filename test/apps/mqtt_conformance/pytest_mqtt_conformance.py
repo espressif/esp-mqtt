@@ -36,6 +36,7 @@ CONNECT_RETRIES = int(os.getenv("MQTT_CONFORMANCE_CONNECT_RETRIES", "3"))
 RETRY_BACKOFF_SEC = float(os.getenv("MQTT_CONFORMANCE_RETRY_BACKOFF_SEC", "2"))
 DEFAULT_BROKER_RECEIVE_MAXIMUM = 2
 TEST_TIMEOUT_MARGIN_SEC = 2
+PUBREL_SETTLE_SEC = 2  # longer than the default retransmit timeout (1 s)
 
 QUOTA_REJECTION_FORBIDDEN = (
     b"MQTT5 publish check fail",
@@ -2204,3 +2205,33 @@ def test_client_shared_subscribe_not_no_local__mqtt_3_8_3_4(dut: Dut) -> None:
                 if no_local and name.startswith("$share/"):
                     illegal.append((name, no_local))
         assert not illegal, f"MQTT-3.8.3-4: DUT SUBSCRIBE set No Local on shared filter: {illegal}"
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(connect_operations=1, publish_operations=1, event_wait_operations=1) + PUBREL_SETTLE_SEC,
+    func_only=True,
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+def test_mqtt5_pubrec_with_error_ends_qos2_flow__mqtt_4_3_3_4(dut: Dut) -> None:
+    """A PUBREC with a Reason Code of 0x80 or greater ends the QoS 2 flow.
+
+    Claim ID: MQTT-4.3.3-4
+    DUT observable: MQTT_EVENT_PUBLISHED carries the PUBREC's Reason Code, and
+      the broker receives no PUBREL for the refused message
+    Violating DUT still passes?: no — a DUT that sends PUBREL, or that reports
+      the PUBCOMP's Reason Code, fails
+    """
+    refused_topic = "test_qos_1_2_errors"  # the paho broker refuses a PUBLISH to it with 0x87 (Not authorized)
+    not_authorized = 0x87
+
+    with (
+        broker_started(record_inbound_types=(MqttPacketType.PUBREL,)) as broker,
+        initialized_mqtt_client(dut, broker.uri) as client,
+        started_client(client),
+    ):
+        publish_from_dut(client, refused_topic, 2, payload_prefix="refused", message_count=1)
+        client.expect(re.compile(rb"PUBLISHED_REASON=" + str(not_authorized).encode()), timeout=DUT_EVENT_TIMEOUT)
+        # The retransmit timer would send a PUBREL again if the item were still in the outbox.
+        time.sleep(PUBREL_SETTLE_SEC)
+        assert broker.inbound_packet_identifiers(MqttPacketType.PUBREL) == []
