@@ -63,8 +63,23 @@ void esp_mqtt5_staged_property_clear(mqtt5_staged_property_t *slot)
     }
 }
 
-void esp_mqtt5_increment_packet_counter(esp_mqtt5_client_handle_t client)
+void esp_mqtt5_increment_packet_counter(esp_mqtt5_client_handle_t client, uint16_t msg_id)
 {
+    if (client->inflight_ids_len == client->inflight_ids_cap) {
+        size_t cap = client->inflight_ids_cap ? client->inflight_ids_cap * 2 : 8;
+        uint16_t *ids = realloc(client->inflight_ids, cap * sizeof(*ids));
+
+        if (!ids) {
+            // Not counted, so the quota does not apply to this packet.
+            ESP_LOGW(TAG, "No memory to track packet id %d, it is not counted", msg_id);
+            return;
+        }
+
+        client->inflight_ids = ids;
+        client->inflight_ids_cap = cap;
+    }
+
+    client->inflight_ids[client->inflight_ids_len++] = msg_id;
     client->send_publish_packet_count ++;
     ESP_LOGD(TAG, "Sent (%d) qos > 0 publish packet without ack", client->send_publish_packet_count);
 }
@@ -74,6 +89,17 @@ void esp_mqtt5_decrement_packet_counter(esp_mqtt5_client_handle_t client)
     if (client->send_publish_packet_count > 0) {
         client->send_publish_packet_count --;
         ESP_LOGD(TAG, "Receive (%d) qos > 0 publish packet with ack", client->send_publish_packet_count);
+    }
+}
+
+void esp_mqtt5_release_inflight(esp_mqtt5_client_handle_t client, uint16_t msg_id)
+{
+    for (size_t i = 0; i < client->inflight_ids_len; i++) {
+        if (client->inflight_ids[i] == msg_id) {
+            client->inflight_ids[i] = client->inflight_ids[--client->inflight_ids_len];
+            esp_mqtt5_decrement_packet_counter(client);
+            return;
+        }
     }
 }
 
@@ -434,6 +460,8 @@ esp_err_t esp_mqtt5_client_check_inflight_maximum(esp_mqtt5_client_handle_t clie
 
 void esp_mqtt5_client_destory(esp_mqtt5_client_handle_t client)
 {
+    free(client->inflight_ids);
+
     if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
         if (client->mqtt5_config) {
             free(client->mqtt5_config->will_property_info.content_type);

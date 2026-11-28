@@ -17,6 +17,8 @@ extern "C" {
 
     esp_err_t test_mqtt5_check_inflight_maximum(uint16_t send_count, uint16_t receive_maximum);
     int test_mqtt5_increment_packet_counter_with_dup(void);
+    esp_mqtt_client_handle_t test_mqtt5_flow_reset(uint16_t receive_maximum);
+    int test_mqtt5_flow_count(void);
     esp_err_t test_mqtt5_set_connect_null_property(void);
     esp_err_t test_mqtt5_set_publish_null_property(void);
     esp_err_t test_mqtt5_set_subscribe_null_property(void);
@@ -49,6 +51,61 @@ TEST_CASE("MQTT5 inflight quota uses an exact upper bound")
 TEST_CASE("MQTT5 first send on a connection counts even when PUBLISH has DUP set")
 {
     REQUIRE(test_mqtt5_increment_packet_counter_with_dup() == 1);
+}
+
+TEST_CASE("MQTT5 an ack releases the slot of the packet id that was counted")
+{
+    esp_mqtt_client_handle_t client = test_mqtt5_flow_reset(1);
+    esp_mqtt5_increment_packet_counter(client, 7);
+    REQUIRE(esp_mqtt5_client_check_inflight_maximum(client) == ESP_FAIL);
+    esp_mqtt5_release_inflight(client, 7);
+    REQUIRE(esp_mqtt5_client_check_inflight_maximum(client) == ESP_OK);
+    REQUIRE(test_mqtt5_flow_count() == 0);
+    test_mqtt5_flow_reset(0);
+}
+
+TEST_CASE("MQTT5 an ack for a packet id that was not counted releases nothing")
+{
+    esp_mqtt_client_handle_t client = test_mqtt5_flow_reset(1);
+    esp_mqtt5_release_inflight(client, 9);
+    REQUIRE(test_mqtt5_flow_count() == 0);
+    esp_mqtt5_increment_packet_counter(client, 7);
+    esp_mqtt5_release_inflight(client, 8);
+    REQUIRE(esp_mqtt5_client_check_inflight_maximum(client) == ESP_FAIL);
+    REQUIRE(test_mqtt5_flow_count() == 1);
+    test_mqtt5_flow_reset(0);
+}
+
+TEST_CASE("MQTT5 a second ack for the same packet id releases nothing")
+{
+    esp_mqtt_client_handle_t client = test_mqtt5_flow_reset(3);
+    esp_mqtt5_increment_packet_counter(client, 7);
+    esp_mqtt5_increment_packet_counter(client, 9);
+    esp_mqtt5_release_inflight(client, 7);
+    esp_mqtt5_release_inflight(client, 7);
+    REQUIRE(test_mqtt5_flow_count() == 1);
+    test_mqtt5_flow_reset(0);
+}
+
+TEST_CASE("MQTT5 the in-flight list holds more ids than its first allocation and equal ids")
+{
+    esp_mqtt_client_handle_t client = test_mqtt5_flow_reset(100);
+
+    for (uint16_t id = 1; id <= 20; id++) {
+        esp_mqtt5_increment_packet_counter(client, id);
+    }
+
+    esp_mqtt5_increment_packet_counter(client, 5); // the same id again, as after an id reuse
+    REQUIRE(test_mqtt5_flow_count() == 21);
+
+    for (uint16_t id = 20; id >= 1; id--) {
+        esp_mqtt5_release_inflight(client, id);
+    }
+
+    REQUIRE(test_mqtt5_flow_count() == 1);
+    esp_mqtt5_release_inflight(client, 5);
+    REQUIRE(test_mqtt5_flow_count() == 0);
+    test_mqtt5_flow_reset(0);
 }
 
 TEST_CASE("MQTT5 property setters reject a null property")

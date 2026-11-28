@@ -36,6 +36,7 @@ CONNECT_RETRIES = int(os.getenv("MQTT_CONFORMANCE_CONNECT_RETRIES", "3"))
 RETRY_BACKOFF_SEC = float(os.getenv("MQTT_CONFORMANCE_RETRY_BACKOFF_SEC", "2"))
 DEFAULT_BROKER_RECEIVE_MAXIMUM = 2
 TEST_TIMEOUT_MARGIN_SEC = 2
+OUTBOX_EXPIRY_SEC = 30  # OUTBOX_EXPIRED_TIMEOUT_MS default, lib/include/mqtt_config.h
 
 QUOTA_REJECTION_FORBIDDEN = (
     b"MQTT5 publish check fail",
@@ -2204,3 +2205,63 @@ def test_client_shared_subscribe_not_no_local__mqtt_3_8_3_4(dut: Dut) -> None:
                 if no_local and name.startswith("$share/"):
                     illegal.append((name, no_local))
         assert not illegal, f"MQTT-3.8.3-4: DUT SUBSCRIBE set No Local on shared filter: {illegal}"
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(
+        connect_operations=1,
+        subscribe_operations=1,
+        publish_operations=2,
+        event_wait_operations=2,
+    )
+    + OUTBOX_EXPIRY_SEC
+    + 5,
+    func_only=True,
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+@pytest.mark.parametrize(
+    "qos,completion_packet",
+    [(1, MqttPacketType.PUBACK), (2, MqttPacketType.PUBCOMP)],
+    ids=["qos1", "qos2"],
+)
+def test_mqtt5_late_ack_of_expired_publish_releases_receive_maximum(
+    dut: Dut,
+    qos: int,
+    completion_packet: MqttPacketType,
+) -> None:
+    """An acknowledgement that arrives after the outbox item expired still releases its quota.
+
+    The server holds the acknowledgement of a PUBLISH for longer than the outbox
+    expiry. The packet identifier is still in flight for the server, so the
+    quota stays used until the acknowledgement arrives, and then it is released.
+    """
+    topic = build_topic()
+    probe_payload = "after_expiry"
+
+    with (
+        broker_started(receive_maximum=1, hold_packet_types=(completion_packet,)) as broker,
+        initialized_mqtt_client(dut, broker.uri) as client,
+        started_client(client),
+    ):
+        subscribed_to(client, topic, qos)
+        try:
+            publish_from_dut(client, topic, qos, payload_prefix="expiring", message_count=1)
+            expect_n(
+                client,
+                {b"Publish requested, msg_id=": 1, b"MQTT_EVENT_DATA_PAYLOAD expiring": 1},
+                timeout=DUT_EVENT_TIMEOUT,
+            )
+            broker.wait_for_held_packets(completion_packet, 1, timeout=DUT_EVENT_TIMEOUT)
+            time.sleep(OUTBOX_EXPIRY_SEC + 3)
+            # Enqueued only now: a queued item expires too.
+            publish_from_dut(client, topic, qos, payload_prefix=probe_payload, message_count=1, enqueue=1)
+            expect_n(client, {b"Publish requested, msg_id=": 1}, timeout=DUT_CMD_TIMEOUT)
+            broker.release_held_packets(completion_packet)
+            expect_n(
+                client,
+                {f"MQTT_EVENT_DATA_PAYLOAD {probe_payload}".encode(): 1},
+                timeout=DUT_EVENT_TIMEOUT,
+            )
+        finally:
+            broker.release_all_held_packets()

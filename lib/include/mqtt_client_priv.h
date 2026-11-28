@@ -129,6 +129,9 @@ struct esp_mqtt_client {
 #ifdef MQTT_PROTOCOL_5
     mqtt5_config_storage_t *mqtt5_config;
     uint16_t send_publish_packet_count; // This is for MQTT v5.0 flow control
+    uint16_t *inflight_ids;             // Packet ids counted in send_publish_packet_count on this connection
+    size_t inflight_ids_len;
+    size_t inflight_ids_cap;
 #endif
     int wait_timeout_ms;
     int auto_reconnect;

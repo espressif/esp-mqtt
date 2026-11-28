@@ -901,6 +901,7 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
 
         if (esp_mqtt5_parse_connack(client, &connect_rsp_code) == ESP_OK) {
             client->send_publish_packet_count = 0;
+            client->inflight_ids_len = 0;
             mqtt_requeue_transmitted_messages(client);
             return ESP_OK;
         }
@@ -1715,14 +1716,16 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
         break;
 
     case MQTT_MSG_TYPE_PUBACK:
-        if (remove_initiator_message(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
 #ifdef MQTT_PROTOCOL_5
 
-            if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-                esp_mqtt5_decrement_packet_counter(client);
-            }
+        // By packet id: the outbox item may have expired before this ack.
+        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
+            esp_mqtt5_release_inflight(client, msg_id);
+        }
 
 #endif
+
+        if (remove_initiator_message(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
             ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBACK, finish QoS1 publish");
 #ifdef MQTT_PROTOCOL_5
             esp_mqtt5_parse_puback(client);
@@ -1778,15 +1781,15 @@ static esp_err_t mqtt_process_receive(esp_mqtt_client_handle_t client)
 
     case MQTT_MSG_TYPE_PUBCOMP:
         ESP_LOGD(TAG, "received MQTT_MSG_TYPE_PUBCOMP");
-
-        if (remove_initiator_message(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
 #ifdef MQTT_PROTOCOL_5
 
-            if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-                esp_mqtt5_decrement_packet_counter(client);
-            }
+        if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
+            esp_mqtt5_release_inflight(client, msg_id);
+        }
 
 #endif
+
+        if (remove_initiator_message(client, MQTT_MSG_TYPE_PUBLISH, msg_id)) {
             ESP_LOGD(TAG, "Receive MQTT_MSG_TYPE_PUBCOMP, finish QoS2 publish");
 #ifdef MQTT_PROTOCOL_5
             esp_mqtt5_parse_pubcomp(client);
@@ -2098,7 +2101,7 @@ static void esp_mqtt_task(void *pv)
 
                         if (client->mqtt_state.connection.outbound_message.type == MQTT_MSG_TYPE_PUBLISH &&
                                 client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-                            esp_mqtt5_increment_packet_counter(client);
+                            esp_mqtt5_increment_packet_counter(client, client->mqtt_state.connection.outbound_message.id);
                         }
 
 #endif
@@ -2682,7 +2685,7 @@ int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, 
 #ifdef MQTT_PROTOCOL_5
 
         if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
-            esp_mqtt5_increment_packet_counter(client);
+            esp_mqtt5_increment_packet_counter(client, pending_msg_id);
         }
 
 #endif
