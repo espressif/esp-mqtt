@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "mqtt_client_priv.h"
@@ -50,8 +51,23 @@ int test_mqtt5_increment_packet_counter_with_dup(void)
     struct esp_mqtt_client client = {0};
     uint8_t publish_header[] = {0x3a}; // PUBLISH, DUP=1, QoS=1
     client.mqtt_state.connection.outbound_message.data = publish_header;
-    esp_mqtt5_increment_packet_counter(&client);
-    return client.send_publish_packet_count;
+    esp_mqtt5_increment_packet_counter(&client, 1);
+    int count = client.send_publish_packet_count;
+    free(client.inflight_ids);
+    return count;
+}
+
+esp_mqtt_client_handle_t test_mqtt5_flow_reset(uint16_t receive_maximum)
+{
+    free(s_client.inflight_ids);
+    esp_mqtt_client_handle_t client = test_mqtt5_property_client_reset();
+    s_mqtt5_config.server_resp_property_info.receive_maximum = receive_maximum;
+    return client;
+}
+
+int test_mqtt5_flow_count(void)
+{
+    return s_client.send_publish_packet_count;
 }
 
 esp_err_t test_mqtt5_set_connect_null_property(void)
