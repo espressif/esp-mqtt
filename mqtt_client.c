@@ -957,9 +957,16 @@ static void esp_mqtt_abort_connection(esp_mqtt_client_handle_t client)
     client->tick.reconnect = platform_tick_get_ms();
     client->state = MQTT_STATE_WAIT_RECONNECT;
     ESP_LOGD(TAG, "Reconnect after %d ms", client->wait_timeout_ms);
-    client->event.event_id = MQTT_EVENT_DISCONNECTED;
     client->wait_for_ping_resp = false;
-    esp_mqtt_dispatch_event_with_msgid(client);
+    // A new event: the ack parsers leave their fields in client->event.
+    client->event = (esp_mqtt_event_t) {
+        .event_id = MQTT_EVENT_DISCONNECTED,
+        .error_handle = client->event.error_handle,
+#ifdef CONFIG_MQTT_PROTOCOL_5
+        .property = client->event.property,
+#endif
+    };
+    esp_mqtt_dispatch_event(client);
     MQTT_API_UNLOCK(client);
 }
 
