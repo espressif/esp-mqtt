@@ -2204,3 +2204,24 @@ def test_client_shared_subscribe_not_no_local__mqtt_3_8_3_4(dut: Dut) -> None:
                 if no_local and name.startswith("$share/"):
                     illegal.append((name, no_local))
         assert not illegal, f"MQTT-3.8.3-4: DUT SUBSCRIBE set No Local on shared filter: {illegal}"
+
+
+@pytest.mark.eth_ip101
+@pytest.mark.timeout(
+    case_timeout(connect_operations=1, subscribe_operations=1, event_wait_operations=2),
+    func_only=True,
+)
+@idf_parametrize("target", ["esp32"], indirect=["target"])
+def test_mqtt5_disconnected_event_does_not_carry_the_last_ack_reason_code(dut: Dut) -> None:
+    """MQTT_EVENT_DISCONNECTED after a client disconnect carries no field of the SUBACK before it."""
+    topic = build_topic()
+    with (
+        broker_started() as broker,
+        initialized_mqtt_client(dut, broker.uri) as client,
+        started_client(client),
+    ):
+        client.write(f"subscribe {topic} 1")
+        client.expect(re.compile(rb"MQTT_EVENT_SUBSCRIBED data_len=1 return_code=0x01"), timeout=DUT_SUBSCRIBE_TIMEOUT)
+        client.write("disconnect")
+        match = client.expect(re.compile(rb"DISCONNECT_REASON=(\d+)"), timeout=DUT_EVENT_TIMEOUT)
+        assert int(match.group(1)) == 0, f"DISCONNECTED carries reason code {int(match.group(1))} of the SUBACK"
